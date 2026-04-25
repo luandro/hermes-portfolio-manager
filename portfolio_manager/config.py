@@ -181,6 +181,9 @@ def _validate_and_build_projects(
             errors.extend(entry_errors)
             continue
 
+        # github_raw is guaranteed dict here (non-dict appends to entry_errors and continues)
+        assert isinstance(github_raw, dict)
+
         # 1.7 — normalize local paths
         local_raw = raw.get("local")
         project_id_str = str(raw["id"])
