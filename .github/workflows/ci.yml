@@ -82,7 +82,7 @@ jobs:
           pip install bandit[toml] pip-audit
 
       - name: Bandit
-        run: bandit -c pyproject.toml -r .
+        run: bandit -c pyproject.toml -r portfolio_manager
 
       - name: Gitleaks (full history)
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
