@@ -36,14 +36,19 @@ To run the Portfolio Manager, ensure you have the following installed on your ho
 
 ### Installation
 
-1. **Clone the repository** (or copy the plugin directory) into your Hermes plugins folder:
+1. **Clone the repository** (or symlink the plugin directory) into your Hermes plugins folder:
    ```bash
-   cp -r portfolio-manager ~/.hermes/plugins/portfolio-manager/
+   ln -s /path/to/portfolio-manager ~/.hermes/plugins/portfolio-manager
    ```
-2. **Install dependencies** (if any are specified in `pyproject.toml` outside of dev requirements):
+2. **Install dependencies using uv**:
    ```bash
-   cd ~/.hermes/plugins/portfolio-manager
-   pip install -e .
+   cd portfolio-manager
+   uv venv --python 3.11
+   uv pip install -e ".[dev]"
+   ```
+3. **Install into Hermes' Python** (so the agent can import it):
+   ```bash
+   uv pip install --python ~/.hermes/hermes-agent/venv/bin/python3 -e .
    ```
 
 ---
@@ -54,7 +59,7 @@ The plugin relies on a centralized, server-side configuration manifest. No repos
 
 **Default Configuration Path:**
 ```text
-/srv/agent-system/config/projects.yaml
+~/.agent-system/config/projects.yaml
 ```
 *(You can override this location by setting the `AGENT_SYSTEM_ROOT` environment variable).*
 

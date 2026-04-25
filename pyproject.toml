@@ -2,13 +2,15 @@
 name = "hermes-portfolio-manager"
 version = "0.1.0"
 description = "Hermes plugin to manage multiple GitHub projects from one server-side manifest. MVP 1 is read-only."
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = "MIT"
+dependencies = [
+    "pyyaml>=6",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7",
-    "pyyaml>=6",
     "pydantic>=2",
 ]
 
@@ -16,7 +18,7 @@ dev = [
 include = ["portfolio_manager*"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
@@ -43,7 +45,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -72,6 +74,6 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.bandit]
-targets = ["hermes-portfolio-manager"]
+targets = ["portfolio_manager"]
 exclude_dirs = ["tests"]
 skips = ["B101"]  # allow assert in tests

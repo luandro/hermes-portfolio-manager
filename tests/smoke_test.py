@@ -9,8 +9,7 @@ import sys
 
 
 def _get_tools_module():
-    """Import portfolio_manager.tools after adding project root to sys.path."""
-    sys.path.insert(0, "/home/luandro/Dev/hermes-multi-projects/portfolio-manager")
+    """Import portfolio_manager.tools — relies on uv editable install."""
     import portfolio_manager.tools  # fmt: skip
 
     return portfolio_manager.tools
@@ -53,7 +52,7 @@ def main():
     failed = 0
 
     print("=== Portfolio Manager — Phase 9 Smoke Tests ===\n")
-    print(f"AGENT_SYSTEM_ROOT={os.environ.get('AGENT_SYSTEM_ROOT', '/srv/agent-system (default)')}")
+    print(f"AGENT_SYSTEM_ROOT={os.environ.get('AGENT_SYSTEM_ROOT', '~/.agent-system (default)')}")
     print()
 
     # 9.1 portfolio_ping

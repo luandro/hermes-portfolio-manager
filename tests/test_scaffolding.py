@@ -35,10 +35,13 @@ class TestDevDependencies:
         dev_deps = data["project"]["optional-dependencies"]["dev"]
         assert any("pytest" in d.lower() for d in dev_deps), "pytest missing from dev deps"
 
-    def test_dev_deps_include_pyyaml(self) -> None:
+    def test_pyyaml_declared(self) -> None:
+        """pyyaml must be declared as a runtime or dev dependency."""
         data = tomllib.loads(PYPROJECT.read_text())
-        dev_deps = data["project"]["optional-dependencies"]["dev"]
-        assert any("pyyaml" in d.lower() for d in dev_deps), "pyyaml missing from dev deps"
+        runtime = data.get("project", {}).get("dependencies", [])
+        dev = data.get("project", {}).get("optional-dependencies", {}).get("dev", [])
+        all_deps = runtime + dev
+        assert any("pyyaml" in d.lower() for d in all_deps), "pyyaml missing from dependencies"
 
     def test_dev_deps_include_pydantic(self) -> None:
         data = tomllib.loads(PYPROJECT.read_text())

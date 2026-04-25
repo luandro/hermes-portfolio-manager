@@ -37,10 +37,10 @@ def test_resolve_root_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_resolve_root_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Falls back to /srv/agent-system when nothing else is provided."""
+    """Falls back to ~/.agent-system when nothing else is provided."""
     monkeypatch.delenv("AGENT_SYSTEM_ROOT", raising=False)
     result = resolve_root(None)
-    assert result == Path("/srv/agent-system")
+    assert result == Path.home() / ".agent-system"
 
 
 # ---------------------------------------------------------------------------

@@ -77,14 +77,14 @@ class ConfigError(Exception):
 def resolve_root(root: str | None = None) -> Path:
     """Resolve the agent system root path.
 
-    Priority: explicit arg > AGENT_SYSTEM_ROOT env > /srv/agent-system
+    Priority: explicit arg > AGENT_SYSTEM_ROOT env > ~/.agent-system
     """
     if root is not None:
         return Path(root)
     env = os.environ.get("AGENT_SYSTEM_ROOT")
     if env:
         return Path(env)
-    return Path("/srv/agent-system")
+    return Path.home() / ".agent-system"
 
 
 # ---------------------------------------------------------------------------

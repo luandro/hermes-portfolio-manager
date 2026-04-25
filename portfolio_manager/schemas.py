@@ -37,7 +37,7 @@ PORTFOLIO_CONFIG_VALIDATE_SCHEMA = {
         "properties": {
             "root": {
                 "type": "string",
-                "description": ("Optional agent system root. Defaults to AGENT_SYSTEM_ROOT or /srv/agent-system."),
+                "description": ("Optional agent system root. Defaults to AGENT_SYSTEM_ROOT or ~/.agent-system."),
             },
         },
         "required": [],
