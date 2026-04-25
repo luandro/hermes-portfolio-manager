@@ -7,7 +7,6 @@ state (clean/dirty/conflict/missing/blocked), and reporting results.
 from __future__ import annotations
 
 import logging
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,8 +43,6 @@ class WorktreeInspection:
 # ---------------------------------------------------------------------------
 # 3.1 discover_issue_worktrees
 # ---------------------------------------------------------------------------
-
-_ISSUE_DIR_RE = re.compile(r"^(.+)-issue-(\d+)$")
 
 
 def discover_issue_worktrees(root: Path, project: ProjectConfig) -> list[WorktreeCandidate]:

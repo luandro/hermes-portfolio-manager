@@ -182,7 +182,8 @@ def _validate_and_build_projects(
             continue
 
         # github_raw is guaranteed dict here (non-dict appends to entry_errors and continues)
-        assert isinstance(github_raw, dict)
+        if not isinstance(github_raw, dict):  # type: ignore[redundant-isinstance]
+            continue
 
         # 1.7 — normalize local paths
         local_raw = raw.get("local")
@@ -256,11 +257,11 @@ def select_projects(
     result: list[ProjectConfig] = []
 
     for p in config.projects:
-        if status is not None and p.status != status:
-            continue
         if not include_archived and p.status == "archived":
             continue
         if not include_paused and p.status == "paused":
+            continue
+        if status is not None and p.status != status:
             continue
         result.append(p)
 

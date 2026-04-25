@@ -12,14 +12,14 @@ def redact_secrets(text: str) -> str:
     (e.g. ``ghp_abc123`` → ``ghp_***``).
 
     Handled patterns:
-    - GitHub personal access tokens: ``ghp_``, ``gho_``, ``ghu_``, ``ghs_``
+    - GitHub personal access tokens: ``ghp_``, ``gho_``, ``ghu_``, ``ghs_``, ``ghr_``, ``gha_``
     - GitHub fine-grained tokens: ``github_pat_``
     - Bearer tokens in headers: ``Bearer <token>``
     - Generic ``token=<value>`` patterns
     """
     patterns: list[tuple[str, str]] = [
         (r"\b(github_pat_)[A-Za-z0-9_\-]+", r"\1***"),
-        (r"\b(gh[oupsa]_)[A-Za-z0-9_\-]+", r"\1***"),
+        (r"\b(gh[rouspa]_)[A-Za-z0-9_\-]+", r"\1***"),
         (r"\bBearer\s+[A-Za-z0-9_\-]+", "Bearer ***"),
         (r"(?<![\w])(token=)\S+", r"\1***"),
     ]

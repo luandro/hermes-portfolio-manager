@@ -552,7 +552,7 @@ class TestLock:
         conn = _open_and_init(str(tmp_path))
         acquire_lock(conn, "heartbeat:portfolio", "agent-1", 900)
         result = release_lock(conn, "heartbeat:portfolio", "agent-1")
-        assert result.acquired is True
+        assert result.success is True
         # After release, lock should be gone
         cur = conn.execute("SELECT count(*) FROM locks WHERE name=?", ("heartbeat:portfolio",))
         assert cur.fetchone()[0] == 0
@@ -562,7 +562,7 @@ class TestLock:
         conn = _open_and_init(str(tmp_path))
         acquire_lock(conn, "heartbeat:portfolio", "agent-1", 900)
         result = release_lock(conn, "heartbeat:portfolio", "agent-2")
-        assert result.acquired is False
+        assert result.success is False
         # Lock should still exist
         cur = conn.execute("SELECT owner FROM locks WHERE name=?", ("heartbeat:portfolio",))
         assert cur.fetchone()[0] == "agent-1"

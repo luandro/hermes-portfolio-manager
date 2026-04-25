@@ -377,6 +377,12 @@ class LockResult:
     reason: str = ""
 
 
+@dataclass
+class ReleaseResult:
+    success: bool
+    reason: str = ""
+
+
 def acquire_lock(conn: sqlite3.Connection, name: str, owner: str, ttl_seconds: int) -> LockResult:
     now = datetime.now(UTC)
     now_iso = now.isoformat()
@@ -419,15 +425,15 @@ def acquire_lock(conn: sqlite3.Connection, name: str, owner: str, ttl_seconds: i
     return LockResult(acquired=False, reason="lock contention on expiry")
 
 
-def release_lock(conn: sqlite3.Connection, name: str, owner: str) -> LockResult:
+def release_lock(conn: sqlite3.Connection, name: str, owner: str) -> ReleaseResult:
     cur = conn.execute("SELECT owner FROM locks WHERE name=?", (name,))
     row = cur.fetchone()
     if row is None:
-        return LockResult(acquired=True, reason="lock not found")
+        return ReleaseResult(success=True, reason="lock not found")
 
     if row[0] != owner:
-        return LockResult(acquired=False, reason=f"held by {row[0]}")
+        return ReleaseResult(success=False, reason=f"held by {row[0]}")
 
     conn.execute("DELETE FROM locks WHERE name=? AND owner=?", (name, owner))
     conn.commit()
-    return LockResult(acquired=True)
+    return ReleaseResult(success=True)
