@@ -71,9 +71,16 @@ class ProjectGitHubSyncResult:
 
 
 def _gh_env() -> dict[str, str]:
-    """Return a copy of os.environ with GH_NO_UPDATE_NOTIFIER set."""
+    """Return a copy of os.environ with gh configured for script use.
+
+    Strips force-color variables that override gh's own ``color: never`` config.
+    """
     env = os.environ.copy()
     env["GH_NO_UPDATE_NOTIFIER"] = "1"
+    env["NO_COLOR"] = "1"
+    # Remove force-color variables that override gh's color config
+    for key in ("CLICOLOR_FORCE", "FORCE_COLOR", "GIT_CONFIG_PARAMETERS"):
+        env.pop(key, None)
     return env
 
 
