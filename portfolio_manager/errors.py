@@ -18,10 +18,10 @@ def redact_secrets(text: str) -> str:
     - Generic ``token=<value>`` patterns
     """
     patterns: list[tuple[str, str]] = [
-        (r"(github_pat_)\S+", r"\1***"),
-        (r"(gh[ousp]_)\S+", r"\1***"),
-        (r"Bearer\s+\S+", "Bearer ***"),
-        (r"(token=)\S+", r"\1***"),
+        (r"\b(github_pat_)\S+", r"\1***"),
+        (r"\b(gh[ousp]_)\S+", r"\1***"),
+        (r"\bBearer\s+\S+", "Bearer ***"),
+        (r"(token=)\S+\b", r"\1***"),
     ]
     result = text
     for pattern, replacement in patterns:

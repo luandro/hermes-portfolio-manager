@@ -13,7 +13,7 @@ from __future__ import annotations
 import importlib
 import subprocess
 from pathlib import Path
-from unittest.mock import ANY, call
+from typing import ClassVar
 
 import pytest
 
@@ -94,7 +94,7 @@ class TestSubprocessUsesArgumentArrays:
 class TestNoUnsafeGitCommands:
     """Scan source files for banned destructive git commands."""
 
-    BANNED_GIT = [
+    BANNED_GIT: ClassVar[list[str]] = [
         "git pull",
         "git rebase",
         "git merge",
@@ -123,7 +123,7 @@ class TestNoUnsafeGitCommands:
 class TestNoGithubMutations:
     """Scan source files for banned destructive GitHub CLI commands."""
 
-    BANNED_GH = [
+    BANNED_GH: ClassVar[list[str]] = [
         "gh issue create",
         "gh pr create",
         "gh pr merge",
@@ -137,7 +137,9 @@ class TestNoGithubMutations:
         """Verify banned gh command '{banned}' appears nowhere in source."""
         for src_file in SOURCE_FILES:
             content = src_file.read_text()
-            assert banned not in content, f"Banned gh command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            assert banned not in content, (
+                f"Banned gh command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +168,7 @@ class TestRedactSecrets:
             ("ghs_xxxxxtoken", "ghs_***"),
             # Bearer tokens in HTTP
             ("Authorization: Bearer sk-abc123def456", "Authorization: Bearer ***"),
-                # Note: after the first pass, only the secret marker remains
+            # Note: after the first pass, only the secret marker remains
             # Generic token patterns
             ("token=abcdef1234567890abcdef", "token=***"),
             # Multiple tokens in one string
@@ -193,7 +195,7 @@ class TestRedactSecrets:
 class TestMvp1ReadOnlyBoundary:
     """Verify no code paths exist for write operations (MVP-2 features)."""
 
-    BANNED_FUNCTIONS = [
+    BANNED_FUNCTIONS: ClassVar[list[str]] = [
         "create_issue",
         "create_pr",
         "merge_pr",

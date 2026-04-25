@@ -1,0 +1,19 @@
+version: 1
+projects:
+  - id: comapeo-cloud-app
+    name: CoMapeo Cloud App
+    repo: git@github.com:awana-digital/comapeo-cloud-app.git
+    github:
+      owner: awana-digital
+      repo: comapeo-cloud-app
+    priority: high
+    status: active
+
+  - id: comapeo-cloud-app
+    name: CoMapeo Cloud App Duplicate
+    repo: git@github.com:awana-digital/comapeo-cloud-app.git
+    github:
+      owner: awana-digital
+      repo: comapeo-cloud-app
+    priority: medium
+    status: active

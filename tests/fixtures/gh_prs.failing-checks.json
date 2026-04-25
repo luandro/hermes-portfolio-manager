@@ -1,0 +1,17 @@
+[
+  {
+    "number": 301,
+    "title": "Fix CI pipeline",
+    "headRefName": "fix/ci-pipeline",
+    "baseRefName": "main",
+    "labels": [{"name": "ci"}],
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [
+      {"status": "completed", "conclusion": "failure"},
+      {"status": "completed", "conclusion": "success"}
+    ],
+    "createdAt": "2026-04-15T08:00:00Z",
+    "updatedAt": "2026-04-24T10:00:00Z",
+    "url": "https://github.com/acme/app/pull/301"
+  }
+]

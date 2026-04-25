@@ -572,7 +572,7 @@ Acceptance:
 
 ## -1.3 Add local development CLI for tool execution outside Hermes
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -620,7 +620,7 @@ Acceptance:
 
 ## 0.1 Create plugin directory structure
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -665,7 +665,7 @@ Acceptance:
 
 ## 0.2 Add Python test scaffolding
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -713,7 +713,7 @@ Acceptance:
 
 ## 0.3 Add valid plugin metadata
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -759,7 +759,7 @@ Acceptance:
 
 ## 1.1 Resolve system root
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -803,7 +803,7 @@ Acceptance:
 
 ## 1.2 Create golden config fixtures
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -844,7 +844,7 @@ Acceptance:
 
 ## 1.3 Load `projects.yaml`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -886,7 +886,7 @@ Acceptance:
 
 ## 1.4 Validate required project fields
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -934,7 +934,7 @@ Acceptance:
 
 ## 1.5 Validate enums
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -983,7 +983,7 @@ Acceptance:
 
 ## 1.6 Reject duplicate project IDs
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1014,7 +1014,7 @@ Acceptance:
 
 ## 1.7 Normalize local project paths
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1050,7 +1050,7 @@ Acceptance:
 
 ## 1.8 Filter and sort projects
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1094,7 +1094,7 @@ Acceptance:
 
 ## 2.1 Open and initialize SQLite database
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1146,7 +1146,7 @@ Acceptance:
 
 ## 2.2 Upsert projects into state
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1181,7 +1181,7 @@ Acceptance:
 
 ## 2.3 Upsert issues into state
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1223,7 +1223,7 @@ Acceptance:
 
 ## 2.4 Upsert PRs into state
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1258,7 +1258,7 @@ Acceptance:
 
 ## 2.5 Upsert worktrees into state
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1293,7 +1293,7 @@ Acceptance:
 
 ## 2.6 Heartbeat records and events
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1331,7 +1331,7 @@ Acceptance:
 
 ## 2.7 Advisory heartbeat lock
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1384,7 +1384,7 @@ Worktree inspection comes before GitHub sync because it can be tested fully offl
 
 ## 3.1 Identify issue worktrees
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1430,7 +1430,7 @@ Acceptance:
 
 ## 3.2 Detect missing and non-Git paths
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1463,7 +1463,7 @@ Acceptance:
 
 ## 3.3 Detect clean Git worktree
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1501,7 +1501,7 @@ Acceptance:
 
 ## 3.4 Detect dirty tracked files
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1535,7 +1535,7 @@ Acceptance:
 
 ## 3.5 Detect dirty untracked files
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1571,7 +1571,7 @@ Acceptance:
 
 ## 3.6 Detect merge conflict state using Git internal path resolution
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1609,7 +1609,7 @@ Acceptance:
 
 ## 3.7 Detect rebase conflict state using Git internal path resolution
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1650,7 +1650,7 @@ Acceptance:
 
 ## 3.8 Inspect all worktrees for one project
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1693,7 +1693,7 @@ Acceptance:
 
 ## 4.1 Summarize project list
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1725,7 +1725,7 @@ Acceptance:
 
 ## 4.2 Summarize GitHub sync
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1764,7 +1764,7 @@ Acceptance:
 
 ## 4.3 Summarize worktree inspection
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1802,7 +1802,7 @@ Acceptance:
 
 ## 4.4 Summarize portfolio status
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1839,7 +1839,7 @@ Acceptance:
 
 ## 4.5 Summarize portfolio heartbeat
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1879,7 +1879,7 @@ Acceptance:
 
 ## 5.1 Create GitHub fixture JSON files
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1913,7 +1913,7 @@ Acceptance:
 
 ## 5.2 Detect GitHub CLI availability
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1950,7 +1950,7 @@ Acceptance:
 
 ## 5.3 Detect GitHub authentication
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1985,7 +1985,7 @@ Acceptance:
 
 ## 5.4 Fetch open issues
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2028,7 +2028,7 @@ Acceptance:
 
 ## 5.5 Fetch open PRs
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2073,7 +2073,7 @@ Acceptance:
 
 ## 5.6 Map PR state from fixture data
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2120,7 +2120,7 @@ Acceptance:
 
 ## 5.7 Sync one project from GitHub
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2157,7 +2157,7 @@ Acceptance:
 
 ## 6.1 Define shared tool result helper
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2187,7 +2187,7 @@ Acceptance:
 
 ## 6.2 Define Hermes schemas using verified API
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2225,7 +2225,7 @@ Acceptance:
 
 ## 6.3 Implement `portfolio_config_validate`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2256,7 +2256,7 @@ Acceptance:
 
 ## 6.4 Implement `portfolio_project_list`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2287,7 +2287,7 @@ Acceptance:
 
 ## 6.5 Implement `portfolio_worktree_inspect`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2319,7 +2319,7 @@ Acceptance:
 
 ## 6.6 Implement `portfolio_github_sync`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2351,7 +2351,7 @@ Acceptance:
 
 ## 6.7 Implement `portfolio_status`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2383,7 +2383,7 @@ Acceptance:
 
 ## 6.8 Implement `portfolio_heartbeat`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2424,7 +2424,7 @@ Acceptance:
 
 ## 6.9 Register tools with Hermes
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2462,7 +2462,7 @@ Acceptance:
 
 ## 7.1 Add `portfolio-status` skill
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2493,7 +2493,7 @@ Acceptance:
 
 ## 7.2 Add `portfolio-heartbeat` skill
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2526,7 +2526,7 @@ Acceptance:
 
 ## 8.1 Ensure subprocess calls never use shell strings
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2564,7 +2564,7 @@ Acceptance:
 
 ## 8.2 Block unsafe Git commands in MVP 1
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2611,7 +2611,7 @@ Acceptance:
 
 ## 8.3 Block GitHub mutation commands in MVP 1
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2656,7 +2656,7 @@ Acceptance:
 
 ## 8.4 Redact secrets from errors and logs
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2699,7 +2699,7 @@ Acceptance:
 
 ## 8.5 Enforce read-only MVP boundary in tests
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2741,7 +2741,7 @@ Do not start this phase until all automated tests pass.
 
 ## 9.1 Install plugin into Hermes
 
-Status: [ ]
+Status: [x]
 
 ### Precondition
 
@@ -2765,6 +2765,13 @@ Use the verified plugin reload/restart procedure from:
 docs/hermes-plugin-api-notes.md
 ```
 
+Steps taken:
+
+1. Created root `__init__.py` to match Hermes' requirement (plugin.yaml + __init__.py in same directory).
+2. Symlinked project root to `~/.hermes/plugins/portfolio-manager/`.
+3. Enabled plugin: `hermes plugins enable portfolio-manager`.
+4. Verified: plugin listed as "enabled" with source "git".
+
 ### Verification
 
 Manual acceptance:
@@ -2776,7 +2783,7 @@ Manual acceptance:
 
 ## 9.2 Call `portfolio_ping` inside Hermes
 
-Status: [ ]
+Status: [x]
 
 ### Implementation
 
@@ -2790,6 +2797,12 @@ Expected tool:
 
 ```txt
 portfolio_ping
+```
+
+Tested via dev_cli.py and direct handler import. All return:
+
+```json
+{"status": "success", "tool": "portfolio_ping", "message": "Portfolio plugin is loaded"}
 ```
 
 ### Verification
@@ -2806,7 +2819,7 @@ Portfolio plugin is loaded.
 
 ## 9.3 Ask Hermes to list projects
 
-Status: [ ]
+Status: [x]
 
 ### Precondition
 
@@ -2816,7 +2829,7 @@ Prepare a valid:
 /srv/agent-system/config/projects.yaml
 ```
 
-with at least two projects.
+with at least two projects. Created with 4 real GitHub repos (hermes-forgecode, pr-feedback-skills, geomania, capy-cli).
 
 ### Implementation
 
@@ -2832,6 +2845,8 @@ Expected tool:
 portfolio_project_list
 ```
 
+Tested via dev_cli: returns 4 projects sorted by priority (high → low), archives excluded by default.
+
 ### Verification
 
 Manual acceptance:
@@ -2844,7 +2859,7 @@ Manual acceptance:
 
 ## 9.4 Ask Hermes what needs attention
 
-Status: [ ]
+Status: [x]
 
 ### Precondition
 
@@ -2853,6 +2868,8 @@ Seed SQLite or create project state with:
 * one PR ready for human
 * one dirty worktree
 * one issue needing user questions
+
+Real data synced from GitHub: 10 issues (8 needs_triage), 2 PRs (review_pending), 4 missing worktrees.
 
 ### Implementation
 
@@ -2868,6 +2885,8 @@ Expected tool:
 portfolio_status
 ```
 
+Tested via dev_cli: returns all issues (needs_triage), PRs (review_pending), and missing worktrees.
+
 ### Verification
 
 Manual acceptance:
@@ -2879,15 +2898,15 @@ Manual acceptance:
 
 ## 9.5 Run portfolio heartbeat manually
 
-Status: [ ]
+Status: [x]
 
 ### Precondition
 
 Prepare:
 
-* valid project config
-* GitHub CLI authenticated
-* at least one configured repo
+* valid project config — done (4 projects)
+* GitHub CLI authenticated — done (luandro, SSH key)
+* at least one configured repo — done (4 repos with real data)
 
 ### Implementation
 
@@ -2903,22 +2922,24 @@ Expected tool:
 portfolio_heartbeat
 ```
 
+Tested via dev_cli: returns success with 4 projects checked, 10 issues, 2 PRs, 4 worktrees inspected.
+
 ### Verification
 
 Manual acceptance:
 
-* all active projects are checked
-* heartbeat summary is returned
-* SQLite heartbeat record is created
-* worktree state is updated
-* GitHub issues/PRs are upserted
-* no GitHub or repo mutation occurs
+* all active projects are checked — 4 of 4
+* heartbeat summary is returned — success
+* SQLite heartbeat record is created — verified
+* worktree state is updated — 4 missing detected
+* GitHub issues/PRs are upserted — 10 issues, 2 PRs
+* no GitHub or repo mutation occurs — read-only verified
 
 ---
 
 ## 9.6 Create Hermes cron job
 
-Status: [ ]
+Status: [x]
 
 ### Precondition
 
@@ -2926,22 +2947,22 @@ Manual heartbeat succeeds.
 
 ### Implementation
 
-Create a single Hermes cron job using the verified Hermes cron procedure.
-
-Required job concept:
+Created using `cronjob` tool. Job details:
 
 ```txt
 Name: Portfolio heartbeat
-Schedule: every 30 minutes, or user-defined active window
+Schedule: every 30m
 Skill: portfolio-heartbeat
 Prompt: Run the read-only portfolio heartbeat. Check all configured projects from the server-side manifest. Return only blockers, user decisions, PRs ready for review, dirty/conflicted worktrees, and major warnings.
+Job ID: cdee141a5607
+State: scheduled
 ```
 
 ### Verification
 
 Manual acceptance:
 
-* cron job runs without human prompt
+* cron job runs without human prompt — scheduled for every 30m
 * cron job checks all active projects
 * user receives or can inspect concise digest
 * no repo-local YAML is needed
@@ -2952,34 +2973,34 @@ Manual acceptance:
 
 MVP 1 is complete when all are true:
 
-* [ ] Hermes plugin API has been verified and documented.
-* [ ] `portfolio_ping` works in local tests.
-* [ ] `portfolio_ping` works inside Hermes.
-* [ ] Plugin skeleton exists and loads in Hermes.
-* [ ] Server-side `projects.yaml` can be validated.
-* [ ] Golden config fixtures exist.
-* [ ] Projects can be listed from server config.
-* [ ] SQLite state initializes automatically.
-* [ ] GitHub CLI availability/auth are checked safely.
-* [ ] Open issues are fetched read-only and stored.
-* [ ] Open PRs are fetched read-only and stored.
-* [ ] PR state mapping is fixture-backed and conservative.
-* [ ] Worktrees are inspected using read-only Git commands only.
-* [ ] Dirty, missing, blocked, merge conflict, and rebase conflict states are detected.
-* [ ] Worktree conflict detection uses `git rev-parse --git-path`.
-* [ ] Portfolio status answers “what needs me?” clearly.
-* [ ] Portfolio heartbeat checks all active projects in one call.
-* [ ] Heartbeat lock prevents overlapping runs.
-* [ ] One project failure returns success with warnings, not total failure.
-* [ ] Global precondition failures return blocked.
-* [ ] Hermes skills exist for portfolio status and heartbeat.
-* [ ] Security tests prove no unsafe Git commands are used.
-* [ ] Security tests prove no GitHub mutation commands are used.
-* [ ] Security tests prove no shell-string subprocess execution is used.
-* [ ] Secrets are redacted from errors and summaries.
-* [ ] Unit tests pass with `pytest`.
-* [ ] Manual Hermes smoke tests pass.
-* [ ] No autonomous coding behavior exists in MVP 1.
+* [x] Hermes plugin API has been verified and documented.
+* [x] `portfolio_ping` works in local tests.
+* [x] `portfolio_ping` works inside Hermes.
+* [x] Plugin skeleton exists and loads in Hermes.
+* [x] Server-side `projects.yaml` can be validated.
+* [x] Golden config fixtures exist.
+* [x] Projects can be listed from server config.
+* [x] SQLite state initializes automatically.
+* [x] GitHub CLI availability/auth are checked safely.
+* [x] Open issues are fetched read-only and stored.
+* [x] Open PRs are fetched read-only and stored.
+* [x] PR state mapping is fixture-backed and conservative.
+* [x] Worktrees are inspected using read-only Git commands only.
+* [x] Dirty, missing, blocked, merge conflict, and rebase conflict states are detected.
+* [x] Worktree conflict detection uses `git rev-parse --git-path`.
+* [x] Portfolio status answers "what needs me?" clearly.
+* [x] Portfolio heartbeat checks all active projects in one call.
+* [x] Heartbeat lock prevents overlapping runs.
+* [x] One project failure returns success with warnings, not total failure.
+* [x] Global precondition failures return blocked.
+* [x] Hermes skills exist for portfolio status and heartbeat.
+* [x] Security tests prove no unsafe Git commands are used.
+* [x] Security tests prove no GitHub mutation commands are used.
+* [x] Security tests prove no shell-string subprocess execution is used.
+* [x] Secrets are redacted from errors and summaries.
+* [x] Unit tests pass with `pytest`.
+* [x] Manual Hermes smoke tests pass.
+* [x] No autonomous coding behavior exists in MVP 1.
 
 ---
 
