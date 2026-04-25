@@ -6,6 +6,7 @@ heartbeat lifecycle, advisory locks.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -328,8 +329,6 @@ def add_event(
     project_id: str | None = None,
     data: dict[str, Any] | None = None,
 ) -> None:
-    import json
-
     event_id = str(uuid4())
     now = _utcnow()
     conn.execute(
@@ -383,32 +382,41 @@ def acquire_lock(conn: sqlite3.Connection, name: str, owner: str, ttl_seconds: i
     now_iso = now.isoformat()
     expires_iso = datetime.fromtimestamp(now.timestamp() + ttl_seconds, tz=UTC).isoformat()
 
-    cur = conn.execute("SELECT owner, expires_at FROM locks WHERE name=?", (name,))
-    row = cur.fetchone()
-
-    if row is None:
+    # Optimistic INSERT — atomic at the SQLite level; handles the common case
+    # (no existing lock) without a SELECT/INSERT race.
+    try:
         conn.execute(
             "INSERT INTO locks (name, owner, acquired_at, expires_at) VALUES (?, ?, ?, ?)",
             (name, owner, now_iso, expires_iso),
         )
         conn.commit()
         return LockResult(acquired=True)
+    except sqlite3.IntegrityError:
+        conn.rollback()
+
+    # Lock exists — check whether it has expired
+    row = conn.execute("SELECT owner, expires_at FROM locks WHERE name=?", (name,)).fetchone()
+    if row is None:
+        return LockResult(acquired=False, reason="lock contention")
 
     existing_owner, expires_at_str = row
     expires_at = datetime.fromisoformat(expires_at_str)
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
 
-    if expires_at < now:
-        # Expired — replace
-        conn.execute(
-            "UPDATE locks SET owner=?, acquired_at=?, expires_at=? WHERE name=?",
-            (owner, now_iso, expires_iso, name),
-        )
-        conn.commit()
+    if expires_at >= now:
+        return LockResult(acquired=False, reason=f"held by {existing_owner}")
+
+    # Expired — conditional UPDATE guards against a concurrent steal (CAS pattern)
+    conn.execute(
+        "UPDATE locks SET owner=?, acquired_at=?, expires_at=? WHERE name=? AND expires_at=?",
+        (owner, now_iso, expires_iso, name, expires_at_str),
+    )
+    conn.commit()
+    if conn.execute("SELECT changes()").fetchone()[0] > 0:
         return LockResult(acquired=True)
 
-    return LockResult(acquired=False, reason=f"held by {existing_owner}")
+    return LockResult(acquired=False, reason="lock contention on expiry")
 
 
 def release_lock(conn: sqlite3.Connection, name: str, owner: str) -> LockResult:
