@@ -221,21 +221,21 @@ class TestUpsertIssue:
                 "updated_at": now,
             },
         )
-        # Upsert again without changing state — should keep "in_progress"
+        # Upsert again with different state — should keep original "in_progress"
         upsert_issue(
             conn,
             "p1",
             {
                 "number": 10,
                 "title": "Issue ten updated",
-                "state": "in_progress",
+                "state": "needs_triage",
                 "labels_json": "[]",
                 "created_at": now,
                 "updated_at": now,
             },
         )
         cur = conn.execute("SELECT state FROM issues WHERE project_id=? AND issue_number=?", ("p1", 10))
-        assert cur.fetchone()[0] == "in_progress"
+        assert cur.fetchone()[0] == "in_progress"  # Should still be original
         conn.close()
 
     def test_upsert_issue_labels_json(self, tmp_path: Path):

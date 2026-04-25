@@ -627,9 +627,17 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
     except Exception as e:
         with contextlib.suppress(Exception):
             if hb_id is not None:
-                finish_heartbeat(conn, hb_id, "failed", error=str(e))
+                finish_heartbeat(conn, hb_id, "failed", error=redact_secrets(str(e)))
         with contextlib.suppress(Exception):
             release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
-        raise
+        logger.exception("Heartbeat failed: %s", e)
+        return _result(
+            status="error",
+            tool=tool,
+            message=f"Heartbeat failed: {redact_secrets(str(e))}",
+            data={},
+            summary="Heartbeat failed.",
+            reason="heartbeat_failed",
+        )
     finally:
         conn.close()

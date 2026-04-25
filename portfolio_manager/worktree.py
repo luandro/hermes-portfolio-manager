@@ -76,13 +76,14 @@ def discover_issue_worktrees(root: Path, project: ProjectConfig) -> list[Worktre
 # ---------------------------------------------------------------------------
 
 
-def _run_git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run_git(*args: str, cwd: Path, timeout: int = 30) -> subprocess.CompletedProcess[str]:
     """Run a git command with argument arrays. Returns CompletedProcess."""
     return subprocess.run(
         ["git", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
+        timeout=timeout,
     )
 
 
@@ -95,6 +96,9 @@ def _is_git_repo(path: Path) -> bool:
 def _resolve_git_path(path: Path, git_path: str) -> Path:
     """Resolve a git internal path via ``git rev-parse --git-path``."""
     result = _run_git("rev-parse", "--git-path", git_path, cwd=path)
+    if result.returncode != 0 or not result.stdout.strip():
+        # Return a path that won't exist so the caller's .exists() check works correctly
+        return path / f"__git_internal_{git_path}_not_found__"
     resolved = Path(result.stdout.strip())
     # git rev-parse may return a relative path; resolve against the repo root
     if not resolved.is_absolute():

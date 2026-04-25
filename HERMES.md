@@ -104,7 +104,7 @@ If forge produces two bad outputs in a row on the same task: stop, write a sharp
 
 ## Environment
 
-- Python >=3.12 (`/home/linuxbrew/.linuxbrew/bin/python3`)
+- Python >=3.11 (`/home/linuxbrew/.linuxbrew/bin/python3`)
 - Forge: `/home/luandro/.local/bin/forge`
 - Claude Code: `/home/luandro/.local/bin/claude`
 - CodexBar: `/home/linuxbrew/.linuxbrew/bin/codexbar`

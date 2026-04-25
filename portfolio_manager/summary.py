@@ -149,7 +149,8 @@ def summarize_worktrees(worktree_results: list[WorktreeInspection]) -> str:
     lines: list[str] = ["Worktree inspection complete.", ""]
 
     if problem_wts:
-        lines.append(f"{len(problem_wts)} worktree{'s' if len(problem_wts) != 1 else ''} need attention:")
+        n = len(problem_wts)
+        lines.append(f"{n} worktree{'s' if n != 1 else ''} {'need' if n != 1 else 'needs'} attention:")
         for w in problem_wts:
             detail = ""
             if w.dirty_summary:

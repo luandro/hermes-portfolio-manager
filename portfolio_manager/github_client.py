@@ -92,7 +92,9 @@ def _gh_env() -> dict[str, str]:
 def check_gh_available() -> ToolCheckResult:
     """Check whether the GitHub CLI is installed."""
     try:
-        subprocess.run(["gh", "--version"], capture_output=True, text=True, timeout=10, env=_gh_env())
+        proc = subprocess.run(["gh", "--version"], capture_output=True, text=True, timeout=10, env=_gh_env())
+        if proc.returncode != 0:
+            return ToolCheckResult(available=False, message=f"GitHub CLI check failed: {proc.stderr.strip()}")
         return ToolCheckResult(available=True)
     except FileNotFoundError:
         return ToolCheckResult(available=False, message="GitHub CLI (gh) is not installed.")
@@ -228,21 +230,25 @@ def list_open_prs(owner: str, repo: str, limit: int = 50) -> list[PullRequestRec
 # ---------------------------------------------------------------------------
 
 
+_FAILING_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "stale"}
+_PASSING_CONCLUSIONS = {"success", "neutral", "skipped"}
+
+
 def _has_failing_checks(rollup: list[dict[str, Any]] | None) -> bool:
-    """Return True if any check in the rollup has conclusion=failure."""
+    """Return True if any check in the rollup has a failing conclusion."""
     if not rollup:
         return False
-    return any(c.get("conclusion") == "failure" for c in rollup if isinstance(c, dict))
+    return any(c.get("conclusion") in _FAILING_CONCLUSIONS for c in rollup if isinstance(c, dict))
 
 
 def _all_passing(rollup: list[dict[str, Any]] | None) -> bool:
-    """Return True if all completed checks have conclusion=success."""
+    """Return True if all completed checks have a passing conclusion."""
     if not rollup:
         return True
     completed = [c for c in rollup if isinstance(c, dict) and c.get("status") == "completed"]
     if not completed:
         return True
-    return all(c.get("conclusion") == "success" for c in completed)
+    return all(c.get("conclusion") in _PASSING_CONCLUSIONS for c in completed)
 
 
 def map_pr_state(pr_json: dict[str, Any]) -> str:
@@ -270,11 +276,11 @@ def map_pr_state(pr_json: dict[str, Any]) -> str:
     if decision == "APPROVED" and _all_passing(rollup):
         return "ready_for_human"
 
-    # 4. No review decision
-    if not decision:
+    # 4. No review decision or REVIEW_REQUIRED
+    if not decision or decision == "REVIEW_REQUIRED":
         return "review_pending"
 
-    # 5. Fallback
+    # 5. Fallback (e.g. APPROVED without passing checks)
     return "open"
 
 

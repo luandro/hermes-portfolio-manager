@@ -219,10 +219,15 @@ class TestMapPrState:
         state = map_pr_state(pr_json)
         assert state == "review_pending"
 
+    def test_map_pr_state_review_required(self):
+        pr_json = {"reviewDecision": "REVIEW_REQUIRED", "statusCheckRollup": []}
+        state = map_pr_state(pr_json)
+        assert state == "review_pending"
+
     def test_map_pr_state_fallback_open(self):
+        # Unknown reviewDecision that isn't one of the handled values hits the fallback
         pr_json = {
-            "reviewDecision": "REVIEW_REQUIRED",
-            "statusCheckRollup": [{"status": "completed", "conclusion": "success"}],
+            "reviewDecision": "DISMISSED",
         }
         state = map_pr_state(pr_json)
         assert state == "open"

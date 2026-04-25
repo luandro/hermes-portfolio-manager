@@ -25,7 +25,7 @@ def test(tool_name: str, handler, args: dict | None = None) -> dict:
         result_raw = handler(args)
         result = json.loads(result_raw) if isinstance(result_raw, str) else result_raw
     except Exception as e:
-        result = {"status": "failed", "error": str(e)}
+        result = {"status": "failed", "message": str(e)}
     status = result.get("status", "?")
     symbol = (
         "PASS"

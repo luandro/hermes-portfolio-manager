@@ -80,10 +80,10 @@ def resolve_root(root: str | None = None) -> Path:
     Priority: explicit arg > AGENT_SYSTEM_ROOT env > ~/.agent-system
     """
     if root is not None:
-        return Path(root)
+        return Path(root).expanduser()
     env = os.environ.get("AGENT_SYSTEM_ROOT")
     if env:
-        return Path(env)
+        return Path(env).expanduser()
     return Path.home() / ".agent-system"
 
 
