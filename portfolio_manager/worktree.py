@@ -131,8 +131,8 @@ def _parse_porcelain(porcelain: str) -> tuple[list[str], list[str], list[str]]:
         # Untracked
         elif xy == "??":
             untracked.append(filepath)
-        # Modified tracked: first char space, second char not space and not ?
-        elif xy[0] == " " and xy[1] not in (" ", "?"):
+        # Modified: staged (index) OR unstaged (working tree) changes
+        elif xy[0] not in (" ", "?") or xy[1] not in (" ", "?"):
             modified.append(filepath)
 
     return modified, untracked, conflict
@@ -219,17 +219,21 @@ def inspect_worktree(path: Path, project_id: str = "", issue_number: int | None 
 # ---------------------------------------------------------------------------
 
 
-def inspect_project_worktrees(project: ProjectConfig) -> list[WorktreeInspection]:
+def inspect_project_worktrees(project: ProjectConfig, root: Path | None = None) -> list[WorktreeInspection]:
     """Inspect the base worktree and all issue worktrees for a project.
+
+    Pass ``root`` explicitly (the agent-system root) so that issue-worktree
+    discovery works correctly when ``local.base_path`` is configured to a
+    non-default location.  When omitted, root is derived from base_path as a
+    fallback (only reliable for the default path layout).
 
     Returns a combined list of WorktreeInspection for every discovered worktree.
     """
     results: list[WorktreeInspection] = []
 
-    # Determine root from base_path pattern: base is root/worktrees/project_id
-    # so root is base_path.parent.parent
     base_path = project.local.base_path
-    root = base_path.parent.parent if base_path else Path("/")
+    if root is None:
+        root = base_path.parent.parent if base_path else Path("/")
 
     # Inspect base worktree
     base_inspection = inspect_worktree(base_path, project_id=project.id)

@@ -13,6 +13,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import sqlite3
     from pathlib import Path
 
 from portfolio_manager.config import ConfigError, load_projects_config, resolve_root, select_projects
@@ -86,7 +87,7 @@ def _ensure_dirs(root: Path) -> None:
         (root / d).mkdir(parents=True, exist_ok=True)
 
 
-def _persist_github_sync(conn: Any, project_id: str, sync: ProjectGitHubSyncResult) -> None:
+def _persist_github_sync(conn: sqlite3.Connection, project_id: str, sync: ProjectGitHubSyncResult) -> None:
     """Persist fetched issues and PRs into the state database."""
     for issue in sync.issues:
         upsert_issue(
@@ -339,7 +340,7 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
         all_inspections = []
         for project in projects:
             upsert_project(conn, project)
-            inspections = inspect_project_worktrees(project)
+            inspections = inspect_project_worktrees(project, root)
             all_inspections.extend(inspections)
 
             # Upsert each worktree into state
@@ -424,7 +425,7 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
                         sync = sync_project_github(project)
                         _persist_github_sync(conn, project.id, sync)
                     # Upsert worktrees
-                    inspections = inspect_project_worktrees(project)
+                    inspections = inspect_project_worktrees(project, root)
                     for insp in inspections:
                         wt_id = f"{insp.project_id}"
                         if insp.issue_number is not None:
@@ -572,7 +573,7 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
                 )
 
             # Worktree inspect
-            inspections = inspect_project_worktrees(project)
+            inspections = inspect_project_worktrees(project, root)
             all_worktree_inspections.extend(inspections)
             for insp in inspections:
                 wt_id = f"{insp.project_id}"
