@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -24,30 +23,6 @@ from portfolio_manager.tools import (
     _handle_portfolio_status,
     _handle_portfolio_worktree_inspect,
 )
-
-
-def tool_result(
-    *,
-    status: str,
-    tool: str,
-    message: str,
-    data: dict[str, Any] | None = None,
-    summary: str = "",
-    reason: str | None = None,
-) -> str:
-    """Build a JSON string in the shared tool result format."""
-    return json.dumps(
-        {
-            "status": status,
-            "tool": tool,
-            "message": message,
-            "data": data if data is not None else {},
-            "summary": summary,
-            "reason": reason,
-        },
-        ensure_ascii=False,
-    )
-
 
 # Tool name -> (schema, handler) mapping
 _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
