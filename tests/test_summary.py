@@ -226,14 +226,14 @@ class TestSummarizePortfolioStatus:
         }
 
     def test_filter_all_shows_everything(self) -> None:
-        result = summarize_portfolio_status(self._snapshot(), filter="all")
+        result = summarize_portfolio_status(self._snapshot(), status_filter="all")
         assert "proj-a" in result
         assert "proj-b" in result
         assert "Fix login bug" in result or "#47" in result
         assert "Fix auth" in result or "#130" in result
 
     def test_filter_needs_user_shows_attention_items(self) -> None:
-        result = summarize_portfolio_status(self._snapshot(), filter="needs_user")
+        result = summarize_portfolio_status(self._snapshot(), status_filter="needs_user")
         # Should include the PR ready for human review
         assert "#130" in result or "ready" in result.lower() or "human" in result.lower()
         # Should include the dirty worktree
@@ -242,7 +242,7 @@ class TestSummarizePortfolioStatus:
         assert "#47" in result or "triage" in result.lower() or "needs" in result.lower()
 
     def test_filter_needs_user_excludes_clean_items(self) -> None:
-        result = summarize_portfolio_status(self._snapshot(), filter="needs_user")
+        result = summarize_portfolio_status(self._snapshot(), status_filter="needs_user")
         # Clean worktree and open (not ready_for_human) PR should not be highlighted
         # The clean worktree path should not appear as a problem
         assert "/tmp/wt2" not in result
@@ -250,7 +250,7 @@ class TestSummarizePortfolioStatus:
     def test_empty_snapshot(self) -> None:
         result = summarize_portfolio_status(
             {"issues": [], "pull_requests": [], "worktrees": []},
-            filter="all",
+            status_filter="all",
         )
         assert isinstance(result, str)
         assert len(result) > 0

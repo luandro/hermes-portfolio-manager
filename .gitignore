@@ -48,4 +48,3 @@ htmlcov/
 
 # Gitleaks baseline
 .gitleaks-report.json
-__init__.py

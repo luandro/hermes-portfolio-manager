@@ -36,7 +36,7 @@ jobs:
         run: ruff format --check .
 
       - name: MyPy
-        run: mypy --strict --ignore-missing-imports hermes-portfolio-manager/
+        run: mypy --strict --ignore-missing-imports portfolio_manager
 
   test:
     name: Test
@@ -56,9 +56,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov pyyaml
+          pip install -e .
 
       - name: Run tests
-        run: pytest --cov=hermes-portfolio-manager --cov-report=term-missing
+        run: pytest --cov=portfolio_manager --cov-report=term-missing
 
   security:
     name: Security

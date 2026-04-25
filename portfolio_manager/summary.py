@@ -173,11 +173,11 @@ def summarize_worktrees(worktree_results: list[WorktreeInspection]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def summarize_portfolio_status(state_snapshot: dict[str, Any], filter: str = "all") -> str:
+def summarize_portfolio_status(state_snapshot: dict[str, Any], status_filter: str = "all") -> str:
     """Summarize portfolio status from a state snapshot.
 
-    filter='all': show everything.
-    filter='needs_user': only items needing human attention.
+    status_filter='all': show everything.
+    status_filter='needs_user': only items needing human attention.
     """
     issues = state_snapshot.get("issues", [])
     pull_requests = state_snapshot.get("pull_requests", [])
@@ -185,7 +185,7 @@ def summarize_portfolio_status(state_snapshot: dict[str, Any], filter: str = "al
 
     lines: list[str] = []
 
-    if filter == "needs_user":
+    if status_filter == "needs_user":
         needs_lines: list[str] = []
 
         # Issues needing attention
@@ -226,7 +226,7 @@ def summarize_portfolio_status(state_snapshot: dict[str, Any], filter: str = "al
 
         return "\n".join(lines)
 
-    # filter == 'all'
+    # status_filter == 'all'
     lines.append("Portfolio status:")
     lines.append("")
 

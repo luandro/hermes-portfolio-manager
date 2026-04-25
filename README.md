@@ -1,7 +1,7 @@
 # Hermes Portfolio Manager
 
 <!-- PROJECT SHIELDS -->
-[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## About The Project
@@ -18,7 +18,7 @@ Designed for developers, team leads, and automated workflows, it provides a read
 
 ### Built With
 
-* [Python >= 3.12](https://www.python.org/)
+* [Python >= 3.11](https://www.python.org/)
 * [Hermes Agent System](https://github.com/awana-digital/hermes)
 * [GitHub CLI (`gh`)](https://cli.github.com/)
 * [SQLite](https://www.sqlite.org/index.html)
@@ -30,7 +30,7 @@ Designed for developers, team leads, and automated workflows, it provides a read
 ### Prerequisites
 
 To run the Portfolio Manager, ensure you have the following installed on your host system:
-* **Python 3.12+**
+* **Python 3.11+**
 * **GitHub CLI (`gh`)** - Must be authenticated (`gh auth status`).
 * **Hermes Agent** - Running on your VPS or local machine.
 

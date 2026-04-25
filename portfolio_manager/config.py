@@ -138,6 +138,7 @@ def _validate_and_build_projects(
 
     for idx, raw in enumerate(raw_projects):
         prefix = f"project[{idx}]"
+        entry_errors: list[str] = []
 
         if not isinstance(raw, dict):
             errors.append(f"{prefix}: must be a mapping, got {type(raw).__name__}")
@@ -146,17 +147,18 @@ def _validate_and_build_projects(
         # 1.4 — required fields
         for fld in REQUIRED_PROJECT_FIELDS:
             if fld not in raw or not raw[fld]:
-                errors.append(f"{prefix}: missing required field '{fld}'")
+                entry_errors.append(f"{prefix}: missing required field '{fld}'")
 
         github_raw = raw.get("github")
         if not isinstance(github_raw, dict):
-            errors.append(f"{prefix}: 'github' must be a mapping")
+            entry_errors.append(f"{prefix}: 'github' must be a mapping")
         else:
             for fld in REQUIRED_GITHUB_FIELDS:
                 if fld not in github_raw or not github_raw[fld]:
-                    errors.append(f"{prefix}: missing required field 'github.{fld}'")
+                    entry_errors.append(f"{prefix}: missing required field 'github.{fld}'")
 
-        if errors:
+        if entry_errors:
+            errors.extend(entry_errors)
             # Keep collecting but skip enum / duplicate checks for broken entries
             continue
 
@@ -165,17 +167,18 @@ def _validate_and_build_projects(
         status = str(raw["status"])
 
         if priority not in VALID_PRIORITIES:
-            errors.append(f"{prefix}: invalid priority '{priority}'")
+            entry_errors.append(f"{prefix}: invalid priority '{priority}'")
         if status not in VALID_STATUSES:
-            errors.append(f"{prefix}: invalid status '{status}'")
+            entry_errors.append(f"{prefix}: invalid status '{status}'")
 
         # 1.6 — duplicate IDs
         project_id = str(raw["id"])
         if project_id in seen_ids:
-            errors.append(f"{prefix}: duplicate project id '{project_id}'")
+            entry_errors.append(f"{prefix}: duplicate project id '{project_id}'")
         seen_ids.add(project_id)
 
-        if errors:
+        if entry_errors:
+            errors.extend(entry_errors)
             continue
 
         # 1.7 — normalize local paths

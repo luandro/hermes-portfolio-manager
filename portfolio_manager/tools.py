@@ -345,9 +345,9 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
 
             # Upsert each worktree into state
             for insp in inspections:
-                wt_id = f"{insp.project_id}"
+                wt_id = f"{insp.project_id}-{insp.path}"
                 if insp.issue_number is not None:
-                    wt_id += f"-issue-{insp.issue_number}"
+                    wt_id = f"{insp.project_id}-issue-{insp.issue_number}"
                 upsert_worktree(
                     conn,
                     {
@@ -427,9 +427,9 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
                     # Upsert worktrees
                     inspections = inspect_project_worktrees(project, root)
                     for insp in inspections:
-                        wt_id = f"{insp.project_id}"
+                        wt_id = f"{insp.project_id}-{insp.path}"
                         if insp.issue_number is not None:
-                            wt_id += f"-issue-{insp.issue_number}"
+                            wt_id = f"{insp.project_id}-issue-{insp.issue_number}"
                         upsert_worktree(
                             conn,
                             {
@@ -470,7 +470,7 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
             ],
         }
 
-        summary = summarize_portfolio_status(state_snapshot, filter=filter_val)
+        summary = summarize_portfolio_status(state_snapshot, status_filter=filter_val)
 
         return _result(
             status="success",
@@ -576,9 +576,9 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
             inspections = inspect_project_worktrees(project, root)
             all_worktree_inspections.extend(inspections)
             for insp in inspections:
-                wt_id = f"{insp.project_id}"
+                wt_id = f"{insp.project_id}-{insp.path}"
                 if insp.issue_number is not None:
-                    wt_id += f"-issue-{insp.issue_number}"
+                    wt_id = f"{insp.project_id}-issue-{insp.issue_number}"
                 upsert_worktree(
                     conn,
                     {
