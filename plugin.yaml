@@ -1,0 +1,7 @@
+name: portfolio-manager
+version: 0.1.0
+description: Manage multiple GitHub projects from one server-side manifest. MVP 1 is read-only.
+author: Awana Digital
+kind: standalone
+provides_tools:
+  - portfolio_ping

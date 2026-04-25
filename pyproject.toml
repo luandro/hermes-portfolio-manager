@@ -1,0 +1,72 @@
+[project]
+name = "hermes-portfolio-manager"
+version = "0.1.0"
+description = "Hermes plugin to manage multiple GitHub projects from one server-side manifest. MVP 1 is read-only."
+requires-python = ">=3.12"
+license = "MIT"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pyyaml>=6",
+    "pydantic>=2",
+]
+
+[tool.setuptools.packages.find]
+include = ["portfolio_manager*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # line length handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["portfolio_manager"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["yaml.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.bandit]
+targets = ["hermes-portfolio-manager"]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # allow assert in tests

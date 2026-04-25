@@ -1,0 +1,50 @@
+# Secrets and environment files
+.secrets.*
+.env
+.env.*
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Config with potential secrets
+config/*.yaml
+config/*.yml
+!config/projects.example.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Gitleaks baseline
+.gitleaks-report.json
