@@ -13,12 +13,15 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from portfolio_manager.state import upsert_issue, upsert_pull_request
-
 if TYPE_CHECKING:
     from portfolio_manager.config import ProjectConfig
 
 logger = logging.getLogger(__name__)
+
+
+class GitHubSyncError(Exception):
+    """Raised when GitHub CLI operations fail."""
+
 
 # ---------------------------------------------------------------------------
 # Data models
@@ -59,6 +62,8 @@ class PullRequestRecord:
 @dataclass
 class ProjectGitHubSyncResult:
     project_id: str
+    issues: list[IssueRecord] = field(default_factory=list)
+    prs: list[PullRequestRecord] = field(default_factory=list)
     issues_count: int = 0
     prs_count: int = 0
     warnings: list[str] = field(default_factory=list)
@@ -132,12 +137,12 @@ def list_open_issues(owner: str, repo: str, limit: int = 50) -> list[IssueRecord
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=_gh_env())
         if proc.returncode != 0:
-            logger.warning("gh issue list failed for %s/%s: %s", owner, repo, proc.stderr.strip())
-            return []
+            raise GitHubSyncError(f"gh issue list failed for {owner}/{repo}: {proc.stderr.strip()}")
         raw: list[dict[str, Any]] = json.loads(proc.stdout)
+    except GitHubSyncError:
+        raise
     except Exception as exc:
-        logger.warning("gh issue list error for %s/%s: %s", owner, repo, exc)
-        return []
+        raise GitHubSyncError(f"gh issue list error for {owner}/{repo}: {exc}") from exc
 
     results: list[IssueRecord] = []
     for item in raw:
@@ -181,12 +186,12 @@ def list_open_prs(owner: str, repo: str, limit: int = 50) -> list[PullRequestRec
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=_gh_env())
         if proc.returncode != 0:
-            logger.warning("gh pr list failed for %s/%s: %s", owner, repo, proc.stderr.strip())
-            return []
+            raise GitHubSyncError(f"gh pr list failed for {owner}/{repo}: {proc.stderr.strip()}")
         raw: list[dict[str, Any]] = json.loads(proc.stdout)
+    except GitHubSyncError:
+        raise
     except Exception as exc:
-        logger.warning("gh pr list error for %s/%s: %s", owner, repo, exc)
-        return []
+        raise GitHubSyncError(f"gh pr list error for {owner}/{repo}: {exc}") from exc
 
     results: list[PullRequestRecord] = []
     for item in raw:
@@ -272,19 +277,20 @@ def map_pr_state(pr_json: dict[str, Any]) -> str:
 
 
 def sync_project_github(
-    conn: Any,
     project: ProjectConfig,
     max_items: int = 50,
 ) -> ProjectGitHubSyncResult:
-    """Sync open issues and PRs for a single project into the state DB.
+    """Fetch open issues and PRs for a single project from GitHub.
 
-    Handles inaccessible repos without crashing.
+    Handles inaccessible repos without crashing. Returns data to be persisted.
     """
     result = ProjectGitHubSyncResult(project_id=project.id)
 
     try:
         issues = list_open_issues(project.github.owner, project.github.repo, limit=max_items)
-    except Exception as exc:
+        result.issues = issues
+        result.issues_count = len(issues)
+    except GitHubSyncError as exc:
         msg = f"Failed to fetch issues for {project.id}: {exc}"
         logger.warning(msg)
         result.warnings.append(msg)
@@ -293,44 +299,13 @@ def sync_project_github(
 
     try:
         prs = list_open_prs(project.github.owner, project.github.repo, limit=max_items)
-    except Exception as exc:
+        result.prs = prs
+        result.prs_count = len(prs)
+    except GitHubSyncError as exc:
         msg = f"Failed to fetch PRs for {project.id}: {exc}"
         logger.warning(msg)
         result.warnings.append(msg)
         result.error = msg
         return result
-
-    for issue in issues:
-        labels_json = json.dumps(issue.labels)
-        upsert_issue(
-            conn,
-            project.id,
-            {
-                "number": issue.number,
-                "title": issue.title,
-                "state": "needs_triage",
-                "labels_json": labels_json,
-                "created_at": issue.created_at,
-                "updated_at": issue.updated_at,
-            },
-        )
-    result.issues_count = len(issues)
-
-    for pr in prs:
-        upsert_pull_request(
-            conn,
-            project.id,
-            {
-                "number": pr.number,
-                "title": pr.title,
-                "branch_name": pr.head_branch,
-                "base_branch": pr.base_branch,
-                "state": pr.review_stage,
-                "review_stage": pr.review_stage,
-                "created_at": pr.created_at,
-                "updated_at": pr.updated_at,
-            },
-        )
-    result.prs_count = len(prs)
 
     return result

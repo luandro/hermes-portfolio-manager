@@ -10,8 +10,8 @@ projects:
     status: active
     default_branch: auto
     local:
-      base_path: /srv/agent-system/worktrees/comapeo-cloud-app
-      issue_worktree_pattern: /srv/agent-system/worktrees/comapeo-cloud-app-issue-{issue_number}
+      base_path: worktrees/comapeo-cloud-app
+      issue_worktree_pattern: worktrees/comapeo-cloud-app-issue-{issue_number}
     protected_paths:
       - .github/workflows/**
       - infra/**

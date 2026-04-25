@@ -157,7 +157,7 @@ def init_state(conn: sqlite3.Connection) -> None:
         row = conn.execute("SELECT value FROM _schema_meta WHERE key='schema_version'").fetchone()
         if row:
             return
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     conn.executescript(SCHEMA_SQL)
     conn.execute("CREATE TABLE IF NOT EXISTS _schema_meta (key TEXT PRIMARY KEY, value TEXT)")

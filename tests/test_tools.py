@@ -370,7 +370,7 @@ def test_heartbeat_continues_on_project_failure(tmp_path: Path) -> None:
 
     call_count = 0
 
-    def flaky_sync(conn: Any, project: Any, max_items: int = 50) -> MagicMock:
+    def flaky_sync(project: Any, max_items: int = 50) -> MagicMock:
         nonlocal call_count
         call_count += 1
         if call_count == 1:

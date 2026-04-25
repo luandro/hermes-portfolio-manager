@@ -194,7 +194,7 @@ def test_normalize_local_paths(tmp_path: Path) -> None:
     (config_dir / "projects.yaml").write_text(valid.read_text(), encoding="utf-8")
     cfg2 = load_projects_config(tmp_path)
     first = cfg2.projects[0]
-    assert first.local.base_path == Path("/srv/agent-system/worktrees/comapeo-cloud-app")
+    assert first.local.base_path == tmp_path / "worktrees" / "comapeo-cloud-app"
 
 
 # ---------------------------------------------------------------------------

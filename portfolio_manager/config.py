@@ -182,9 +182,17 @@ def _validate_and_build_projects(
         project_id_str = str(raw["id"])
 
         if isinstance(local_raw, dict):
-            base_path = (
-                Path(str(local_raw["base_path"])) if local_raw.get("base_path") else root / "worktrees" / project_id_str
-            )
+            if local_raw.get("base_path"):
+                bp = Path(str(local_raw["base_path"]))
+                if not bp.is_absolute():
+                    bp = root / bp
+                bp = bp.resolve()
+                if not bp.is_relative_to(root.resolve()):
+                    errors.append(f"{prefix}: 'local.base_path' must be inside {root}")
+                base_path = bp
+            else:
+                base_path = root / "worktrees" / project_id_str
+
             issue_pattern = (
                 str(local_raw["issue_worktree_pattern"])
                 if local_raw.get("issue_worktree_pattern")

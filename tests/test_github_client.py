@@ -19,7 +19,6 @@ from portfolio_manager.github_client import (
     map_pr_state,
     sync_project_github,
 )
-from portfolio_manager.state import init_state, open_state
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -144,10 +143,14 @@ class TestListOpenIssues:
         assert "acme/app" in args
 
     @patch("portfolio_manager.github_client.subprocess.run")
-    def test_list_open_issues_error_returns_empty(self, mock_run: MagicMock):
+    def test_list_open_issues_error_raises(self, mock_run: MagicMock):
+        import pytest
+
+        from portfolio_manager.github_client import GitHubSyncError
+
         mock_run.side_effect = Exception("boom")
-        result = list_open_issues("acme", "app")
-        assert result == []
+        with pytest.raises(GitHubSyncError):
+            list_open_issues("acme", "app")
 
 
 # ---------------------------------------------------------------------------
@@ -175,10 +178,14 @@ class TestListOpenPrs:
         assert args[2] == "list"
 
     @patch("portfolio_manager.github_client.subprocess.run")
-    def test_list_open_prs_error_returns_empty(self, mock_run: MagicMock):
+    def test_list_open_prs_error_raises(self, mock_run: MagicMock):
+        import pytest
+
+        from portfolio_manager.github_client import GitHubSyncError
+
         mock_run.side_effect = Exception("boom")
-        result = list_open_prs("acme", "app")
-        assert result == []
+        with pytest.raises(GitHubSyncError):
+            list_open_prs("acme", "app")
 
 
 # ---------------------------------------------------------------------------
@@ -259,43 +266,29 @@ class TestSyncProjectGithub:
             for p in fixture_prs
         ]
 
-        conn = open_state(tmp_path)
-        init_state(conn)
-
-        from portfolio_manager.state import upsert_project
-
         project = _make_project()
-        upsert_project(conn, project)
 
-        result = sync_project_github(conn, project, max_items=50)
+        result = sync_project_github(project, max_items=50)
 
         assert isinstance(result, ProjectGitHubSyncResult)
         assert result.project_id == "test-proj"
         assert result.issues_count == 2
         assert result.prs_count == 2
+        assert len(result.issues) == 2
+        assert len(result.prs) == 2
         assert result.error is None
-
-        # Verify DB has records
-        cur = conn.execute("SELECT COUNT(*) FROM issues WHERE project_id=?", ("test-proj",))
-        assert cur.fetchone()[0] == 2
-        cur = conn.execute("SELECT COUNT(*) FROM pull_requests WHERE project_id=?", ("test-proj",))
-        assert cur.fetchone()[0] == 2
 
     @patch("portfolio_manager.github_client.list_open_prs")
     @patch("portfolio_manager.github_client.list_open_issues")
-    def test_sync_project_github_inaccessible(self, mock_issues: MagicMock, mock_prs: MagicMock, tmp_path: Path):
-        mock_issues.side_effect = Exception("repo not found")
+    def test_sync_project_github_inaccessible(self, mock_issues: MagicMock, mock_prs: MagicMock):
+        from portfolio_manager.github_client import GitHubSyncError
+
+        mock_issues.side_effect = GitHubSyncError("repo not found")
         mock_prs.return_value = []
 
-        conn = open_state(tmp_path)
-        init_state(conn)
-
-        from portfolio_manager.state import upsert_project
-
         project = _make_project()
-        upsert_project(conn, project)
 
-        result = sync_project_github(conn, project)
+        result = sync_project_github(project)
 
         assert isinstance(result, ProjectGitHubSyncResult)
         assert result.project_id == "test-proj"

@@ -17,7 +17,12 @@ if TYPE_CHECKING:
 
 from portfolio_manager.config import ConfigError, load_projects_config, resolve_root, select_projects
 from portfolio_manager.errors import redact_secrets
-from portfolio_manager.github_client import check_gh_auth, check_gh_available, sync_project_github
+from portfolio_manager.github_client import (
+    ProjectGitHubSyncResult,
+    check_gh_auth,
+    check_gh_available,
+    sync_project_github,
+)
 from portfolio_manager.state import (
     acquire_lock,
     add_event,
@@ -26,7 +31,9 @@ from portfolio_manager.state import (
     open_state,
     release_lock,
     start_heartbeat,
+    upsert_issue,
     upsert_project,
+    upsert_pull_request,
     upsert_worktree,
 )
 from portfolio_manager.summary import (
@@ -77,6 +84,38 @@ def _ensure_dirs(root: Path) -> None:
     """Create state/, worktrees/, logs/, artifacts/ if missing."""
     for d in ("state", "worktrees", "logs", "artifacts"):
         (root / d).mkdir(parents=True, exist_ok=True)
+
+
+def _persist_github_sync(conn: Any, project_id: str, sync: ProjectGitHubSyncResult) -> None:
+    """Persist fetched issues and PRs into the state database."""
+    for issue in sync.issues:
+        upsert_issue(
+            conn,
+            project_id,
+            {
+                "number": issue.number,
+                "title": issue.title,
+                "state": "needs_triage",
+                "labels_json": json.dumps(issue.labels),
+                "created_at": issue.created_at,
+                "updated_at": issue.updated_at,
+            },
+        )
+    for pr in sync.prs:
+        upsert_pull_request(
+            conn,
+            project_id,
+            {
+                "number": pr.number,
+                "title": pr.title,
+                "branch_name": pr.head_branch,
+                "base_branch": pr.base_branch,
+                "state": pr.review_stage,
+                "review_stage": pr.review_stage,
+                "created_at": pr.created_at,
+                "updated_at": pr.updated_at,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +275,8 @@ def _handle_portfolio_github_sync(args: dict[str, Any], **kwargs: Any) -> str:
 
         for project in projects:
             upsert_project(conn, project)
-            sync = sync_project_github(conn, project, max_items=max_items)
+            sync = sync_project_github(project, max_items=max_items)
+            _persist_github_sync(conn, project.id, sync)
             sync_results.append(
                 {
                     "id": sync.project_id,
@@ -381,7 +421,8 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
                 for project in projects:
                     upsert_project(conn, project)
                     if gh_ok:
-                        sync_project_github(conn, project)
+                        sync = sync_project_github(project)
+                        _persist_github_sync(conn, project.id, sync)
                     # Upsert worktrees
                     inspections = inspect_project_worktrees(project)
                     for insp in inspections:
@@ -467,6 +508,7 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
     init_state(conn)
 
     try:
+        hb_id: str | None = None
         # Acquire lock
         lock = acquire_lock(conn, _LOCK_NAME, _LOCK_OWNER, _LOCK_TTL)
         if not lock.acquired:
@@ -503,7 +545,8 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
             upsert_project(conn, project)
 
             # GitHub sync
-            sync = sync_project_github(conn, project)
+            sync = sync_project_github(project)
+            _persist_github_sync(conn, project.id, sync)
             total_issues += sync.issues_count
             total_prs += sync.prs_count
             if sync.warnings:
@@ -582,7 +625,8 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
         )
     except Exception as e:
         with contextlib.suppress(Exception):
-            finish_heartbeat(conn, hb_id, "failed", error=str(e))
+            if hb_id is not None:
+                finish_heartbeat(conn, hb_id, "failed", error=str(e))
         with contextlib.suppress(Exception):
             release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
         raise
