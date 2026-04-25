@@ -139,6 +139,10 @@ def _validate_and_build_projects(
     for idx, raw in enumerate(raw_projects):
         prefix = f"project[{idx}]"
 
+        if not isinstance(raw, dict):
+            errors.append(f"{prefix}: must be a mapping, got {type(raw).__name__}")
+            continue
+
         # 1.4 — required fields
         for fld in REQUIRED_PROJECT_FIELDS:
             if fld not in raw or not raw[fld]:
@@ -155,9 +159,6 @@ def _validate_and_build_projects(
         if errors:
             # Keep collecting but skip enum / duplicate checks for broken entries
             continue
-
-        assert isinstance(raw, dict)
-        assert isinstance(github_raw, dict)
 
         # 1.5 — enum validation
         priority = str(raw["priority"])
