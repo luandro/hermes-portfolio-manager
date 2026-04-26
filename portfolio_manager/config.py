@@ -209,6 +209,10 @@ def _validate_and_build_projects(
         protected = raw.get("protected_paths")
         protected_paths = list(protected) if isinstance(protected, list) else []
 
+        # github_raw is guaranteed dict here: the isinstance check on line 153
+        # adds an entry_error, and both error-guards (lines 160, 180) continue.
+        assert isinstance(github_raw, dict)
+
         projects.append(
             ProjectConfig(
                 id=project_id,
