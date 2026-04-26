@@ -1,20 +1,327 @@
 """Tests for dev_cli.py local tool runner."""
 
+from __future__ import annotations
+
 import json
 import subprocess
 import sys
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
-def test_dev_cli_portfolio_ping() -> None:
-    """dev_cli.py portfolio_ping --json returns valid JSON with success status."""
-    result = subprocess.run(
-        [sys.executable, "dev_cli.py", "portfolio_ping", "--json"],
+def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "dev_cli.py", *args],
         capture_output=True,
         text=True,
         check=False,
     )
 
-    assert result.returncode == 0, f"stderr: {result.stderr}"
-    parsed = json.loads(result.stdout)
+
+def _parse_json(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    assert result.returncode == 0, f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    return json.loads(result.stdout)
+
+
+def _write_config(root: Path, projects: list[dict[str, Any]] | None = None) -> Path:
+    """Write a projects.yaml into root/config/ and return root."""
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config = {"version": 1, "projects": projects or []}
+    (config_dir / "projects.yaml").write_text(
+        _to_yaml(config),
+        encoding="utf-8",
+    )
+    return root
+
+
+def _to_yaml(data: dict[str, Any]) -> str:
+    """Minimal YAML serializer for test fixtures."""
+    lines: list[str] = [f"version: {data['version']}", "projects:"]
+    for p in data.get("projects", []):
+        lines.append(f"  - id: {p['id']}")
+        lines.append(f"    name: {p.get('name', p['id'])}")
+        lines.append(f"    repo: {p.get('repo', '')}")
+        gh = p.get("github", {})
+        lines.append("    github:")
+        lines.append(f"      owner: {gh.get('owner', '')}")
+        lines.append(f"      repo: {gh.get('repo', '')}")
+        lines.append(f"    priority: {p.get('priority', 'medium')}")
+        lines.append(f"    status: {p.get('status', 'active')}")
+        lines.append(f"    default_branch: {p.get('default_branch', 'auto')}")
+    return "\n".join(lines) + "\n"
+
+
+SAMPLE_PROJECT: dict[str, Any] = {
+    "id": "test-project",
+    "name": "Test Project",
+    "repo": "https://github.com/example/test-project",
+    "github": {"owner": "example", "repo": "test-project"},
+    "priority": "medium",
+    "status": "active",
+    "default_branch": "auto",
+}
+
+
+# ---------------------------------------------------------------------------
+# MVP 1 — existing test
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_portfolio_ping() -> None:
+    """dev_cli.py portfolio_ping returns valid JSON with success status."""
+    result = _run_cli("portfolio_ping")
+    parsed = _parse_json(result)
     assert parsed["status"] == "success"
     assert parsed["tool"] == "portfolio_ping"
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_add
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_add(tmp_path: Path) -> None:
+    """portfolio_project_add with --repo, --priority, --root, --validate-github false."""
+    root = tmp_path / "portfolio"
+    result = _run_cli(
+        "portfolio_project_add",
+        "--repo",
+        "example/test-project",
+        "--priority",
+        "high",
+        "--root",
+        str(root),
+        "--validate-github",
+        "false",
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_add"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_pause
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_pause(tmp_path: Path) -> None:
+    """portfolio_project_pause with --project-id, --reason, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_pause",
+        "--project-id",
+        "test-project",
+        "--reason",
+        "maintenance",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_pause"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_resume
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_resume(tmp_path: Path) -> None:
+    """portfolio_project_resume with --project-id, --root."""
+    paused = {**SAMPLE_PROJECT, "status": "paused"}
+    root = _write_config(tmp_path / "portfolio", [paused])
+    result = _run_cli(
+        "portfolio_project_resume",
+        "--project-id",
+        "test-project",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_resume"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_archive
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_archive(tmp_path: Path) -> None:
+    """portfolio_project_archive with --project-id, --reason, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_archive",
+        "--project-id",
+        "test-project",
+        "--reason",
+        "deprecated",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_archive"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_set_priority
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_set_priority(tmp_path: Path) -> None:
+    """portfolio_project_set_priority with --project-id, --priority, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_set_priority",
+        "--project-id",
+        "test-project",
+        "--priority",
+        "high",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_set_priority"
+    assert "high" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_set_auto_merge
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_set_auto_merge(tmp_path: Path) -> None:
+    """portfolio_project_set_auto_merge with --project-id, --auto-merge-enabled, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_set_auto_merge",
+        "--project-id",
+        "test-project",
+        "--auto-merge-enabled",
+        "true",
+        "--auto-merge-max-risk",
+        "low",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_set_auto_merge"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_remove (no confirm → blocked)
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_remove_no_confirm(tmp_path: Path) -> None:
+    """portfolio_project_remove without --confirm returns blocked."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_remove",
+        "--project-id",
+        "test-project",
+        "--root",
+        str(root),
+    )
+    parsed = json.loads(result.stdout)
+    assert parsed["status"] == "blocked"
+    assert parsed["tool"] == "portfolio_project_remove"
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_remove (with confirm → success)
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_remove_with_confirm(tmp_path: Path) -> None:
+    """portfolio_project_remove with --confirm true succeeds."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_remove",
+        "--project-id",
+        "test-project",
+        "--confirm",
+        "true",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_remove"
+    assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_explain
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_explain(tmp_path: Path) -> None:
+    """portfolio_project_explain with --project-id, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_explain",
+        "--project-id",
+        "test-project",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_explain"
+    assert parsed["data"]["project"]["id"] == "test-project"
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_config_backup
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_config_backup(tmp_path: Path) -> None:
+    """portfolio_project_config_backup with --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_config_backup",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_config_backup"
+    assert parsed["data"].get("backup_created") is True
+
+
+# ---------------------------------------------------------------------------
+# MVP 2 — project_update
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_project_update(tmp_path: Path) -> None:
+    """portfolio_project_update with --project-id, --priority, --status, --root."""
+    root = _write_config(tmp_path / "portfolio", [SAMPLE_PROJECT])
+    result = _run_cli(
+        "portfolio_project_update",
+        "--project-id",
+        "test-project",
+        "--priority",
+        "low",
+        "--status",
+        "active",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success"
+    assert parsed["tool"] == "portfolio_project_update"
+    assert "test-project" in parsed["message"]
