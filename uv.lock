@@ -25,6 +25,7 @@ name = "hermes-portfolio-manager"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
@@ -36,6 +37,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pydantic", specifier = ">=2" },
     { name = "pydantic", marker = "extra == 'dev'", specifier = ">=2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7" },
     { name = "pyyaml", specifier = ">=6" },
