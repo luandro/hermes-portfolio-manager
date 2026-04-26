@@ -151,21 +151,22 @@ Boris Cherny (creator of Claude Code) keeps his team's file around 100 lines. Un
 **Fill this in per project. Keep it specific. Delete sections that don't apply.**
 
 ### Stack
-- Language and version: Python >=3.12 (from `pyproject.toml`)
+- Language and version: Python >=3.11 (from `pyproject.toml`)
 - Framework(s): Hermes plugin system (pure Python modules)
-- Package manager: pip with pyproject.toml (no runtime deps declared yet)
+- Package manager: uv (pyproject.toml)
 - Runtime / deployment target: Hermes Agent on a VPS with Telegram + GitHub integration
 
 ### Commands
-- Install: `pip install -e .` (once deps in pyproject.toml)
+- Install: `uv venv --python 3.11 && uv pip install -e ".[dev]"`
+- Install into Hermes: `uv pip install --python ~/.hermes/hermes-agent/venv/bin/python3 -e .`
 - Build: `TODO`
-- Test (all): `pytest`
-- Test (single file): `pytest tests/test_foo.py`
-- Lint: `ruff check .`
-- Format: `ruff format .`
-- Format check: `ruff format --check .`
-- Typecheck: `mypy --strict --ignore-missing-imports <valid-package-dir>/` (target actual Python package, not dev dir)
-- Security: `bandit -c pyproject.toml -r .`
+- Test (all): `uv run pytest`
+- Test (single file): `uv run pytest tests/test_foo.py`
+- Lint: `uv run ruff check .`
+- Format: `uv run ruff format .`
+- Format check: `uv run ruff format --check .`
+- Typecheck: `uv run mypy --strict --ignore-missing-imports <valid-package-dir>/` (target actual Python package, not dev dir)
+- Security: `uv run bandit -c pyproject.toml -r .`
 
 ### Layout
 - Source lives in: `TODO` — spec defines plugin dir `hermes-portfolio-manager/` with modules (config.py, github_client.py, worktree.py, state.py, summary.py, errors.py, tools.py, schemas.py). Installed as `~/.hermes/plugins/portfolio-manager/`. No source code committed yet.

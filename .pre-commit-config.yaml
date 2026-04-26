@@ -19,7 +19,8 @@ repos:
       - id: mypy
         additional_dependencies:
           - pyyaml
-        args: [--strict, --ignore-missing-imports]
+        args: ['--strict', '--ignore-missing-imports', 'portfolio_manager']
+        pass_filenames: false
 
   # Gitleaks: secret scanning
   - repo: https://github.com/gitleaks/gitleaks

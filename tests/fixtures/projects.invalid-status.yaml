@@ -1,0 +1,10 @@
+version: 1
+projects:
+  - id: bad-status-project
+    name: Bad Status Project
+    repo: git@github.com:awana-digital/bad-status.git
+    github:
+      owner: awana-digital
+      repo: bad-status
+    priority: high
+    status: unknown

@@ -1,0 +1,14 @@
+[
+  {
+    "number": 401,
+    "title": "Redesign settings page",
+    "headRefName": "feature/settings-redesign",
+    "baseRefName": "main",
+    "labels": [{"name": "design"}],
+    "reviewDecision": "CHANGES_REQUESTED",
+    "statusCheckRollup": [{"status": "completed", "conclusion": "success"}],
+    "createdAt": "2026-04-10T14:00:00Z",
+    "updatedAt": "2026-04-23T18:00:00Z",
+    "url": "https://github.com/acme/app/pull/401"
+  }
+]

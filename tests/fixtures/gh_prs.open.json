@@ -1,0 +1,26 @@
+[
+  {
+    "number": 201,
+    "title": "Refactor auth module",
+    "headRefName": "feature/auth-refactor",
+    "baseRefName": "main",
+    "labels": [{"name": "refactor"}],
+    "reviewDecision": "REVIEW_REQUIRED",
+    "statusCheckRollup": [{"status": "completed", "conclusion": "success"}],
+    "createdAt": "2026-04-19T12:00:00Z",
+    "updatedAt": "2026-04-23T16:00:00Z",
+    "url": "https://github.com/acme/app/pull/201"
+  },
+  {
+    "number": 202,
+    "title": "Update dependencies",
+    "headRefName": "deps/update-april",
+    "baseRefName": "main",
+    "labels": [{"name": "dependencies"}],
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [{"status": "completed", "conclusion": "success"}],
+    "createdAt": "2026-04-17T09:00:00Z",
+    "updatedAt": "2026-04-22T11:00:00Z",
+    "url": "https://github.com/acme/app/pull/202"
+  }
+]

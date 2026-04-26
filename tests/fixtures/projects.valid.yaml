@@ -1,0 +1,48 @@
+version: 1
+projects:
+  - id: comapeo-cloud-app
+    name: CoMapeo Cloud App
+    repo: git@github.com:awana-digital/comapeo-cloud-app.git
+    github:
+      owner: awana-digital
+      repo: comapeo-cloud-app
+    priority: high
+    status: active
+    default_branch: auto
+    local:
+      base_path: worktrees/comapeo-cloud-app
+      issue_worktree_pattern: worktrees/comapeo-cloud-app-issue-{issue_number}
+    protected_paths:
+      - .github/workflows/**
+      - infra/**
+      - auth/**
+      - migrations/**
+
+  - id: edt-next
+    name: EDT Website Migration
+    repo: git@github.com:awana-digital/edt-next.git
+    github:
+      owner: awana-digital
+      repo: edt-next
+    priority: medium
+    status: active
+    default_branch: auto
+
+  - id: docs-support-bot
+    name: Docs Support Bot
+    repo: git@github.com:awana-digital/docs-support-bot.git
+    github:
+      owner: awana-digital
+      repo: docs-support-bot
+    priority: low
+    status: paused
+    default_branch: main
+
+  - id: old-archived-project
+    name: Old Archived Project
+    repo: git@github.com:awana-digital/old-archived-project.git
+    github:
+      owner: awana-digital
+      repo: old-archived-project
+    priority: low
+    status: archived

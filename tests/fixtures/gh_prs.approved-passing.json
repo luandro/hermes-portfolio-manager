@@ -1,0 +1,17 @@
+[
+  {
+    "number": 501,
+    "title": "Add rate limiting middleware",
+    "headRefName": "feature/rate-limiting",
+    "baseRefName": "main",
+    "labels": [{"name": "enhancement"}, {"name": "security"}],
+    "reviewDecision": "APPROVED",
+    "statusCheckRollup": [
+      {"status": "completed", "conclusion": "success"},
+      {"status": "completed", "conclusion": "success"}
+    ],
+    "createdAt": "2026-04-12T11:00:00Z",
+    "updatedAt": "2026-04-24T09:00:00Z",
+    "url": "https://github.com/acme/app/pull/501"
+  }
+]

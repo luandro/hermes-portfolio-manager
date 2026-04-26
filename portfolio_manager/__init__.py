@@ -2,52 +2,65 @@
 
 from __future__ import annotations
 
-import json
+from pathlib import Path
 from typing import Any
 
-from portfolio_manager.tools import _handle_portfolio_ping
+from portfolio_manager.schemas import (
+    PORTFOLIO_CONFIG_VALIDATE_SCHEMA,
+    PORTFOLIO_GITHUB_SYNC_SCHEMA,
+    PORTFOLIO_HEARTBEAT_SCHEMA,
+    PORTFOLIO_PING_SCHEMA,
+    PORTFOLIO_PROJECT_LIST_SCHEMA,
+    PORTFOLIO_STATUS_SCHEMA,
+    PORTFOLIO_WORKTREE_INSPECT_SCHEMA,
+)
+from portfolio_manager.tools import (
+    _handle_portfolio_config_validate,
+    _handle_portfolio_github_sync,
+    _handle_portfolio_heartbeat,
+    _handle_portfolio_ping,
+    _handle_portfolio_project_list,
+    _handle_portfolio_status,
+    _handle_portfolio_worktree_inspect,
+)
 
-PORTFOLIO_PING_SCHEMA = {
-    "name": "portfolio_ping",
-    "description": "Smoke test: confirm the Portfolio Manager plugin is loaded.",
-    "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-    },
+# Tool name -> (schema, handler) mapping
+_TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
+    ("portfolio_ping", PORTFOLIO_PING_SCHEMA, _handle_portfolio_ping),
+    ("portfolio_config_validate", PORTFOLIO_CONFIG_VALIDATE_SCHEMA, _handle_portfolio_config_validate),
+    ("portfolio_project_list", PORTFOLIO_PROJECT_LIST_SCHEMA, _handle_portfolio_project_list),
+    ("portfolio_github_sync", PORTFOLIO_GITHUB_SYNC_SCHEMA, _handle_portfolio_github_sync),
+    ("portfolio_worktree_inspect", PORTFOLIO_WORKTREE_INSPECT_SCHEMA, _handle_portfolio_worktree_inspect),
+    ("portfolio_status", PORTFOLIO_STATUS_SCHEMA, _handle_portfolio_status),
+    ("portfolio_heartbeat", PORTFOLIO_HEARTBEAT_SCHEMA, _handle_portfolio_heartbeat),
+]
+
+# Skills directory relative to this file
+_PLUGIN_DIR = Path(__file__).parent
+_SKILLS_DIR = _PLUGIN_DIR / "skills"
+
+_SKILL_DESCRIPTIONS: dict[str, str] = {
+    "portfolio-status": "View portfolio status — projects, issues, PRs, worktrees.",
+    "portfolio-heartbeat": "Periodic health check across all portfolio projects.",
 }
 
 
-def tool_result(
-    *,
-    status: str,
-    tool: str,
-    message: str,
-    data: dict[str, Any] | None = None,
-    summary: str = "",
-    reason: str | None = None,
-) -> str:
-    """Build a JSON string in the shared tool result format."""
-    return json.dumps(
-        {
-            "status": status,
-            "tool": tool,
-            "message": message,
-            "data": data if data is not None else {},
-            "summary": summary,
-            "reason": reason,
-        },
-        ensure_ascii=False,
-    )
-
-
 def register(ctx: Any) -> None:
-    """Register portfolio tools with the Hermes plugin context."""
-    ctx.register_tool(
-        name="portfolio_ping",
-        toolset="portfolio-manager",
-        schema=PORTFOLIO_PING_SCHEMA,
-        handler=_handle_portfolio_ping,
-        check_fn=None,
-        emoji="",
-    )
+    """Register all portfolio tools and skills with the Hermes plugin context."""
+    for name, schema, handler in _TOOL_REGISTRY:
+        ctx.register_tool(
+            name=name,
+            toolset="portfolio-manager",
+            schema=schema,
+            handler=handler,
+            check_fn=None,
+            emoji="",
+        )
+    for name, description in _SKILL_DESCRIPTIONS.items():
+        skill_path = _SKILLS_DIR / name / "SKILL.md"
+        if skill_path.exists():
+            ctx.register_skill(
+                name=name,
+                path=skill_path,
+                description=description,
+            )

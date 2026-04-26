@@ -1,0 +1,9 @@
+version: 1
+projects:
+  - name: Missing ID Project
+    repo: git@github.com:awana-digital/missing-id.git
+    github:
+      owner: awana-digital
+      repo: missing-id
+    priority: high
+    status: active
