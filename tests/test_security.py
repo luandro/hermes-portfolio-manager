@@ -11,6 +11,7 @@ Phase 8 ensures all MVP-1 code stays read-only and avoids:
 from __future__ import annotations
 
 import importlib
+import re
 import subprocess
 from pathlib import Path
 from typing import ClassVar
@@ -206,13 +207,17 @@ class TestMvp1ReadOnlyBoundary:
     @pytest.mark.parametrize("func_name", BANNED_FUNCTIONS)
     def test_no_write_function_definitions(self, func_name: str) -> None:
         """Verify banned function '{func_name}' is not defined anywhere in source."""
+        # Use word-boundary regex to match exact function names,
+        # e.g. "def create_pr(" but not "def create_projects_config_backup("
+        def_pattern = re.compile(rf"\bdef {func_name}\b")
+        reg_pattern = re.compile(rf"\({func_name}\b")
         for src_file in SOURCE_FILES:
             content = src_file.read_text()
             # Check for function definitions
-            assert f"def {func_name}" not in content, (
+            assert not def_pattern.search(content), (
                 f"Write function '{func_name}()' defined in {src_file.relative_to(SRC_DIR.parent)}"
             )
             # Check for handler registrations
-            assert f"({func_name}," not in content, (
+            assert not reg_pattern.search(content), (
                 f"Write function '{func_name}' registered in {src_file.relative_to(SRC_DIR.parent)}"
             )
