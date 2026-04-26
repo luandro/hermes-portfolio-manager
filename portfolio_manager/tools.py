@@ -83,7 +83,7 @@ def _blocked(tool: str, message: str, reason: str | None = None, data: dict[str,
 
 def _ensure_dirs(root: Path) -> None:
     """Create state/, worktrees/, logs/, artifacts/ if missing."""
-    for d in ("state", "worktrees", "logs", "artifacts"):
+    for d in ("state", "worktrees", "logs", "artifacts", "backups"):
         (root / d).mkdir(parents=True, exist_ok=True)
 
 
