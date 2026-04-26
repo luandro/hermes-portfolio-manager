@@ -410,8 +410,20 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
     conn = open_state(root)
     init_state(conn)
 
+    _lock_acquired = False
     try:
         if refresh:
+            lock = acquire_lock(conn, _LOCK_NAME, _LOCK_OWNER, _LOCK_TTL)
+            if not lock.acquired:
+                return _result(
+                    status="blocked",
+                    tool=tool,
+                    message="Status refresh blocked: heartbeat lock already held.",
+                    data={},
+                    summary="Status refresh blocked: another operation is running.",
+                    reason="heartbeat_lock_already_held",
+                )
+            _lock_acquired = True
             # Run github sync + worktree inspect for all active projects
             try:
                 config = load_projects_config(root)
@@ -480,6 +492,9 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
             summary=summary,
         )
     finally:
+        if _lock_acquired:
+            with contextlib.suppress(Exception):
+                release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
         conn.close()
 
 

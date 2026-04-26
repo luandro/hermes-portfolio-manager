@@ -234,7 +234,7 @@ def inspect_project_worktrees(project: ProjectConfig, root: Path | None = None) 
 
     base_path = project.local.base_path
     if root is None:
-        root = base_path.parent.parent if base_path else Path("/")
+        root = base_path.parent.parent
 
     # Inspect base worktree
     base_inspection = inspect_worktree(base_path, project_id=project.id)

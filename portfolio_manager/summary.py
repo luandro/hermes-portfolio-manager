@@ -258,7 +258,10 @@ def summarize_portfolio_status(state_snapshot: dict[str, Any], status_filter: st
     if worktrees:
         dirty_count = sum(1 for w in worktrees if w.get("state") in _NEEDS_USER_WORKTREE_STATES)
         clean_count = sum(1 for w in worktrees if w.get("state") == "clean")
-        lines.append(f"{dirty_count} worktree{'s' if dirty_count != 1 else ''} need attention, {clean_count} clean.")
+        lines.append(
+            f"{dirty_count} worktree{'s' if dirty_count != 1 else ''} "
+            f"{'need' if dirty_count != 1 else 'needs'} attention, {clean_count} clean."
+        )
 
     return "\n".join(lines)
 

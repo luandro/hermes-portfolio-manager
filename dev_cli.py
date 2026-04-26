@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -19,7 +18,7 @@ from portfolio_manager.tools import (
     _handle_portfolio_worktree_inspect,
 )
 
-TOOL_HANDLERS: dict[str, Callable[[dict[str, str]], str] | None] = {
+TOOL_HANDLERS: dict[str, Callable[[dict[str, str]], str]] = {
     "portfolio_ping": _handle_portfolio_ping,
     "portfolio_config_validate": _handle_portfolio_config_validate,
     "portfolio_project_list": _handle_portfolio_project_list,
@@ -37,20 +36,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     handler = TOOL_HANDLERS[args.tool]
-    if handler is None:
-        result = json.dumps(
-            {
-                "status": "blocked",
-                "tool": args.tool,
-                "message": f"{args.tool} is not yet implemented",
-                "data": {},
-                "summary": f"{args.tool} is not yet implemented.",
-                "reason": None,
-            },
-            ensure_ascii=False,
-        )
-    else:
-        result = handler({})
+    result = handler({})
 
     print(result)
 

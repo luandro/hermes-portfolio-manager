@@ -368,12 +368,8 @@ def test_heartbeat_blocked_no_gh(tmp_path: Path) -> None:
 def test_heartbeat_continues_on_project_failure(tmp_path: Path) -> None:
     root = _make_root_with_config(tmp_path)
 
-    call_count = 0
-
     def flaky_sync(project: Any, max_items: int = 50) -> MagicMock:
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
+        if project.id == "comapeo-cloud-app":
             return MagicMock(
                 project_id=project.id,
                 issues_count=0,

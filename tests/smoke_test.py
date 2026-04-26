@@ -7,15 +7,7 @@ import json
 import os
 import sys
 
-
-def _get_tools_module():
-    """Import portfolio_manager.tools — relies on uv editable install."""
-    import portfolio_manager.tools  # fmt: skip
-
-    return portfolio_manager.tools
-
-
-_tools = _get_tools_module()
+import portfolio_manager.tools as _tools  # fmt: skip
 
 
 def test(tool_name: str, handler, args: dict | None = None) -> dict:
@@ -40,8 +32,8 @@ def test(tool_name: str, handler, args: dict | None = None) -> dict:
     print(f"  [{symbol}] {tool_name}: {status} — {msg}")
     if result.get("summary"):
         print(f"           summary: {result['summary']}")
-    if result.get("warnings") or result.get("data", {}).get("has_warnings"):
-        warns = result.get("data", {}).get("warnings", [])
+    warns = result.get("data", {}).get("warnings", [])
+    if warns:
         for w in warns:
             print(f"           warning: {w}")
     return result

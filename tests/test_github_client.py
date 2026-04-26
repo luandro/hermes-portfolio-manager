@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 
+import pytest
+
 from portfolio_manager.config import GithubRef, LocalPaths, ProjectConfig
 from portfolio_manager.github_client import (
+    GitHubSyncError,
     IssueRecord,
     ProjectGitHubSyncResult,
     PullRequestRecord,
@@ -144,10 +147,6 @@ class TestListOpenIssues:
 
     @patch("portfolio_manager.github_client.subprocess.run")
     def test_list_open_issues_error_raises(self, mock_run: MagicMock):
-        import pytest
-
-        from portfolio_manager.github_client import GitHubSyncError
-
         mock_run.side_effect = Exception("boom")
         with pytest.raises(GitHubSyncError):
             list_open_issues("acme", "app")
@@ -179,10 +178,6 @@ class TestListOpenPrs:
 
     @patch("portfolio_manager.github_client.subprocess.run")
     def test_list_open_prs_error_raises(self, mock_run: MagicMock):
-        import pytest
-
-        from portfolio_manager.github_client import GitHubSyncError
-
         mock_run.side_effect = Exception("boom")
         with pytest.raises(GitHubSyncError):
             list_open_prs("acme", "app")
@@ -286,8 +281,6 @@ class TestSyncProjectGithub:
     @patch("portfolio_manager.github_client.list_open_prs")
     @patch("portfolio_manager.github_client.list_open_issues")
     def test_sync_project_github_inaccessible(self, mock_issues: MagicMock, mock_prs: MagicMock):
-        from portfolio_manager.github_client import GitHubSyncError
-
         mock_issues.side_effect = GitHubSyncError("repo not found")
         mock_prs.return_value = []
 

@@ -204,6 +204,13 @@ def upsert_project(conn: sqlite3.Connection, project: ProjectConfig) -> None:
 
 
 def upsert_issue(conn: sqlite3.Connection, project_id: str, issue_record: dict[str, Any]) -> None:
+    """Insert or update an issue record.
+
+    On conflict (same project_id + issue_number), only title, labels_json,
+    last_seen_at, and updated_at are updated. The existing ``state`` is
+    intentionally preserved so that manually-set states (e.g. "in_progress")
+    are not overwritten by the default "needs_triage" from GitHub sync.
+    """
     now = _utcnow()
     conn.execute(
         """INSERT INTO issues
@@ -414,12 +421,12 @@ def acquire_lock(conn: sqlite3.Connection, name: str, owner: str, ttl_seconds: i
         return LockResult(acquired=False, reason=f"held by {existing_owner}")
 
     # Expired — conditional UPDATE guards against a concurrent steal (CAS pattern)
-    conn.execute(
+    cur = conn.execute(
         "UPDATE locks SET owner=?, acquired_at=?, expires_at=? WHERE name=? AND expires_at=?",
         (owner, now_iso, expires_iso, name, expires_at_str),
     )
     conn.commit()
-    if conn.execute("SELECT changes()").fetchone()[0] > 0:
+    if cur.rowcount > 0:
         return LockResult(acquired=True)
 
     return LockResult(acquired=False, reason="lock contention on expiry")

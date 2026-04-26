@@ -540,10 +540,10 @@ class TestLock:
 
     def test_lock_expired_replaced(self, tmp_path: Path):
         conn = _open_and_init(str(tmp_path))
-        # Acquire with a very short TTL
-        r1 = acquire_lock(conn, "heartbeat:portfolio", "agent-1", 0)
+        # Acquire with a negative TTL so it's already in the past
+        r1 = acquire_lock(conn, "heartbeat:portfolio", "agent-1", -1)
         assert r1.acquired is True
-        # TTL=0 means already expired, so second acquire should succeed
+        # Expired lock should be replaceable
         r2 = acquire_lock(conn, "heartbeat:portfolio", "agent-2", 900)
         assert r2.acquired is True
         conn.close()

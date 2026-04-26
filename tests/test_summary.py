@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from portfolio_manager.config import GithubRef, LocalPaths, ProjectConfig
 from portfolio_manager.summary import (
     summarize_github_sync,
@@ -30,7 +32,7 @@ def _project(
         github=GithubRef(owner="test", repo="repo"),
         priority=priority,
         status=status,
-        local=LocalPaths(base_path="/tmp/dummy", issue_worktree_pattern="/tmp/dummy-issue-{issue_number}"),
+        local=LocalPaths(base_path=Path("/tmp/dummy"), issue_worktree_pattern="/tmp/dummy-issue-{issue_number}"),
     )
 
 

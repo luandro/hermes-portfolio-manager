@@ -181,10 +181,6 @@ def _validate_and_build_projects(
             errors.extend(entry_errors)
             continue
 
-        # github_raw is guaranteed dict here (non-dict appends to entry_errors and continues)
-        if not isinstance(github_raw, dict):  # type: ignore[redundant-isinstance]
-            continue
-
         # 1.7 — normalize local paths
         local_raw = raw.get("local")
         project_id_str = str(raw["id"])
@@ -231,7 +227,7 @@ def _validate_and_build_projects(
         )
 
     if errors:
-        # Show the first error that matches what tests look for
+        # Report all accumulated validation errors
         raise ConfigError("; ".join(errors))
 
     return projects
@@ -251,18 +247,26 @@ def select_projects(
 ) -> list[ProjectConfig]:
     """Filter and sort projects from the portfolio config.
 
-    By default excludes archived and paused projects.
-    Sorts by priority: critical > high > medium > low > paused.
+    When *status* is provided, only projects matching that status are returned
+    (the ``include_archived`` / ``include_paused`` flags are ignored).
+
+    When *status* is ``None``, projects are filtered by the boolean flags:
+    archived and paused projects are excluded unless the corresponding flag is
+    set.
+
+    Results are sorted by priority: critical > high > medium > low > paused.
     """
     result: list[ProjectConfig] = []
 
     for p in config.projects:
-        if not include_archived and p.status == "archived":
-            continue
-        if not include_paused and p.status == "paused":
-            continue
-        if status is not None and p.status != status:
-            continue
+        if status is not None:
+            if p.status != status:
+                continue
+        else:
+            if not include_archived and p.status == "archived":
+                continue
+            if not include_paused and p.status == "paused":
+                continue
         result.append(p)
 
     result.sort(key=lambda p: PRIORITY_ORDER.get(p.priority, 99))
