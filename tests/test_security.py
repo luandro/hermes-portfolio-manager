@@ -221,3 +221,161 @@ class TestMvp1ReadOnlyBoundary:
             assert not reg_pattern.search(content), (
                 f"Write function '{func_name}' registered in {src_file.relative_to(SRC_DIR.parent)}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 — MVP 2 security hardening
+# ---------------------------------------------------------------------------
+
+# Admin / MVP 2 source files to scan
+ADMIN_FILES = sorted(
+    p
+    for p in SRC_DIR.rglob("*.py")
+    if p.name
+    in {
+        "admin_functions.py",
+        "admin_writes.py",
+        "admin_locks.py",
+        "admin_models.py",
+        "repo_parser.py",
+        "repo_validation.py",
+    }
+)
+
+
+class TestMvp2NoGithubMutations:
+    """MVP 2 admin modules must not contain GitHub mutation commands."""
+
+    BANNED_GH: ClassVar[list[str]] = TestNoGithubMutations.BANNED_GH
+
+    @pytest.mark.parametrize("banned", BANNED_GH)
+    def test_no_github_mutations_in_admin_code(self, banned: str) -> None:
+        """Verify banned gh command '{banned}' not in admin modules."""
+        for src_file in ADMIN_FILES:
+            content = src_file.read_text()
+            assert banned not in content, (
+                f"Banned gh command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
+
+
+class TestMvp2NoUnsafeGitCommands:
+    """MVP 2 admin modules must not contain unsafe git commands."""
+
+    BANNED_GIT: ClassVar[list[str]] = TestNoUnsafeGitCommands.BANNED_GIT
+
+    @pytest.mark.parametrize("banned", BANNED_GIT)
+    def test_no_unsafe_git_in_admin_code(self, banned: str) -> None:
+        """Verify banned git command '{banned}' not in admin modules."""
+        for src_file in ADMIN_FILES:
+            content = src_file.read_text()
+            assert banned not in content, (
+                f"Banned git command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
+
+
+class TestMvp2SubprocessArgumentArrays:
+    """repo_validation.py must use argument arrays, not shell strings."""
+
+    def test_repo_validation_uses_argument_arrays(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """validate_github_repo passes a list to subprocess.run, never a string."""
+        calls: list[tuple] = []
+        original_run = subprocess.run
+
+        def tracking_run(*args: object, **kwargs: object) -> object:
+            calls.append((args, kwargs))
+            return original_run(["true"], capture_output=True, text=True)
+
+        monkeypatch.setattr(subprocess, "run", tracking_run)
+
+        import portfolio_manager.repo_validation as mod
+
+        importlib.reload(mod)
+
+        # Call the function — will get a minimal result (gh not available in CI)
+        mod.validate_github_repo("owner", "repo")
+
+        assert len(calls) >= 1, "Expected at least one subprocess.run call"
+        for call_args, call_kwargs in calls:
+            cmd = call_args[0] if call_args else call_kwargs.get("args", [])
+            assert isinstance(cmd, list), f"Expected list, got {type(cmd).__name__}: {cmd}"
+            assert not call_kwargs.get("shell", False), f"shell=True found in call: {cmd}"
+
+
+class TestMvp2RedactSecretsInToolOutput:
+    """_result() in tools.py must redact secrets from output."""
+
+    def test_redact_secrets_in_tool_output(self) -> None:
+        """Tokens in _result() message are redacted."""
+        from portfolio_manager.tools import _result
+
+        output = _result(
+            status="success",
+            tool="test_tool",
+            message="Token is ghp_abc123def456ghi789 in output",
+        )
+        assert "ghp_abc123def456ghi789" not in output, "GitHub token leaked in tool output"
+        assert "ghp_***" in output, "Token not properly redacted"
+
+
+class TestMvp2AdminDoesNotModifyRepositories:
+    """Admin tool handlers must not create/modify files inside repository paths."""
+
+    def test_admin_does_not_modify_repositories(self, tmp_path: object) -> None:
+        """Running admin handlers only touches config/state/backups, not repo dirs."""
+
+        tmp = tmp_path  # type: ignore[assignment]
+        from pathlib import Path as PathCls
+
+        tmp = PathCls(str(tmp))
+
+        # Create a fake repo-like directory (simulates a checked-out repo)
+        repo_dir = tmp / "worktrees" / "my-project"
+        repo_dir.mkdir(parents=True)
+        repo_file = repo_dir / "README.md"
+        repo_file.write_text("original content", encoding="utf-8")
+
+        # Snapshot all files under the repo dir
+        repo_files_before: dict[str, str] = {}
+        for f in repo_dir.rglob("*"):
+            if f.is_file():
+                repo_files_before[str(f.relative_to(repo_dir))] = f.read_text(encoding="utf-8")
+
+        # Create minimal config so handlers can load it
+        config_dir = tmp / "config"
+        config_dir.mkdir(parents=True)
+        config_yaml = config_dir / "projects.yaml"
+        config_yaml.write_text(
+            "version: 1\nprojects:\n"
+            "- id: my-project\n  name: My Project\n  repo: git@github.com:test/my-project.git\n"
+            "  github: {owner: test, repo: my-project}\n"
+            "  priority: medium\n  status: active\n  default_branch: auto\n",
+            encoding="utf-8",
+        )
+
+        # Import handlers
+        from portfolio_manager.tools import (
+            _handle_portfolio_project_explain,
+            _handle_portfolio_project_list,
+            _handle_portfolio_project_update,
+        )
+
+        # Run read-only handlers
+        _handle_portfolio_project_list({"root": str(tmp)})
+        _handle_portfolio_project_explain({"root": str(tmp), "project_id": "my-project"})
+
+        # Run a mutation handler (will write config, but not repo files)
+        _handle_portfolio_project_update({"root": str(tmp), "project_id": "my-project", "priority": "high"})
+
+        # Verify repo files unchanged
+        repo_files_after: dict[str, str] = {}
+        for f in repo_dir.rglob("*"):
+            if f.is_file():
+                repo_files_after[str(f.relative_to(repo_dir))] = f.read_text(encoding="utf-8")
+
+        assert repo_files_before == repo_files_after, (
+            f"Admin handler modified repo files: {set(repo_files_after) - set(repo_files_before)}"
+        )
+
+        # Verify no new files created inside repo dir
+        new_files = set(repo_files_after) - set(repo_files_before)
+        assert not new_files, f"Admin handler created files in repo: {new_files}"
