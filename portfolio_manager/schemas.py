@@ -61,6 +61,7 @@ PORTFOLIO_PROJECT_LIST_SCHEMA = {
             "status": {
                 "type": "string",
                 "description": ("Optional project status filter: active, paused, archived, blocked, missing."),
+                "enum": ["active", "paused", "archived", "blocked", "missing"],
             },
             "include_archived": {
                 "type": "boolean",

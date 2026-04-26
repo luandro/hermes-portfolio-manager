@@ -236,7 +236,7 @@ class TestMapPrState:
 class TestSyncProjectGithub:
     @patch("portfolio_manager.github_client.list_open_prs")
     @patch("portfolio_manager.github_client.list_open_issues")
-    def test_sync_project_github(self, mock_issues: MagicMock, mock_prs: MagicMock, tmp_path: Path):
+    def test_sync_project_github(self, mock_issues: MagicMock, mock_prs: MagicMock):
         fixture_issues = _load_fixture("gh_issues.open.json")
         fixture_prs = _load_fixture("gh_prs.open.json")
         mock_issues.return_value = [

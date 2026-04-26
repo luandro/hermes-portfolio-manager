@@ -76,4 +76,9 @@ addopts = "-v --tb=short"
 [tool.bandit]
 targets = ["portfolio_manager"]
 exclude_dirs = ["tests"]
-skips = ["B101", "B404", "B603", "B607"]  # assert_ok, subprocess imports/calls expected in this project
+skips = [
+    "B101",  # assert is expected in tests
+    "B404",  # subprocess imports are intentional
+    "B603",  # subprocess.run calls are expected in this project
+    "B607",  # subprocess.run calls are expected in this project
+]

@@ -66,7 +66,7 @@ def summarize_project_list(projects: list[ProjectConfig], counts: dict[str, int]
     active_projects = [p for p in projects if p.status != "archived"]
     sorted_projects = sorted(active_projects, key=lambda p: PRIORITY_ORDER.get(p.priority, 99))
 
-    total = counts.get("active", 0)
+    total = counts.get("active", 0) + counts.get("paused", 0)
     lines: list[str] = [f"I am managing {total} project{'s' if total != 1 else ''}."]
 
     # Group by priority
@@ -258,10 +258,18 @@ def summarize_portfolio_status(state_snapshot: dict[str, Any], status_filter: st
     if worktrees:
         dirty_count = sum(1 for w in worktrees if w.get("state") in _NEEDS_USER_WORKTREE_STATES)
         clean_count = sum(1 for w in worktrees if w.get("state") == "clean")
-        lines.append(
-            f"{dirty_count} worktree{'s' if dirty_count != 1 else ''} "
-            f"{'need' if dirty_count != 1 else 'needs'} attention, {clean_count} clean."
-        )
+        other_count = len(worktrees) - dirty_count - clean_count
+        parts = []
+        if dirty_count:
+            parts.append(
+                f"{dirty_count} worktree{'s' if dirty_count != 1 else ''} "
+                f"{'need' if dirty_count != 1 else 'needs'} attention"
+            )
+        if clean_count:
+            parts.append(f"{clean_count} clean")
+        if other_count:
+            parts.append(f"{other_count} blocked/unknown")
+        lines.append(", ".join(parts) + ".")
 
     return "\n".join(lines)
 

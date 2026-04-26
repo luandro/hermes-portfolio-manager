@@ -18,7 +18,7 @@ from portfolio_manager.tools import (
     _handle_portfolio_worktree_inspect,
 )
 
-TOOL_HANDLERS: dict[str, Callable[[dict[str, str]], str]] = {
+TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_ping": _handle_portfolio_ping,
     "portfolio_config_validate": _handle_portfolio_config_validate,
     "portfolio_project_list": _handle_portfolio_project_list,

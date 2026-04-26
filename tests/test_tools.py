@@ -332,10 +332,13 @@ def test_heartbeat_blocked_by_lock(tmp_path: Path) -> None:
 
     conn = open_state(root)
     init_state(conn)
-    # Pre-acquire the lock
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC).isoformat()
+    expires = datetime.fromtimestamp(datetime.now(UTC).timestamp() + 900, tz=UTC).isoformat()
     conn.execute(
-        "INSERT INTO locks (name, owner, acquired_at, expires_at) VALUES (?, ?, datetime('now'), datetime('now', '+900 seconds'))",
-        ("heartbeat:portfolio", "other-owner"),
+        "INSERT INTO locks (name, owner, acquired_at, expires_at) VALUES (?, ?, ?, ?)",
+        ("heartbeat:portfolio", "other-owner", now, expires),
     )
     conn.commit()
     conn.close()

@@ -20,7 +20,7 @@ def redact_secrets(text: str) -> str:
     patterns: list[tuple[str, str]] = [
         (r"\b(github_pat_)[A-Za-z0-9_\-]+", r"\1***"),
         (r"\b(gh[rouspa]_)[A-Za-z0-9_\-]+", r"\1***"),
-        (r"\bBearer\s+[^\s]+", "Bearer ***"),
+        (r"\bBearer\s+\S+", "Bearer ***"),
         (r"(?<![\w])(token=)\S+", r"\1***"),
     ]
     result = text

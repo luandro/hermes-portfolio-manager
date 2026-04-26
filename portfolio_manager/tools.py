@@ -90,6 +90,8 @@ def _ensure_dirs(root: Path) -> None:
 def _persist_github_sync(conn: sqlite3.Connection, project_id: str, sync: ProjectGitHubSyncResult) -> None:
     """Persist fetched issues and PRs into the state database."""
     for issue in sync.issues:
+        # NOTE: state='needs_triage' is the default for new rows; upsert_issue
+        # intentionally preserves existing state on conflict (see state.py).
         upsert_issue(
             conn,
             project_id,
@@ -336,7 +338,20 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
     conn = open_state(root)
     init_state(conn)
 
+    _lock_acquired = False
     try:
+        lock = acquire_lock(conn, _LOCK_NAME, _LOCK_OWNER, _LOCK_TTL)
+        if not lock.acquired:
+            return _result(
+                status="blocked",
+                tool=tool,
+                message="Worktree inspect blocked: heartbeat lock already held.",
+                data={},
+                summary="Worktree inspect blocked: another operation is running.",
+                reason="heartbeat_lock_already_held",
+            )
+        _lock_acquired = True
+
         all_inspections = []
         for project in projects:
             upsert_project(conn, project)
@@ -390,7 +405,19 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
             summary=summary,
         )
     finally:
+        if _lock_acquired:
+            with contextlib.suppress(Exception):
+                release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat lock constants (shared by status, worktree_inspect, and heartbeat)
+# ---------------------------------------------------------------------------
+
+_LOCK_NAME = "heartbeat:portfolio"
+_LOCK_TTL = 900
+_LOCK_OWNER = "portfolio-manager"
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +482,17 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
                             },
                         )
             except ConfigError as exc:
-                logger.warning("Status refresh skipped: %s", exc)  # No config — still query whatever state exists
+                logger.warning("Status refresh skipped: %s", exc)
+            except Exception as exc:
+                logger.exception("Status refresh failed: %s", exc)
+                return _result(
+                    status="error",
+                    tool=tool,
+                    message=f"Status refresh failed: {redact_secrets(str(exc))}",
+                    data={},
+                    summary="Status refresh encountered an error.",
+                    reason="refresh_failed",
+                )
 
         # Query state for snapshot
         issues_rows = conn.execute("SELECT project_id, issue_number, title, state FROM issues").fetchall()
@@ -502,10 +539,6 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
 # portfolio_heartbeat
 # ---------------------------------------------------------------------------
 
-_LOCK_NAME = "heartbeat:portfolio"
-_LOCK_TTL = 900
-_LOCK_OWNER = "portfolio-manager"
-
 
 def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
     """Run the read-only portfolio heartbeat across all configured projects."""
@@ -525,6 +558,7 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
 
     try:
         hb_id: str | None = None
+        lock_acquired = False
         # Acquire lock
         lock = acquire_lock(conn, _LOCK_NAME, _LOCK_OWNER, _LOCK_TTL)
         if not lock.acquired:
@@ -536,6 +570,7 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
                 summary="Heartbeat is already running.",
                 reason="heartbeat_lock_already_held",
             )
+        lock_acquired = True
 
         # Check gh
         gh_check = check_gh_available()
@@ -558,54 +593,67 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
         all_worktree_inspections = []
 
         for project in projects:
-            upsert_project(conn, project)
+            try:
+                upsert_project(conn, project)
 
-            # GitHub sync
-            sync = sync_project_github(project)
-            _persist_github_sync(conn, project.id, sync)
-            total_issues += sync.issues_count
-            total_prs += sync.prs_count
-            if sync.warnings:
-                all_warnings.extend(sync.warnings)
+                # GitHub sync
+                sync = sync_project_github(project)
+                _persist_github_sync(conn, project.id, sync)
+                total_issues += sync.issues_count
+                total_prs += sync.prs_count
+                if sync.warnings:
+                    all_warnings.extend(sync.warnings)
+                    add_event(
+                        conn,
+                        hb_id,
+                        "warning",
+                        "github.sync.warning",
+                        f"Sync warnings for {project.id}",
+                        project_id=project.id,
+                        data={"warnings": sync.warnings},
+                    )
+                else:
+                    add_event(
+                        conn,
+                        hb_id,
+                        "info",
+                        "github.sync.project",
+                        f"GitHub sync completed for {project.id}",
+                        project_id=project.id,
+                        data={"issues_seen": sync.issues_count, "prs_seen": sync.prs_count},
+                    )
+
+                # Worktree inspect
+                inspections = inspect_project_worktrees(project, root)
+                all_worktree_inspections.extend(inspections)
+                for insp in inspections:
+                    wt_id = f"{insp.project_id}-{insp.path}"
+                    if insp.issue_number is not None:
+                        wt_id = f"{insp.project_id}-issue-{insp.issue_number}"
+                    upsert_worktree(
+                        conn,
+                        {
+                            "id": wt_id,
+                            "project_id": insp.project_id,
+                            "issue_number": insp.issue_number,
+                            "path": insp.path,
+                            "branch_name": insp.branch_name,
+                            "state": insp.state,
+                            "dirty_summary": insp.dirty_summary,
+                        },
+                    )
+            except Exception as project_exc:
+                logger.exception("Heartbeat project %s failed: %s", project.id, project_exc)
+                all_warnings.append(f"Project {project.id} failed: {redact_secrets(str(project_exc))}")
                 add_event(
                     conn,
                     hb_id,
-                    "warning",
-                    "github.sync.warning",
-                    f"Sync warnings for {project.id}",
+                    "error",
+                    "heartbeat.project.error",
+                    f"Project {project.id} failed: {redact_secrets(str(project_exc))}",
                     project_id=project.id,
-                    data={"warnings": sync.warnings},
                 )
-            else:
-                add_event(
-                    conn,
-                    hb_id,
-                    "info",
-                    "github.sync.project",
-                    f"GitHub sync completed for {project.id}",
-                    project_id=project.id,
-                    data={"issues_seen": sync.issues_count, "prs_seen": sync.prs_count},
-                )
-
-            # Worktree inspect
-            inspections = inspect_project_worktrees(project, root)
-            all_worktree_inspections.extend(inspections)
-            for insp in inspections:
-                wt_id = f"{insp.project_id}-{insp.path}"
-                if insp.issue_number is not None:
-                    wt_id = f"{insp.project_id}-issue-{insp.issue_number}"
-                upsert_worktree(
-                    conn,
-                    {
-                        "id": wt_id,
-                        "project_id": insp.project_id,
-                        "issue_number": insp.issue_number,
-                        "path": insp.path,
-                        "branch_name": insp.branch_name,
-                        "state": insp.state,
-                        "dirty_summary": insp.dirty_summary,
-                    },
-                )
+                continue
 
         dirty_count = sum(
             1
@@ -643,8 +691,9 @@ def _handle_portfolio_heartbeat(args: dict[str, Any], **kwargs: Any) -> str:
         with contextlib.suppress(Exception):
             if hb_id is not None:
                 finish_heartbeat(conn, hb_id, "failed", error=redact_secrets(str(e)))
-        with contextlib.suppress(Exception):
-            release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
+        if lock_acquired:
+            with contextlib.suppress(Exception):
+                release_lock(conn, _LOCK_NAME, _LOCK_OWNER)
         logger.exception("Heartbeat failed: %s", e)
         return _result(
             status="error",

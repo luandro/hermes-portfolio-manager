@@ -32,10 +32,12 @@ def test(tool_name: str, handler, args: dict | None = None) -> dict:
     print(f"  [{symbol}] {tool_name}: {status} — {msg}")
     if result.get("summary"):
         print(f"           summary: {result['summary']}")
-    warns = result.get("data", {}).get("warnings", [])
-    if warns:
-        for w in warns:
-            print(f"           warning: {w}")
+    data = result.get("data", {})
+    for w in data.get("warnings", []):
+        print(f"           warning: {w}")
+    for proj in data.get("projects", []):
+        for w in proj.get("warnings", []):
+            print(f"           warning ({proj.get('project_id', '?')}): {w}")
     return result
 
 

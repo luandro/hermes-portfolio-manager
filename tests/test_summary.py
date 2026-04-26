@@ -93,7 +93,7 @@ class TestSummarizeProjectList:
         projects = [_project("a"), _project("b")]
         counts = {"active": 2, "paused": 0, "archived": 1}
         result = summarize_project_list(projects, counts)
-        assert "2" in result  # total active count referenced
+        assert "2 projects" in result
 
     def test_concise_telegram_format(self) -> None:
         """Output is a non-empty string without excessive verbosity."""
@@ -231,17 +231,17 @@ class TestSummarizePortfolioStatus:
         result = summarize_portfolio_status(self._snapshot(), status_filter="all")
         assert "proj-a" in result
         assert "proj-b" in result
-        assert "Fix login bug" in result or "#47" in result
-        assert "Fix auth" in result or "#130" in result
+        assert "Fix login bug" in result and "#47" in result
+        assert "Fix auth" in result and "#130" in result
 
     def test_filter_needs_user_shows_attention_items(self) -> None:
         result = summarize_portfolio_status(self._snapshot(), status_filter="needs_user")
         # Should include the PR ready for human review
-        assert "#130" in result or "ready" in result.lower() or "human" in result.lower()
+        assert "#130" in result and "ready for review" in result.lower()
         # Should include the dirty worktree
-        assert "dirty" in result.lower() or "auth.py" in result
+        assert "dirty" in result.lower() and "auth.py" in result
         # Should include issue needing triage
-        assert "#47" in result or "triage" in result.lower() or "needs" in result.lower()
+        assert "#47" in result and "triage" in result.lower() and "needs" in result.lower()
 
     def test_filter_needs_user_excludes_clean_items(self) -> None:
         result = summarize_portfolio_status(self._snapshot(), status_filter="needs_user")

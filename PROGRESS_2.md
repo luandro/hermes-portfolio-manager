@@ -1,4 +1,4 @@
-# PROGRESS.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration
+# PROGRESS.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration, Agent-Ready Revised Version
 
 ## Goal
 
@@ -21,6 +21,25 @@ Set future auto-merge policy.
 ```
 
 MVP 2 still does **not** do autonomous coding.
+
+---
+
+# Agent-Readiness Verdict
+
+This version is ready to hand to coding agents **if MVP 1 is complete and passing**.
+
+It removes the remaining ambiguities from the previous version:
+
+* first-run behavior is specified,
+* YAML library and preservation behavior are specified,
+* removal behavior in SQLite is specified,
+* default protected paths are specified,
+* dev CLI flags are specified,
+* Hermes clarification behavior is specified,
+* root migration behavior is specified,
+* backup edge cases are specified.
+
+If MVP 1 is not complete, stop and finish MVP 1 first.
 
 ---
 
@@ -69,6 +88,122 @@ $HOME/.agent-system/
 
 ---
 
+# Additional Agent-Readiness Decisions
+
+## First-run config behavior
+
+If `projects.yaml` is missing:
+
+* `portfolio_project_add` may create a new config:
+
+```yaml
+version: 1
+projects: []
+```
+
+Then it must add the project through the normal atomic write path.
+
+* Other mutation tools must return:
+
+```txt
+status: blocked
+reason: config_missing
+```
+
+If there was no previous config, no backup is created. The tool result must include:
+
+```json
+{
+  "backup_created": false,
+  "backup_path": null
+}
+```
+
+## YAML behavior
+
+Use:
+
+```txt
+PyYAML + Pydantic v2
+```
+
+MVP 2 must preserve unknown YAML fields as data.
+
+MVP 2 does **not** need to preserve comments or original formatting.
+
+Required preservation scope:
+
+* top-level unknown fields,
+* project-level unknown fields,
+* nested unknown fields under `labels`,
+* nested unknown fields under `notes`,
+* nested unknown fields under other known project dictionaries unless explicitly unsafe.
+
+## Removal behavior
+
+When `portfolio_project_remove(confirm=true)` succeeds:
+
+* remove the project from `projects.yaml`,
+* do not delete worktrees,
+* do not delete logs,
+* do not delete artifacts,
+* do not delete SQLite history,
+* set SQLite `projects.status = archived`.
+
+## Default protected paths for new projects
+
+If no protected paths are provided, new projects must get:
+
+```yaml
+protected_paths:
+  - .github/workflows/**
+  - infra/**
+  - auth/**
+  - security/**
+  - migrations/**
+```
+
+## Dev CLI flags
+
+Use these exact flags:
+
+```txt
+--project-id
+--repo
+--name
+--priority
+--status
+--default-branch
+--auto-merge-enabled
+--auto-merge-max-risk
+--validate-github
+--confirm
+--reason
+--root
+--json
+```
+
+Boolean flags must accept explicit values where useful in tests:
+
+```txt
+--validate-github true
+--validate-github false
+--auto-merge-enabled true
+--auto-merge-enabled false
+--confirm true
+--confirm false
+```
+
+## Hermes clarification behavior
+
+Tool handlers do not run multi-turn clarification flows.
+
+The `project-admin` skill must ask follow-up questions before calling tools when the user request is ambiguous.
+
+Tools must block invalid or unsafe input.
+
+---
+
 # MVP 2 Scope Boundary
 
 MVP 2 may mutate:
@@ -101,58 +236,6 @@ edit repo-local YAML
 
 ---
 
-# Implementation Readiness Critique
-
-This `PROGRESS.md` is designed to be safe for coding agents because it includes:
-
-* exact root path behavior,
-* exact tool names,
-* exact mutation boundary,
-* explicit test-first tasks,
-* atomic YAML write requirements,
-* backup requirements,
-* lock requirements,
-* GitHub repo parsing rules,
-* read-only GitHub validation rules,
-* auto-merge safety rules,
-* removal confirmation behavior,
-* dev CLI requirements,
-* Hermes skill requirements,
-* security tests,
-* manual Hermes smoke tests.
-
-The main implementation risks are:
-
-1. **Breaking MVP 1 behavior while changing the default root.**
-
-   * Mitigation: Phase 0 requires MVP 1 tests to pass after the root migration.
-
-2. **Corrupting `projects.yaml` during writes.**
-
-   * Mitigation: Phase 4 requires atomic writes, backups, reload validation, and tests.
-
-3. **Concurrent Telegram/cron writes.**
-
-   * Mitigation: Phase 5 requires a `config:projects` lock.
-
-4. **Accidentally enabling dangerous automation.**
-
-   * Mitigation: auto-merge is config-only, defaults to disabled, and high/critical risk is rejected.
-
-5. **Letting path traversal escape the system root.**
-
-   * Mitigation: security tests must reject malicious project IDs and unsafe paths.
-
-6. **Calling GitHub mutation commands.**
-
-   * Mitigation: security tests scan/guard allowed `gh` commands.
-
-This plan is implementation-ready if MVP 1 is complete and its tests pass.
-
-If MVP 1 is not complete, stop here and finish MVP 1 first.
-
----
-
 # Non-Negotiable Rules
 
 1. Write a meaningful test before implementation.
@@ -161,14 +244,15 @@ If MVP 1 is not complete, stop here and finish MVP 1 first.
 4. Preserve all MVP 1 behavior.
 5. Use `$HOME/.agent-system` as the default root.
 6. Use atomic writes for config mutations.
-7. Create a backup before every config mutation.
+7. Create a backup before every config mutation when an existing `projects.yaml` exists.
 8. Acquire `config:projects` lock before every config mutation.
 9. Never enable auto-merge by default.
 10. Never run GitHub mutation commands in MVP 2.
 11. Never run unsafe Git commands in MVP 2.
-12. Never write outside the configured system root, except when reading standard user home via `Path.home()`.
+12. Never write outside the configured system root, except when resolving the standard user home via `Path.home()`.
 13. Never edit repo-local automation YAML.
 14. Keep all Hermes tool results in the shared tool-result shape.
+15. Use PyYAML and Pydantic v2 unless the user explicitly changes this decision.
 
 ---
 
@@ -196,7 +280,7 @@ blocked: known precondition prevented operation
 failed: unexpected error
 ```
 
-Blocked/skipped are normal controlled outcomes, not crashes.
+Blocked/skipped are controlled outcomes, not crashes.
 
 ---
 
@@ -228,6 +312,68 @@ portfolio_project_config_backup
 
 ---
 
+# Required MVP 2 Dev CLI Commands
+
+The dev CLI must support all MVP 2 tools outside Hermes.
+
+Required examples:
+
+```bash
+python dev_cli.py portfolio_project_add \
+  --repo awana-digital/edt-next \
+  --priority medium \
+  --validate-github false \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_pause \
+  --project-id edt-next \
+  --reason travel \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_resume \
+  --project-id edt-next \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_archive \
+  --project-id edt-next \
+  --reason done \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_set_priority \
+  --project-id edt-next \
+  --priority high \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_set_auto_merge \
+  --project-id edt-next \
+  --auto-merge-enabled true \
+  --auto-merge-max-risk low \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_remove \
+  --project-id edt-next \
+  --confirm true \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_explain \
+  --project-id edt-next \
+  --root /tmp/agent-system-test \
+  --json
+
+python dev_cli.py portfolio_project_config_backup \
+  --root /tmp/agent-system-test \
+  --json
+```
+
+---
+
 # Phase 0 — Preflight and MVP 1 Compatibility
 
 ## 0.1 Confirm MVP 1 baseline passes
@@ -250,8 +396,8 @@ No implementation yet.
 
 Acceptance:
 
-* all MVP 1 tests pass before MVP 2 work begins
-* if tests fail, fix MVP 1 first
+* all MVP 1 tests pass before MVP 2 work begins,
+* if tests fail, fix MVP 1 first.
 
 ---
 
@@ -263,10 +409,10 @@ Status: [ ]
 
 Update or add tests for root resolution:
 
-1. explicit root argument wins
-2. `AGENT_SYSTEM_ROOT` wins when explicit root is absent
-3. default is `Path.home() / ".agent-system"`
-4. no test expects `/srv/agent-system` as default
+1. explicit root argument wins,
+2. `AGENT_SYSTEM_ROOT` wins when explicit root is absent,
+3. default is `Path.home() / ".agent-system"`,
+4. no test expects `/srv/agent-system` as default.
 
 ### Implementation
 
@@ -295,8 +441,8 @@ pytest
 
 Acceptance:
 
-* root resolution works
-* MVP 1 tests still pass
+* root resolution works,
+* MVP 1 tests still pass.
 
 ---
 
@@ -334,8 +480,8 @@ pytest tests/test_state.py::test_state_initialization
 
 Acceptance:
 
-* required directories are created under the resolved root
-* no code hardcodes `/srv/agent-system`
+* required directories are created under the resolved root,
+* no code hardcodes `/srv/agent-system`.
 
 ---
 
@@ -345,7 +491,7 @@ Status: [ ]
 
 ### Test first
 
-Create a security/regression test that scans source files and fails if these strings appear outside documentation/tests:
+Create a security/regression test that scans source files and fails if these strings appear in runtime code:
 
 ```txt
 /srv/agent-system
@@ -368,13 +514,77 @@ pytest tests/test_security.py::test_no_hardcoded_old_system_roots
 
 Acceptance:
 
-* runtime code does not hardcode old roots
+* runtime code does not hardcode old roots.
+
+---
+
+## 0.5 Update fixtures and samples to use `~/.agent-system`
+
+Status: [ ]
+
+### Test first
+
+Create or update a fixture test that scans sample configs and test fixtures.
+
+Expected:
+
+* runtime sample configs use `~/.agent-system`,
+* tests use temp roots where possible,
+* `/srv/agent-system` appears only in explicit migration notes if needed.
+
+### Implementation
+
+Update all fixtures and samples.
+
+### Verification
+
+Run:
+
+```bash
+pytest tests/test_fixtures.py::test_fixtures_use_home_agent_system_or_temp_roots
+```
+
+Acceptance:
+
+* config examples reflect the new root path.
 
 ---
 
 # Phase 1 — Project Admin Data Models and Validation
 
-## 1.1 Extend project config model for MVP 2 fields
+## 1.1 Lock dependency choices
+
+Status: [ ]
+
+### Test first
+
+Create a test that verifies dependency declarations include:
+
+```txt
+PyYAML
+pydantic>=2
+```
+
+### Implementation
+
+Update `pyproject.toml` or `requirements-dev.txt`.
+
+### Verification
+
+Run:
+
+```bash
+pytest tests/test_dependencies.py::test_mvp2_dependency_choices_are_declared
+```
+
+Acceptance:
+
+* dependency choices are explicit,
+* implementation agents do not choose a different YAML/model stack.
+
+---
+
+## 1.2 Extend project config model for MVP 2 fields
 
 Status: [ ]
 
@@ -393,7 +603,17 @@ protected_paths
 labels
 ```
 
-Also test that unknown fields are preserved when loading and writing config.
+Also test that unknown fields are preserved as data at these levels:
+
+```txt
+top-level config
+project object
+nested labels
+nested notes
+nested known dictionaries
+```
+
+Comments and original formatting do not need to be preserved.
 
 ### Implementation
 
@@ -401,9 +621,9 @@ Extend config model in `config.py` or model module.
 
 Required behavior:
 
-* known fields are validated
-* unknown fields are preserved unless explicitly unsafe
-* writing config does not drop unrelated project metadata
+* known fields are validated,
+* unknown fields are preserved as data,
+* writing config does not drop unrelated project metadata.
 
 ### Verification
 
@@ -415,12 +635,12 @@ pytest tests/test_project_admin_config.py::test_project_model_preserves_optional
 
 Acceptance:
 
-* optional MVP 2 fields are supported
-* existing config metadata is not lost
+* optional MVP 2 fields are supported,
+* existing config metadata is not lost.
 
 ---
 
-## 1.2 Validate project IDs
+## 1.3 Validate project IDs
 
 Status: [ ]
 
@@ -471,11 +691,11 @@ pytest tests/test_project_admin_config.py::test_project_id_validation
 
 Acceptance:
 
-* path traversal and unsafe IDs are rejected
+* path traversal and unsafe IDs are rejected.
 
 ---
 
-## 1.3 Validate auto-merge policy
+## 1.4 Validate auto-merge policy
 
 Status: [ ]
 
@@ -483,13 +703,14 @@ Status: [ ]
 
 Create tests verifying:
 
-1. missing auto-merge config defaults to disabled
-2. `enabled=false` passes
-3. `enabled=true, max_risk=low` passes
-4. `enabled=true, max_risk=medium` passes
-5. `enabled=true, max_risk=high` is rejected
-6. `enabled=true, max_risk=critical` is rejected
-7. `enabled=true` with no `max_risk` defaults to `low`
+1. missing auto-merge config defaults to disabled,
+2. `enabled=false` passes,
+3. `enabled=true, max_risk=low` passes,
+4. `enabled=true, max_risk=medium` passes,
+5. `enabled=true, max_risk=high` is rejected,
+6. `enabled=true, max_risk=critical` is rejected,
+7. `enabled=true` with no `max_risk` defaults to `low`,
+8. summary for enabling auto-merge states that MVP 2 stores policy only and does not merge PRs.
 
 ### Implementation
 
@@ -519,12 +740,12 @@ pytest tests/test_project_admin_config.py::test_auto_merge_policy_validation
 
 Acceptance:
 
-* auto-merge can never be high/critical risk
-* auto-merge is never enabled by default
+* auto-merge can never be high/critical risk,
+* auto-merge is never enabled by default.
 
 ---
 
-## 1.4 Validate project priority and status mutations
+## 1.5 Validate project priority and status mutations
 
 Status: [ ]
 
@@ -566,11 +787,11 @@ pytest tests/test_project_admin_config.py::test_priority_and_status_mutation_val
 
 Acceptance:
 
-* invalid mutations cannot be written
+* invalid mutations cannot be written.
 
 ---
 
-## 1.5 Normalize project local paths for writing
+## 1.6 Normalize project local paths for writing
 
 Status: [ ]
 
@@ -578,10 +799,10 @@ Status: [ ]
 
 Create tests verifying:
 
-1. paths under home are serialized as `~/.agent-system/...`
-2. paths outside home are preserved as absolute only if explicitly allowed by root override
-3. runtime use expands `~` correctly
-4. project ID cannot influence paths outside root
+1. paths under home are serialized as `~/.agent-system/...`,
+2. paths outside home are preserved as absolute only if explicitly allowed by root override,
+3. runtime use expands `~` correctly,
+4. project ID cannot influence paths outside root.
 
 ### Implementation
 
@@ -604,8 +825,47 @@ pytest tests/test_project_admin_config.py::test_project_local_path_normalization
 
 Acceptance:
 
-* config remains portable
-* unsafe path escape is impossible through project ID
+* config remains portable,
+* unsafe path escape is impossible through project ID.
+
+---
+
+## 1.7 Apply default protected paths
+
+Status: [ ]
+
+### Test first
+
+Create tests verifying:
+
+1. new project with no protected paths receives default protected paths,
+2. user-provided protected paths override the default,
+3. default protected paths are exactly:
+
+```yaml
+protected_paths:
+  - .github/workflows/**
+  - infra/**
+  - auth/**
+  - security/**
+  - migrations/**
+```
+
+### Implementation
+
+Add default protected paths to new project creation.
+
+### Verification
+
+Run:
+
+```bash
+pytest tests/test_project_admin_config.py::test_default_protected_paths
+```
+
+Acceptance:
+
+* new projects are conservative by default.
 
 ---
 
@@ -650,7 +910,7 @@ pytest tests/test_project_admin_repo_parse.py::test_parse_owner_repo
 
 Acceptance:
 
-* short GitHub repo references parse correctly
+* short GitHub repo references parse correctly.
 
 ---
 
@@ -683,7 +943,7 @@ pytest tests/test_project_admin_repo_parse.py::test_parse_https_github_url
 
 Acceptance:
 
-* HTTPS repo URLs parse correctly
+* HTTPS repo URLs parse correctly.
 
 ---
 
@@ -715,7 +975,7 @@ pytest tests/test_project_admin_repo_parse.py::test_parse_ssh_github_url
 
 Acceptance:
 
-* SSH GitHub URLs parse correctly
+* SSH GitHub URLs parse correctly.
 
 ---
 
@@ -755,7 +1015,7 @@ pytest tests/test_project_admin_repo_parse.py::test_reject_invalid_github_repo_r
 
 Acceptance:
 
-* only recognizable GitHub repos are accepted
+* only recognizable GitHub repos are accepted.
 
 ---
 
@@ -801,7 +1061,7 @@ pytest tests/test_project_admin_github_validation.py::test_validate_github_repo_
 
 Acceptance:
 
-* validation is read-only and parsed correctly
+* validation is read-only and parsed correctly.
 
 ---
 
@@ -813,15 +1073,15 @@ Status: [ ]
 
 Mock cases:
 
-1. `gh` missing
-2. `gh` unauthenticated
-3. repo inaccessible
-4. command timeout
+1. `gh` missing,
+2. `gh` unauthenticated,
+3. repo inaccessible,
+4. command timeout.
 
 Expected:
 
-* if `validate_github=true`, return blocked
-* if `validate_github=false`, allow project add with warning
+* if `validate_github=true`, return blocked,
+* if `validate_github=false`, allow project add with warning.
 
 ### Implementation
 
@@ -837,7 +1097,7 @@ pytest tests/test_project_admin_github_validation.py::test_github_validation_blo
 
 Acceptance:
 
-* validation failures are controlled and safe
+* validation failures are controlled and safe.
 
 ---
 
@@ -866,13 +1126,14 @@ add_project_to_config(config, add_input)
 
 Expected:
 
-* project is added
-* default priority is `medium` if omitted
-* default status is `active` if omitted
-* default branch is `auto` if omitted
-* auto-merge disabled by default
-* local paths are set
-* `created_at` and `updated_at` set
+* project is added,
+* default priority is `medium` if omitted,
+* default status is `active` if omitted,
+* default branch is `auto` if omitted,
+* auto-merge disabled by default,
+* default protected paths are added,
+* local paths are set,
+* `created_at` and `updated_at` set.
 
 ### Implementation
 
@@ -888,7 +1149,7 @@ pytest tests/test_project_admin_config.py::test_add_project_to_empty_config
 
 Acceptance:
 
-* a new project can be created safely in memory
+* a new project can be created safely in memory.
 
 ---
 
@@ -904,9 +1165,10 @@ Add a new non-duplicate project.
 
 Expected:
 
-* existing projects preserved
-* new project appended or inserted deterministically
-* config remains valid
+* existing projects preserved,
+* unknown fields preserved,
+* new project appended or inserted deterministically,
+* config remains valid.
 
 ### Implementation
 
@@ -922,7 +1184,7 @@ pytest tests/test_project_admin_config.py::test_add_project_to_existing_config
 
 Acceptance:
 
-* adding does not damage existing config
+* adding does not damage existing config.
 
 ---
 
@@ -954,7 +1216,7 @@ pytest tests/test_project_admin_config.py::test_add_rejects_duplicate_project_id
 
 Acceptance:
 
-* duplicate ID is impossible
+* duplicate ID is impossible.
 
 ---
 
@@ -986,7 +1248,7 @@ pytest tests/test_project_admin_config.py::test_add_rejects_duplicate_github_rep
 
 Acceptance:
 
-* same repo cannot be configured twice silently
+* same repo cannot be configured twice silently.
 
 ---
 
@@ -1012,9 +1274,10 @@ auto_merge.max_risk
 
 Expected:
 
-* only provided fields change
-* unprovided fields preserved
-* `updated_at` changes
+* only provided fields change,
+* unprovided fields preserved,
+* unknown fields preserved,
+* `updated_at` changes.
 
 ### Implementation
 
@@ -1034,7 +1297,7 @@ pytest tests/test_project_admin_config.py::test_update_project_fields
 
 Acceptance:
 
-* safe partial updates work
+* safe partial updates work.
 
 ---
 
@@ -1066,7 +1329,7 @@ pytest tests/test_project_admin_config.py::test_update_rejects_no_fields
 
 Acceptance:
 
-* accidental no-op updates are reported clearly
+* accidental no-op updates are reported clearly.
 
 ---
 
@@ -1084,9 +1347,9 @@ pause_project_in_config(config, project_id, reason="travel")
 
 Expected:
 
-* status becomes `paused`
-* reason stored under notes or equivalent
-* updated_at changes
+* status becomes `paused`,
+* reason stored under notes,
+* updated_at changes.
 
 ### Implementation
 
@@ -1102,7 +1365,7 @@ pytest tests/test_project_admin_config.py::test_pause_project
 
 Acceptance:
 
-* paused projects will be skipped by default heartbeat behavior
+* paused projects will be skipped by default heartbeat behavior.
 
 ---
 
@@ -1116,15 +1379,10 @@ Start with paused project.
 
 Expected:
 
-* status becomes `active`
-* updated_at changes
-* previous pause reason is preserved or cleared according to documented behavior
-
-Recommended behavior:
-
-```txt
-preserve pause_reason in notes history, add resumed_at
-```
+* status becomes `active`,
+* updated_at changes,
+* previous pause reason is preserved in notes history,
+* `resumed_at` is added.
 
 ### Implementation
 
@@ -1140,7 +1398,7 @@ pytest tests/test_project_admin_config.py::test_resume_project
 
 Acceptance:
 
-* paused project can become active again
+* paused project can become active again.
 
 ---
 
@@ -1154,9 +1412,9 @@ Call archive helper.
 
 Expected:
 
-* status becomes `archived`
-* reason stored if provided
-* updated_at changes
+* status becomes `archived`,
+* reason stored if provided,
+* updated_at changes.
 
 ### Implementation
 
@@ -1172,7 +1430,7 @@ pytest tests/test_project_admin_config.py::test_archive_project
 
 Acceptance:
 
-* archive is supported as safe alternative to removal
+* archive is supported as safe alternative to removal.
 
 ---
 
@@ -1186,16 +1444,16 @@ Call remove helper with `confirm=False`.
 
 Expected:
 
-* blocked/validation error
-* project remains in config
-* summary recommends archive
+* blocked/validation error,
+* project remains in config,
+* summary recommends archive.
 
 Then call with `confirm=True`.
 
 Expected:
 
-* project removed from config
-* no SQLite deletion happens in pure function
+* project removed from config,
+* no SQLite deletion happens in pure function.
 
 ### Implementation
 
@@ -1215,7 +1473,7 @@ pytest tests/test_project_admin_config.py::test_remove_project_requires_confirma
 
 Acceptance:
 
-* destructive config removal requires explicit confirmation
+* destructive config removal requires explicit confirmation.
 
 ---
 
@@ -1253,7 +1511,7 @@ pytest tests/test_project_admin_config.py::test_set_project_priority
 
 Acceptance:
 
-* priority updates are predictable
+* priority updates are predictable.
 
 ---
 
@@ -1265,11 +1523,11 @@ Status: [ ]
 
 Verify:
 
-1. disable auto-merge
-2. enable with default max risk -> low
-3. enable with max risk medium
-4. reject high/critical
-5. summary warns that MVP 2 only stores policy
+1. disable auto-merge,
+2. enable with default max risk -> low,
+3. enable with max risk medium,
+4. reject high/critical,
+5. summary warns that MVP 2 only stores policy.
 
 ### Implementation
 
@@ -1289,7 +1547,7 @@ pytest tests/test_project_admin_config.py::test_set_project_auto_merge
 
 Acceptance:
 
-* policy storage is safe and conservative
+* policy storage is safe and conservative.
 
 ---
 
@@ -1303,10 +1561,10 @@ Status: [ ]
 
 Create test verifying:
 
-* backup directory is created if missing
-* backup file is created with timestamped name
-* backup contents equal current `projects.yaml`
-* backup path is returned
+* backup directory is created if missing,
+* backup file is created with timestamped name,
+* backup contents equal current `projects.yaml`,
+* backup path is returned.
 
 Expected backup pattern:
 
@@ -1334,11 +1592,42 @@ pytest tests/test_project_admin_writes.py::test_create_projects_config_backup
 
 Acceptance:
 
-* backups are reliable and testable
+* backups are reliable and testable.
 
 ---
 
-## 4.2 Write config through temp file and atomic replace
+## 4.2 Define missing-config backup behavior
+
+Status: [ ]
+
+### Test first
+
+Create tests verifying:
+
+1. if `projects.yaml` does not exist and operation is `portfolio_project_add`, a new config is created and no backup is created,
+2. result includes `backup_created=false` and `backup_path=null`,
+3. if `projects.yaml` does not exist for any other mutation, result is blocked with `reason=config_missing`.
+
+### Implementation
+
+Implement missing-config behavior in config load/write path.
+
+### Verification
+
+Run:
+
+```bash
+pytest tests/test_project_admin_writes.py::test_missing_config_first_run_behavior
+```
+
+Acceptance:
+
+* first project can be added on fresh install,
+* other mutations block on missing config.
+
+---
+
+## 4.3 Write config through temp file and atomic replace
 
 Status: [ ]
 
@@ -1346,10 +1635,10 @@ Status: [ ]
 
 Create test monkeypatching or inspecting write behavior to verify:
 
-* writes a temp file named like `projects.yaml.tmp.<uuid>`
-* calls atomic replacement through `os.replace`
-* final `projects.yaml` exists
-* temp file is removed or replaced
+* writes a temp file named like `projects.yaml.tmp.<uuid>`,
+* calls atomic replacement through `os.replace`,
+* final `projects.yaml` exists,
+* temp file is removed or replaced.
 
 ### Implementation
 
@@ -1369,11 +1658,11 @@ pytest tests/test_project_admin_writes.py::test_atomic_config_write_uses_temp_fi
 
 Acceptance:
 
-* no direct partial writes to `projects.yaml`
+* no direct partial writes to `projects.yaml`.
 
 ---
 
-## 4.3 Validate before and after write
+## 4.4 Validate before and after write
 
 Status: [ ]
 
@@ -1381,9 +1670,9 @@ Status: [ ]
 
 Create tests verifying:
 
-1. invalid new config is rejected before write
-2. if written file cannot be reloaded/validated, result is `failed`
-3. valid config is reloadable after write
+1. invalid new config is rejected before write,
+2. if written file cannot be reloaded/validated, result is `failed`,
+3. valid config is reloadable after write.
 
 ### Implementation
 
@@ -1399,17 +1688,17 @@ pytest tests/test_project_admin_writes.py::test_config_write_validates_before_an
 
 Acceptance:
 
-* config writer never knowingly leaves invalid config
+* config writer never knowingly leaves invalid config.
 
 ---
 
-## 4.4 Backup before every mutation
+## 4.5 Backup before every mutation when config exists
 
 Status: [ ]
 
 ### Test first
 
-For each mutating tool/function that writes config, test backup is created:
+For each mutating tool/function that writes config, test backup is created when config existed before mutation:
 
 ```txt
 add
@@ -1424,23 +1713,23 @@ set auto-merge
 
 ### Implementation
 
-Ensure all write paths call backup before write.
+Ensure all write paths call backup before write when existing config exists.
 
 ### Verification
 
 Run:
 
 ```bash
-pytest tests/test_project_admin_writes.py::test_every_mutation_creates_backup
+pytest tests/test_project_admin_writes.py::test_every_mutation_creates_backup_when_config_exists
 ```
 
 Acceptance:
 
-* every durable config change is recoverable
+* every durable config change is recoverable.
 
 ---
 
-## 4.5 Restrict writes to system root
+## 4.6 Restrict writes to system root
 
 Status: [ ]
 
@@ -1458,9 +1747,9 @@ local.base_path = ../../outside
 
 Expected:
 
-* invalid project ID rejected
-* generated paths stay under root
-* writer only writes to `{root}/config/projects.yaml` and `{root}/backups/`
+* invalid project ID rejected,
+* generated paths stay under root,
+* writer only writes to `{root}/config/projects.yaml` and `{root}/backups/`.
 
 ### Implementation
 
@@ -1476,7 +1765,7 @@ pytest tests/test_security.py::test_config_writes_cannot_escape_system_root
 
 Acceptance:
 
-* config mutation cannot write outside allowed paths
+* config mutation cannot write outside allowed paths.
 
 ---
 
@@ -1520,7 +1809,7 @@ pytest tests/test_project_admin_locks.py::test_mutations_acquire_config_lock
 
 Acceptance:
 
-* no config mutation runs without lock
+* no config mutation runs without lock.
 
 ---
 
@@ -1555,7 +1844,7 @@ pytest tests/test_project_admin_locks.py::test_mutation_blocked_when_config_lock
 
 Acceptance:
 
-* concurrent writes are prevented
+* concurrent writes are prevented.
 
 ---
 
@@ -1567,9 +1856,9 @@ Status: [ ]
 
 Create tests verifying lock is released after:
 
-1. successful mutation
-2. validation failure after lock acquisition
-3. handled write failure
+1. successful mutation,
+2. validation failure after lock acquisition,
+3. handled write failure.
 
 ### Implementation
 
@@ -1585,7 +1874,7 @@ pytest tests/test_project_admin_locks.py::test_config_lock_released_after_succes
 
 Acceptance:
 
-* no stale lock remains after handled outcomes
+* no stale lock remains after handled outcomes.
 
 ---
 
@@ -1611,7 +1900,7 @@ set auto-merge
 
 Expected:
 
-* project row reflects current config status/priority/name/repo
+* project row reflects current config status/priority/name/repo.
 
 ### Implementation
 
@@ -1627,11 +1916,11 @@ pytest tests/test_project_admin_tools.py::test_mutations_upsert_project_state
 
 Acceptance:
 
-* state database tracks project admin changes
+* state database tracks project admin changes.
 
 ---
 
-## 6.2 Remove does not delete SQLite history
+## 6.2 Remove sets SQLite project status to archived
 
 Status: [ ]
 
@@ -1643,31 +1932,26 @@ Call remove with `confirm=True`.
 
 Expected:
 
-* project removed from `projects.yaml`
-* SQLite row still exists
-* optional status may be set to `archived` or left unchanged, but row must not be deleted
-
-Recommended behavior:
-
-```txt
-set SQLite project status to archived
-```
+* project removed from `projects.yaml`,
+* SQLite row still exists,
+* SQLite project status is set to `archived`,
+* logs/worktrees/artifacts are untouched.
 
 ### Implementation
 
-On config remove, do not delete project row. Optionally mark archived.
+On config remove, do not delete project row. Set SQLite project status to `archived`.
 
 ### Verification
 
 Run:
 
 ```bash
-pytest tests/test_project_admin_tools.py::test_remove_does_not_delete_sqlite_history
+pytest tests/test_project_admin_tools.py::test_remove_sets_sqlite_project_archived_without_deleting_history
 ```
 
 Acceptance:
 
-* historical state is preserved
+* historical state is preserved and marked inactive.
 
 ---
 
@@ -1694,7 +1978,7 @@ portfolio_project_explain
 portfolio_project_config_backup
 ```
 
-Each schema must include clear parameter descriptions.
+Each schema must include clear parameter descriptions and use the exact flag/field names from this document.
 
 ### Implementation
 
@@ -1710,7 +1994,7 @@ pytest tests/test_project_admin_tools.py::test_mvp2_tool_schemas_exist
 
 Acceptance:
 
-* Hermes can understand MVP 2 tool inputs
+* Hermes can understand MVP 2 tool inputs.
 
 ---
 
@@ -1722,26 +2006,29 @@ Status: [ ]
 
 Create tests verifying:
 
-1. adds valid project
-2. validates GitHub repo by default
-3. can skip validation with warning
-4. blocks duplicate ID
-5. blocks duplicate GitHub repo
-6. defaults auto-merge disabled
-7. creates backup
-8. updates SQLite
-9. returns concise summary
+1. adds valid project,
+2. creates initial config if missing,
+3. validates GitHub repo by default,
+4. can skip validation with warning,
+5. blocks duplicate ID,
+6. blocks duplicate GitHub repo,
+7. defaults auto-merge disabled,
+8. applies default protected paths,
+9. creates backup when config existed,
+10. does not create backup on first config creation,
+11. updates SQLite,
+12. returns concise summary.
 
 ### Implementation
 
 Implement handler using:
 
-* repo parser
-* optional GitHub validation
-* pure add function
-* config lock
-* atomic write
-* SQLite upsert
+* repo parser,
+* optional GitHub validation,
+* pure add function,
+* config lock,
+* atomic write,
+* SQLite upsert.
 
 ### Verification
 
@@ -1753,7 +2040,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_add
 
 Acceptance:
 
-* adding a project works safely through tool interface
+* adding a project works safely through tool interface.
 
 ---
 
@@ -1765,13 +2052,14 @@ Status: [ ]
 
 Create tests verifying:
 
-1. updates safe fields
-2. rejects missing project
-3. rejects no update fields
-4. rejects invalid priority/status/auto-merge risk
-5. creates backup
-6. updates SQLite
-7. returns changed fields in summary/data
+1. updates safe fields,
+2. rejects missing project,
+3. rejects no update fields,
+4. rejects invalid priority/status/auto-merge risk,
+5. blocks with `config_missing` if config missing,
+6. creates backup,
+7. updates SQLite,
+8. returns changed fields in summary/data.
 
 ### Implementation
 
@@ -1787,7 +2075,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_update
 
 Acceptance:
 
-* safe partial config updates work through tool interface
+* safe partial config updates work through tool interface.
 
 ---
 
@@ -1799,11 +2087,12 @@ Status: [ ]
 
 Create tests verifying:
 
-* status becomes paused
-* optional reason stored
-* backup created
-* SQLite updated
-* summary says future heartbeats skip it by default
+* status becomes paused,
+* optional reason stored,
+* blocks with `config_missing` if config missing,
+* backup created,
+* SQLite updated,
+* summary says future heartbeats skip it by default.
 
 ### Implementation
 
@@ -1819,7 +2108,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_pause
 
 Acceptance:
 
-* project can be paused safely
+* project can be paused safely.
 
 ---
 
@@ -1831,10 +2120,11 @@ Status: [ ]
 
 Create tests verifying:
 
-* paused project becomes active
-* backup created
-* SQLite updated
-* summary says it will be included in future heartbeats
+* paused project becomes active,
+* blocks with `config_missing` if config missing,
+* backup created,
+* SQLite updated,
+* summary says it will be included in future heartbeats.
 
 ### Implementation
 
@@ -1850,7 +2140,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_resume
 
 Acceptance:
 
-* project can be resumed safely
+* project can be resumed safely.
 
 ---
 
@@ -1862,11 +2152,12 @@ Status: [ ]
 
 Create tests verifying:
 
-* status becomes archived
-* optional reason stored
-* backup created
-* SQLite updated
-* archived project excluded by normal project list after archive
+* status becomes archived,
+* optional reason stored,
+* blocks with `config_missing` if config missing,
+* backup created,
+* SQLite updated,
+* archived project excluded by normal project list after archive.
 
 ### Implementation
 
@@ -1882,7 +2173,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_archive
 
 Acceptance:
 
-* archive works as preferred safe removal alternative
+* archive works as preferred safe removal alternative.
 
 ---
 
@@ -1894,11 +2185,12 @@ Status: [ ]
 
 Create tests verifying:
 
-* priority changes to valid value
-* invalid priority blocks
-* priority `paused` also sets status `paused`
-* backup created
-* SQLite updated
+* priority changes to valid value,
+* invalid priority blocks,
+* priority `paused` also sets status `paused`,
+* blocks with `config_missing` if config missing,
+* backup created,
+* SQLite updated.
 
 ### Implementation
 
@@ -1914,7 +2206,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_set_priority
 
 Acceptance:
 
-* priority changes are safe and predictable
+* priority changes are safe and predictable.
 
 ---
 
@@ -1926,12 +2218,14 @@ Status: [ ]
 
 Create tests verifying:
 
-* disable auto-merge
-* enable with max_risk low
-* enable with max_risk medium
-* reject high/critical
-* summary says MVP 2 stores policy only and does not merge PRs
-* backup created
+* disable auto-merge,
+* enable with max_risk low,
+* enable with max_risk medium,
+* enable without max_risk defaults to low,
+* reject high/critical,
+* blocks with `config_missing` if config missing,
+* summary says MVP 2 stores policy only and does not merge PRs,
+* backup created.
 
 ### Implementation
 
@@ -1947,7 +2241,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_set_auto_merge
 
 Acceptance:
 
-* auto-merge policy storage is conservative
+* auto-merge policy storage is conservative.
 
 ---
 
@@ -1959,12 +2253,14 @@ Status: [ ]
 
 Create tests verifying:
 
-* remove without `confirm=True` returns blocked
-* blocked summary recommends archive
-* remove with confirmation removes from config
-* backup created
-* worktrees/logs/artifacts are not deleted
-* SQLite history not deleted
+* remove without `confirm=True` returns blocked,
+* blocked summary recommends archive,
+* remove with confirmation removes from config,
+* blocks with `config_missing` if config missing,
+* backup created,
+* worktrees/logs/artifacts are not deleted,
+* SQLite history not deleted,
+* SQLite project status set to archived.
 
 ### Implementation
 
@@ -1980,7 +2276,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_remove
 
 Acceptance:
 
-* removal is explicit and non-destructive outside config
+* removal is explicit and non-destructive outside config.
 
 ---
 
@@ -2006,6 +2302,8 @@ local paths
 
 It should not mutate config or state.
 
+If config is missing, return blocked with `reason=config_missing`.
+
 ### Implementation
 
 Implement read-only explain handler.
@@ -2020,7 +2318,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_explain
 
 Acceptance:
 
-* user can inspect project config from Telegram
+* user can inspect project config from Telegram.
 
 ---
 
@@ -2032,10 +2330,11 @@ Status: [ ]
 
 Create tests verifying:
 
-* backup is created
-* config is validated first
-* backup path returned
-* summary includes backup path in user-friendly form
+* backup is created,
+* config is validated first,
+* backup path returned,
+* summary includes backup path in user-friendly form,
+* missing config returns blocked with `reason=config_missing`.
 
 ### Implementation
 
@@ -2051,7 +2350,7 @@ pytest tests/test_project_admin_tools.py::test_portfolio_project_config_backup
 
 Acceptance:
 
-* user can manually back up project config
+* user can manually back up project config.
 
 ---
 
@@ -2077,7 +2376,7 @@ pytest tests/test_project_admin_tools.py::test_mvp2_tool_registration
 
 Acceptance:
 
-* Hermes can discover MVP 2 tools
+* Hermes can discover MVP 2 tools.
 
 ---
 
@@ -2097,8 +2396,8 @@ python dev_cli.py portfolio_project_add --repo awana-digital/edt-next --priority
 
 Expected:
 
-* JSON tool result
-* project added to tmp root config
+* JSON tool result,
+* project added to tmp root config.
 
 ### Implementation
 
@@ -2114,7 +2413,7 @@ pytest tests/test_dev_cli.py::test_dev_cli_project_add
 
 Acceptance:
 
-* project add can be tested outside Hermes
+* project add can be tested outside Hermes.
 
 ---
 
@@ -2146,7 +2445,7 @@ pytest tests/test_dev_cli.py::test_dev_cli_project_pause_resume_explain
 
 Acceptance:
 
-* common admin commands run locally
+* common admin commands run locally.
 
 ---
 
@@ -2156,7 +2455,7 @@ Status: [ ]
 
 ### Test first
 
-Create tests invoking each remaining MVP 2 command through `dev_cli.py`.
+Create tests invoking each remaining MVP 2 command through `dev_cli.py` using exact flags from this document.
 
 ### Implementation
 
@@ -2172,7 +2471,7 @@ pytest tests/test_dev_cli.py::test_dev_cli_remaining_project_admin_commands
 
 Acceptance:
 
-* all MVP 2 tools are callable outside Hermes
+* all MVP 2 tools are callable outside Hermes.
 
 ---
 
@@ -2210,7 +2509,7 @@ pytest tests/test_project_admin_skill.py::test_project_admin_skill_exists
 
 Acceptance:
 
-* skill exists with correct name
+* skill exists with correct name.
 
 ---
 
@@ -2249,11 +2548,11 @@ pytest tests/test_project_admin_skill.py::test_project_admin_skill_mentions_tool
 
 Acceptance:
 
-* Hermes has clear guidance on tool selection
+* Hermes has clear guidance on tool selection.
 
 ---
 
-## 9.3 Ensure skill contains safety rules
+## 9.3 Ensure skill contains safety and clarification rules
 
 Status: [ ]
 
@@ -2261,14 +2560,16 @@ Status: [ ]
 
 Create test verifying the skill says:
 
-* ask follow-up if request is ambiguous
-* prefer archive over remove
-* never enable auto-merge unless explicitly requested
-* MVP 2 stores auto-merge policy but does not merge PRs
-* do not create issues
-* do not create branches
-* do not create worktrees
-* do not modify repository files
+* ask follow-up if request is ambiguous before calling a mutating tool,
+* tool handlers do not run clarification flows,
+* prefer archive over remove,
+* never enable auto-merge unless explicitly requested,
+* if enabling auto-merge and risk is unspecified, use low risk,
+* MVP 2 stores auto-merge policy but does not merge PRs,
+* do not create issues,
+* do not create branches,
+* do not create worktrees,
+* do not modify repository files.
 
 ### Implementation
 
@@ -2279,12 +2580,12 @@ Add safety guidance to skill.
 Run:
 
 ```bash
-pytest tests/test_project_admin_skill.py::test_project_admin_skill_safety_rules
+pytest tests/test_project_admin_skill.py::test_project_admin_skill_safety_and_clarification_rules
 ```
 
 Acceptance:
 
-* Telegram/Hermes behavior is constrained by the skill
+* Telegram/Hermes behavior is constrained by the skill.
 
 ---
 
@@ -2332,7 +2633,7 @@ pytest tests/test_security.py::test_no_github_mutations
 
 Acceptance:
 
-* MVP 2 cannot mutate GitHub
+* MVP 2 cannot mutate GitHub.
 
 ---
 
@@ -2371,7 +2672,7 @@ pytest tests/test_security.py::test_no_unsafe_git_commands
 
 Acceptance:
 
-* MVP 2 cannot modify Git worktrees
+* MVP 2 cannot modify Git worktrees.
 
 ---
 
@@ -2381,7 +2682,7 @@ Status: [ ]
 
 ### Test first
 
-Create/extend test to monkeypatch subprocess calls and ensure commands are argument lists.
+Create or extend test to monkeypatch subprocess calls and ensure commands are argument lists.
 
 ### Implementation
 
@@ -2401,7 +2702,7 @@ pytest tests/test_security.py::test_subprocess_uses_argument_arrays
 
 Acceptance:
 
-* no shell-string execution
+* no shell-string execution.
 
 ---
 
@@ -2438,7 +2739,7 @@ pytest tests/test_security.py::test_redact_secrets
 
 Acceptance:
 
-* secrets are never returned in tool summaries or errors
+* secrets are never returned in tool summaries or errors.
 
 ---
 
@@ -2452,8 +2753,8 @@ Create a test that sets up a fake repo/worktree and runs MVP 2 admin tools.
 
 Expected:
 
-* no files inside repo path are created/modified/deleted
-* only config/state/backup files under system root change
+* no files inside repo path are created/modified/deleted,
+* only config/state/backup files under system root change.
 
 ### Implementation
 
@@ -2469,7 +2770,7 @@ pytest tests/test_security.py::test_project_admin_does_not_modify_repositories
 
 Acceptance:
 
-* MVP 2 only changes server-side config/state/backups
+* MVP 2 only changes server-side config/state/backups.
 
 ---
 
@@ -2497,7 +2798,7 @@ pytest
 
 Acceptance:
 
-* all MVP 1 and MVP 2 automated tests pass
+* all MVP 1 and MVP 2 automated tests pass.
 
 ---
 
@@ -2509,21 +2810,26 @@ Status: [ ]
 
 Create a pytest e2e test that uses a temp root and calls the dev CLI to:
 
-1. add project with validation skipped
-2. explain project
-3. set priority high
-4. pause project
-5. resume project
-6. archive project
-7. create backup
-8. attempt remove without confirmation and get blocked
-9. remove with confirmation
+1. add first project with validation skipped and missing config,
+2. explain project,
+3. set priority high,
+4. pause project,
+5. resume project,
+6. set auto-merge low-risk only,
+7. archive project,
+8. create backup,
+9. attempt remove without confirmation and get blocked,
+10. remove with confirmation,
+11. verify SQLite project status is archived,
+12. verify final config is valid.
 
 Expected:
 
-* every step returns shared tool-result JSON
-* backups are created for mutations
-* final config is valid
+* every step returns shared tool-result JSON,
+* backups are created for mutations when config existed,
+* first add creates config without backup,
+* final config is valid,
+* no repo files are modified.
 
 ### Implementation
 
@@ -2539,7 +2845,7 @@ pytest tests/test_project_admin_e2e.py
 
 Acceptance:
 
-* common user management flow works without Hermes
+* common user management flow works without Hermes.
 
 ---
 
@@ -2573,45 +2879,18 @@ Install or reload plugin using the verified MVP 1 Hermes procedure.
 
 Manual acceptance:
 
-* Hermes loads plugin without errors
-* MVP 1 and MVP 2 tools are visible/discoverable
+* Hermes loads plugin without errors,
+* MVP 1 and MVP 2 tools are visible/discoverable.
 
 ---
 
-## 12.2 Explain an existing project
+## 12.2 Add first project from missing config
 
 Status: [ ]
 
 ### Implementation
 
-Ask Hermes:
-
-```txt
-Explain the CoMapeo Cloud App project configuration.
-```
-
-Expected tool:
-
-```txt
-portfolio_project_explain
-```
-
-### Verification
-
-Manual acceptance:
-
-* Hermes summarizes the project config
-* no config mutation happens
-
----
-
-## 12.3 Add a project with validation skipped
-
-Status: [ ]
-
-### Implementation
-
-Ask Hermes:
+With an empty test root, ask Hermes:
 
 ```txt
 Add awana-digital/test-project as a low-priority project. Skip GitHub validation.
@@ -2627,10 +2906,39 @@ portfolio_project_add
 
 Manual acceptance:
 
-* project added under test root
-* auto-merge disabled
-* backup created
-* summary is clear
+* `projects.yaml` is created,
+* project is added,
+* auto-merge disabled,
+* default protected paths added,
+* no backup created because no previous config existed,
+* summary is clear.
+
+---
+
+## 12.3 Explain an existing project
+
+Status: [ ]
+
+### Implementation
+
+Ask Hermes:
+
+```txt
+Explain the test project configuration.
+```
+
+Expected tool:
+
+```txt
+portfolio_project_explain
+```
+
+### Verification
+
+Manual acceptance:
+
+* Hermes summarizes the project config,
+* no config mutation happens.
 
 ---
 
@@ -2643,7 +2951,7 @@ Status: [ ]
 Ask Hermes:
 
 ```txt
-Pause the test project.
+Pause the test project because I am traveling.
 ```
 
 Then:
@@ -2663,9 +2971,9 @@ portfolio_project_resume
 
 Manual acceptance:
 
-* status changes correctly
-* backups are created
-* summaries are concise
+* status changes correctly,
+* backups are created,
+* summaries are concise.
 
 ---
 
@@ -2691,8 +2999,8 @@ portfolio_project_set_priority
 
 Manual acceptance:
 
-* priority changes to high
-* backup created
+* priority changes to high,
+* backup created.
 
 ---
 
@@ -2718,9 +3026,9 @@ portfolio_project_set_auto_merge
 
 Manual acceptance:
 
-* config stores auto_merge.enabled true
-* max risk is low
-* Hermes states that MVP 2 stores policy only and does not merge PRs
+* config stores `auto_merge.enabled=true`,
+* max risk is low,
+* Hermes states that MVP 2 stores policy only and does not merge PRs.
 
 ---
 
@@ -2746,9 +3054,9 @@ portfolio_project_remove
 
 Manual acceptance:
 
-* result is blocked
-* summary recommends archive
-* project remains in config
+* result is blocked,
+* summary recommends archive,
+* project remains in config.
 
 ---
 
@@ -2774,9 +3082,10 @@ portfolio_project_remove
 
 Manual acceptance:
 
-* project removed from config
-* backup created
-* no worktrees/logs/artifacts/state history deleted
+* project removed from config,
+* backup created,
+* no worktrees/logs/artifacts/state history deleted,
+* SQLite project status is archived.
 
 ---
 
@@ -2809,8 +3118,8 @@ portfolio_status
 
 Manual acceptance:
 
-* MVP 1 tools still work with updated config
-* archived/removed projects behave as expected
+* MVP 1 tools still work with updated config,
+* archived/removed projects behave as expected.
 
 ---
 
@@ -2822,10 +3131,16 @@ MVP 2 is complete only when all are true:
 * [ ] Default root is `$HOME/.agent-system` using `Path.home() / ".agent-system"`.
 * [ ] `AGENT_SYSTEM_ROOT` and explicit root override still work.
 * [ ] No runtime code hardcodes `/srv/agent-system` or `/usr/HOME/.agent-system`.
+* [ ] Fixtures and examples use `~/.agent-system` or temp roots.
+* [ ] PyYAML and Pydantic v2 are declared dependencies.
+* [ ] Unknown YAML fields are preserved as data.
 * [ ] Server-side project config can be mutated safely.
+* [ ] First project can be added when config is missing.
+* [ ] Other mutations block with `config_missing` when config is missing.
 * [ ] All project admin mutations are implemented as pure functions first.
 * [ ] All config mutations use `config:projects` lock.
-* [ ] All config mutations create backups.
+* [ ] All config mutations create backups when config existed.
+* [ ] First config creation by project add does not require backup.
 * [ ] All config writes are atomic.
 * [ ] Written config is reloaded and validated after write.
 * [ ] Duplicate project IDs are blocked.
@@ -2834,21 +3149,25 @@ MVP 2 is complete only when all are true:
 * [ ] GitHub validation uses read-only `gh repo view` only.
 * [ ] Validation can be skipped with warning.
 * [ ] Auto-merge defaults to disabled.
+* [ ] Auto-merge max risk defaults to low when enabled without explicit risk.
 * [ ] Auto-merge max risk cannot be high or critical.
+* [ ] New projects get default protected paths unless explicitly overridden.
 * [ ] Remove requires explicit confirmation.
 * [ ] Remove does not delete worktrees, logs, artifacts, or SQLite history.
+* [ ] Remove sets SQLite project status to archived.
 * [ ] Archive is implemented and preferred over remove.
 * [ ] `portfolio_project_explain` is read-only and useful.
 * [ ] `portfolio_project_config_backup` works.
 * [ ] All MVP 2 tools are registered with Hermes.
-* [ ] `dev_cli.py` supports all MVP 2 tools.
-* [ ] `project-admin` skill exists and contains safety guidance.
+* [ ] `dev_cli.py` supports all MVP 2 tools with exact flags from this document.
+* [ ] `project-admin` skill exists and contains safety and clarification guidance.
 * [ ] Security tests prove no GitHub mutation commands are used.
 * [ ] Security tests prove no unsafe Git commands are used.
 * [ ] Security tests prove no `shell=True` subprocess execution is used.
 * [ ] Security tests prove repository files are not modified.
 * [ ] Security tests prove config writes cannot escape system root.
 * [ ] Full automated test suite passes with `pytest`.
+* [ ] Local dev CLI e2e flow passes.
 * [ ] Manual Hermes smoke tests pass using a test root.
 
 ---
@@ -2873,11 +3192,12 @@ Follow this exact order:
 
 Reason:
 
-* root migration must happen before new tools
-* pure functions are safer than tool-first implementation
-* file writes and locks must be correct before Hermes mutates config
-* CLI/e2e tests make debugging possible outside Hermes
-* manual Hermes tests come last
+* root migration must happen before new tools,
+* data and validation decisions must be locked before mutation logic,
+* pure functions are safer than tool-first implementation,
+* file writes and locks must be correct before Hermes mutates config,
+* CLI/e2e tests make debugging possible outside Hermes,
+* manual Hermes tests come last.
 
 ---
 
@@ -2894,7 +3214,7 @@ implementation loops
 review ladders
 budget routing
 auto-development
-auto-merge
+auto-merge execution
 ```
 
 MVP 2 is project administration only.

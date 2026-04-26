@@ -75,13 +75,17 @@ def discover_issue_worktrees(root: Path, project: ProjectConfig) -> list[Worktre
 
 def _run_git(*args: str, cwd: Path, timeout: int = 30) -> subprocess.CompletedProcess[str]:
     """Run a git command with argument arrays. Returns CompletedProcess."""
-    return subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("git %s timed out after %ds in %s", args, timeout, cwd)
+        return subprocess.CompletedProcess(args=["git", *args], returncode=124, stdout="", stderr="timeout")
 
 
 def _is_git_repo(path: Path) -> bool:
@@ -126,6 +130,9 @@ def _parse_porcelain(porcelain: str) -> tuple[list[str], list[str], list[str]]:
             continue
         xy = line[:2]
         filepath = line[3:]
+        # For rename/copy entries, extract the destination path
+        if " -> " in filepath:
+            filepath = filepath.split(" -> ", 1)[1]
         # Conflict indicators: UU, AA, DD, AU, UA, DU, UD
         if xy in ("UU", "AA", "DD", "AU", "UA", "DU", "UD"):
             conflict.append(filepath)

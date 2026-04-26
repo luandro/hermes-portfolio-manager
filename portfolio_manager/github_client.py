@@ -148,28 +148,28 @@ def list_open_issues(owner: str, repo: str, limit: int = 50) -> list[IssueRecord
         if proc.returncode != 0:
             raise GitHubSyncError(f"gh issue list failed for {owner}/{repo}: {proc.stderr.strip()}")
         raw: list[dict[str, Any]] = json.loads(proc.stdout)
+
+        results: list[IssueRecord] = []
+        for item in raw:
+            labels = [name for lbl in item.get("labels", []) if isinstance(lbl, dict) and (name := lbl.get("name"))]
+            author_obj = item.get("author")
+            author = author_obj.get("login") if isinstance(author_obj, dict) else None
+            results.append(
+                IssueRecord(
+                    number=item["number"],
+                    title=item["title"],
+                    labels=labels,
+                    author=author,
+                    url=item.get("url"),
+                    created_at=item.get("createdAt"),
+                    updated_at=item.get("updatedAt"),
+                )
+            )
+        return results
     except GitHubSyncError:
         raise
     except Exception as exc:
         raise GitHubSyncError(f"gh issue list error for {owner}/{repo}: {exc}") from exc
-
-    results: list[IssueRecord] = []
-    for item in raw:
-        labels = [lbl["name"] for lbl in item.get("labels", []) if isinstance(lbl, dict) and "name" in lbl]
-        author_obj = item.get("author")
-        author = author_obj.get("login") if isinstance(author_obj, dict) else None
-        results.append(
-            IssueRecord(
-                number=item["number"],
-                title=item["title"],
-                labels=labels,
-                author=author,
-                url=item.get("url"),
-                created_at=item.get("createdAt"),
-                updated_at=item.get("updatedAt"),
-            )
-        )
-    return results
 
 
 # ---------------------------------------------------------------------------
@@ -197,32 +197,32 @@ def list_open_prs(owner: str, repo: str, limit: int = 50) -> list[PullRequestRec
         if proc.returncode != 0:
             raise GitHubSyncError(f"gh pr list failed for {owner}/{repo}: {proc.stderr.strip()}")
         raw: list[dict[str, Any]] = json.loads(proc.stdout)
+
+        results: list[PullRequestRecord] = []
+        for item in raw:
+            labels = [name for lbl in item.get("labels", []) if isinstance(lbl, dict) and (name := lbl.get("name"))]
+            review_stage = map_pr_state(item)
+            rollup = item.get("statusCheckRollup")
+            rollup_str = json.dumps(rollup) if rollup else None
+            results.append(
+                PullRequestRecord(
+                    number=item["number"],
+                    title=item["title"],
+                    head_branch=item.get("headRefName"),
+                    base_branch=item.get("baseRefName"),
+                    labels=labels,
+                    review_stage=review_stage,
+                    check_rollup=rollup_str,
+                    url=item.get("url"),
+                    created_at=item.get("createdAt"),
+                    updated_at=item.get("updatedAt"),
+                )
+            )
+        return results
     except GitHubSyncError:
         raise
     except Exception as exc:
         raise GitHubSyncError(f"gh pr list error for {owner}/{repo}: {exc}") from exc
-
-    results: list[PullRequestRecord] = []
-    for item in raw:
-        labels = [lbl["name"] for lbl in item.get("labels", []) if isinstance(lbl, dict) and "name" in lbl]
-        review_stage = map_pr_state(item)
-        rollup = item.get("statusCheckRollup")
-        rollup_str = json.dumps(rollup) if rollup else None
-        results.append(
-            PullRequestRecord(
-                number=item["number"],
-                title=item["title"],
-                head_branch=item.get("headRefName"),
-                base_branch=item.get("baseRefName"),
-                labels=labels,
-                review_stage=review_stage,
-                check_rollup=rollup_str,
-                url=item.get("url"),
-                created_at=item.get("createdAt"),
-                updated_at=item.get("updatedAt"),
-            )
-        )
-    return results
 
 
 # ---------------------------------------------------------------------------
