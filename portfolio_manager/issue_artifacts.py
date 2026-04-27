@@ -118,6 +118,8 @@ def read_issue_artifact(root: Path, project_id: str, draft_id: str, filename: st
         raise ValueError(f"Invalid filename: {filename!r}")
     artifact_dir = root / "artifacts" / "issues" / project_id / draft_id
     path = artifact_dir / filename
+    if not path.resolve().is_relative_to(artifact_dir.resolve()):
+        raise ValueError(f"Path traversal detected: {filename!r}")
     if not path.exists():
         return None
     return path.read_text()

@@ -1803,9 +1803,7 @@ def _handle_portfolio_issue_discard_draft(args: dict[str, Any], **kwargs: Any) -
     if not draft_id:
         return _blocked(tool, "draft_id is required")
 
-    confirm = args.get("confirm", False)
-    if isinstance(confirm, str):
-        confirm = confirm.lower() == "true"
+    confirm = _coerce_bool(args.get("confirm"))
     if not confirm:
         return _blocked(tool, "confirm=true is required to discard", reason="confirm_required")
 
