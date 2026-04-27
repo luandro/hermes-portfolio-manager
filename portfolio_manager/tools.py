@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -811,13 +812,6 @@ def _handle_portfolio_project_add(args: dict[str, Any], **kwargs: Any) -> str:
             status=args.get("status", "active"),
         )
 
-        config = load_config_dict(root)
-        is_first_run = config is None
-        if config is None:
-            config = {"version": 1, "projects": []}
-
-        updated = add_project_to_config(config, project)
-
         validate = args.get("validate_github", True)
         if isinstance(validate, str):
             validate = validate.lower() == "true"
@@ -833,6 +827,12 @@ def _handle_portfolio_project_add(args: dict[str, Any], **kwargs: Any) -> str:
 
         try:
             with with_config_lock(conn):
+                config = load_config_dict(root)
+                is_first_run = config is None
+                if config is None:
+                    config = {"version": 1, "projects": []}
+
+                updated = add_project_to_config(config, project)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, is_first_run)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -887,10 +887,6 @@ def _handle_portfolio_project_update(args: dict[str, Any], **kwargs: Any) -> str
         if not project_id:
             return _blocked(tool, "project_id is required")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
         updates: dict[str, Any] = {}
         for key in ("name", "priority", "status", "default_branch", "notes"):
             if key in args:
@@ -899,14 +895,17 @@ def _handle_portfolio_project_update(args: dict[str, Any], **kwargs: Any) -> str
         if not updates:
             return _blocked(tool, "No update fields provided")
 
-        updated = update_project_in_config(config, project_id, updates)
-
         _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = update_project_in_config(config, project_id, updates)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -947,12 +946,7 @@ def _handle_portfolio_project_pause(args: dict[str, Any], **kwargs: Any) -> str:
         if not project_id:
             return _blocked(tool, "project_id is required")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
         reason = args.get("reason")
-        updated = pause_project_in_config(config, project_id, reason=reason)
 
         _ensure_dirs(root)
         conn = open_state(root)
@@ -960,6 +954,11 @@ def _handle_portfolio_project_pause(args: dict[str, Any], **kwargs: Any) -> str:
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = pause_project_in_config(config, project_id, reason=reason)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -1000,18 +999,17 @@ def _handle_portfolio_project_resume(args: dict[str, Any], **kwargs: Any) -> str
         if not project_id:
             return _blocked(tool, "project_id is required")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
-        updated = resume_project_in_config(config, project_id)
-
         _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = resume_project_in_config(config, project_id)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -1051,12 +1049,7 @@ def _handle_portfolio_project_archive(args: dict[str, Any], **kwargs: Any) -> st
         if not project_id:
             return _blocked(tool, "project_id is required")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
         reason = args.get("reason")
-        updated = archive_project_in_config(config, project_id, reason=reason)
 
         _ensure_dirs(root)
         conn = open_state(root)
@@ -1064,6 +1057,11 @@ def _handle_portfolio_project_archive(args: dict[str, Any], **kwargs: Any) -> st
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = archive_project_in_config(config, project_id, reason=reason)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -1107,18 +1105,17 @@ def _handle_portfolio_project_set_priority(args: dict[str, Any], **kwargs: Any) 
         if not priority:
             return _blocked(tool, "priority is required")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
-        updated = set_project_priority_in_config(config, project_id, priority)
-
         _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = set_project_priority_in_config(config, project_id, priority)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -1167,18 +1164,17 @@ def _handle_portfolio_project_set_auto_merge(args: dict[str, Any], **kwargs: Any
 
         max_risk = args.get("max_risk")
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
-        updated = set_project_auto_merge_in_config(config, project_id, enabled, max_risk=max_risk)
-
         _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = set_project_auto_merge_in_config(config, project_id, enabled, max_risk=max_risk)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
@@ -1224,32 +1220,36 @@ def _handle_portfolio_project_remove(args: dict[str, Any], **kwargs: Any) -> str
         if isinstance(confirm, str):
             confirm = confirm.lower() == "true"
 
-        config = _load_config_or_blocked(tool, root)
-        if isinstance(config, str):
-            return config
-
-        updated = remove_project_from_config(config, project_id, confirm=confirm)
-
         _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
 
         try:
             with with_config_lock(conn):
+                config = _load_config_or_blocked(tool, root)
+                if isinstance(config, str):
+                    return config
+
+                updated = remove_project_from_config(config, project_id, confirm=confirm)
                 backup_result, write_result = _mutation_write(tool, root, conn, updated, False)
                 if write_result.get("status") == "failed":
                     return _failed(tool, write_result.get("error", "Write failed"))
 
-                # Archive in SQLite (don't delete — preserve history)
-                pc = ProjectConfig(
-                    id=project_id,
-                    name=project_id,
-                    repo="",
-                    github=GithubRef(owner="", repo=""),
-                    priority="low",
-                    status="archived",
+                # Archive in SQLite (don't delete — preserve history).
+                # Only UPDATE existing rows to avoid clobbering metadata; if no
+                # row exists yet (project was never synced), INSERT a minimal one.
+                now_iso = datetime.now(UTC).isoformat()
+                cursor = conn.execute(
+                    "UPDATE projects SET status='archived', updated_at=? WHERE id=?",
+                    (now_iso, project_id),
                 )
-                upsert_project(conn, pc)
+                if cursor.rowcount == 0:
+                    conn.execute(
+                        "INSERT INTO projects (id, name, repo_url, priority, default_branch, status, created_at, updated_at) "
+                        "VALUES (?, ?, '', 'low', 'auto', 'archived', ?, ?)",
+                        (project_id, project_id, now_iso, now_iso),
+                    )
+                conn.commit()
 
             return _result(
                 status="success",
@@ -1311,8 +1311,8 @@ def _handle_portfolio_project_explain(args: dict[str, Any], **kwargs: Any) -> st
                 f"  Priority: {target.get('priority', 'N/A')}\n"
                 f"  Status: {target.get('status', 'N/A')}\n"
                 f"  Branch: {target.get('default_branch', 'auto')}\n"
-                f"  Auto-merge: {target.get('auto_merge', {})}\n"
-                f"  Protected paths: {target.get('protected_paths', [])}"
+                f"  Auto-merge: enabled={target.get('auto_merge', {}).get('enabled', False)}, max_risk={target.get('auto_merge', {}).get('max_risk') or 'n/a'}\n"
+                f"  Protected paths: {', '.join(target.get('protected_paths', [])) or 'none'}"
             ),
         )
     except Exception as exc:

@@ -57,15 +57,12 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
+plugins = ["pydantic.mypy"]
 exclude = [
     "(^|/)__init__\\.py$",
     "(^|/)tests/",
     "(^|/)smoke_test\\.py$",
 ]
-
-[[tool.mypy.overrides]]
-module = ["portfolio_manager.admin_models"]
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["yaml.*"]

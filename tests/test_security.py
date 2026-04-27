@@ -320,13 +320,9 @@ class TestMvp2RedactSecretsInToolOutput:
 class TestMvp2AdminDoesNotModifyRepositories:
     """Admin tool handlers must not create/modify files inside repository paths."""
 
-    def test_admin_does_not_modify_repositories(self, tmp_path: object) -> None:
+    def test_admin_does_not_modify_repositories(self, tmp_path: Path) -> None:
         """Running admin handlers only touches config/state/backups, not repo dirs."""
-
-        tmp = tmp_path  # type: ignore[assignment]
-        from pathlib import Path as PathCls
-
-        tmp = PathCls(str(tmp))
+        tmp = tmp_path
 
         # Create a fake repo-like directory (simulates a checked-out repo)
         repo_dir = tmp / "worktrees" / "my-project"

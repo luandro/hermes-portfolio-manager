@@ -72,7 +72,7 @@ def test_parse_ssh_github_url() -> None:
     ],
 )
 def test_reject_invalid_github_repo_refs(value: str) -> None:
-    with pytest.raises(ValueError, match="[Nn]ot a recognizable|invalid|Empty"):
+    with pytest.raises(ValueError, match=r"[Nn]ot a recognizable|invalid|Empty"):
         parse_github_repo_ref(value)
 
 

@@ -21,7 +21,7 @@ BACKUP_PATTERN = "projects.yaml.{timestamp}.bak"
 
 
 def _timestamp() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S.%fZ")
 
 
 def load_config_dict(root: Path) -> dict[str, Any] | None:
@@ -34,7 +34,7 @@ def load_config_dict(root: Path) -> dict[str, Any] | None:
         if isinstance(raw, dict):
             return raw
         return None  # Not a dict (list, scalar, etc.) is corrupt/missing config
-    except yaml.YAMLError:
+    except (yaml.YAMLError, OSError, UnicodeDecodeError):
         return None
 
 
@@ -79,8 +79,17 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
     tmp_name = f"projects.yaml.tmp.{uuid.uuid4().hex}"
     tmp_path = config_dir / tmp_name
     try:
-        tmp_path.write_text(yaml_output, encoding="utf-8")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(yaml_output)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(str(tmp_path), str(config_path))
+        try:
+            dir_fd = os.open(str(config_dir), os.O_RDONLY)
+            os.fsync(dir_fd)
+            os.close(dir_fd)
+        except OSError:
+            pass
     except OSError as exc:
         if tmp_path.exists():
             tmp_path.unlink()
@@ -92,7 +101,7 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
         if not isinstance(reloaded, dict):
             return {"status": "failed", "error": "Written config failed reload validation", "path": str(config_path)}
         # Check that reloaded data matches what we tried to write
-        if reloaded != config_dict:
+        if reloaded != parsed_back:
             return {"status": "failed", "error": "Written config data mismatch after reload", "path": str(config_path)}
     except yaml.YAMLError as exc:
         return {"status": "failed", "error": f"Written config failed reload: {exc}", "path": str(config_path)}

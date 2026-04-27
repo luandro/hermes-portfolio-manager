@@ -14,10 +14,9 @@ if TYPE_CHECKING:
     from portfolio_manager.admin_models import AdminProjectConfig
 
 from portfolio_manager.admin_models import (
-    DEFAULT_PROTECTED_PATHS,
     VALID_PRIORITIES,
     AutoMergeConfig,
-    _warn_auto_merge_policy_only,
+    validate_auto_merge,
 )
 
 
@@ -64,7 +63,7 @@ def add_project_to_config(
             "enabled": project.auto_merge.enabled,
             "max_risk": project.auto_merge.max_risk,
         },
-        "protected_paths": list(project.protected_paths) or list(DEFAULT_PROTECTED_PATHS),
+        "protected_paths": list(project.protected_paths),
         "labels": list(project.labels) if project.labels else [],
         "created_at": now,
         "updated_at": now,
@@ -195,15 +194,14 @@ def archive_project_in_config(
     reason: str | None = None,
 ) -> dict[str, Any]:
     """Set project status to 'archived' with optional reason appended to notes."""
+    existing = _find_project(config, project_id)
+    if existing is None:
+        raise ValueError(f"Project not found: {project_id}")
     updates: dict[str, Any] = {"status": "archived"}
-    if reason:
-        existing = _find_project(config, project_id)
-        if existing is None:
-            raise ValueError(f"Project not found: {project_id}")
-        existing_notes = existing.get("notes", "") or ""
-        archive_note = f"Archived: {reason}"
-        new_notes = (existing_notes + "\n" + archive_note).strip() if existing_notes else archive_note
-        updates["notes"] = new_notes
+    existing_notes = existing.get("notes", "") or ""
+    archive_note = f"Archived: {reason}" if reason else "Archived"
+    new_notes = (existing_notes + "\n" + archive_note).strip() if existing_notes else archive_note
+    updates["notes"] = new_notes
     return update_project_in_config(config, project_id, updates)
 
 
@@ -260,9 +258,7 @@ def set_project_auto_merge_in_config(
     max_risk: str | None = None,
 ) -> dict[str, Any]:
     """Set auto-merge policy. Validates via AutoMergeConfig."""
-    am = AutoMergeConfig(enabled=enabled, max_risk=max_risk)
-    if am.enabled:
-        _warn_auto_merge_policy_only()
+    am = validate_auto_merge(enabled=enabled, max_risk=max_risk)
     return update_project_in_config(
         config,
         project_id,

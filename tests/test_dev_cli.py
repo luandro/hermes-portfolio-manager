@@ -38,20 +38,9 @@ def _write_config(root: Path, projects: list[dict[str, Any]] | None = None) -> P
 
 
 def _to_yaml(data: dict[str, Any]) -> str:
-    """Minimal YAML serializer for test fixtures."""
-    lines: list[str] = [f"version: {data['version']}", "projects:"]
-    for p in data.get("projects", []):
-        lines.append(f"  - id: {p['id']}")
-        lines.append(f"    name: {p.get('name', p['id'])}")
-        lines.append(f"    repo: {p.get('repo', '')}")
-        gh = p.get("github", {})
-        lines.append("    github:")
-        lines.append(f"      owner: {gh.get('owner', '')}")
-        lines.append(f"      repo: {gh.get('repo', '')}")
-        lines.append(f"    priority: {p.get('priority', 'medium')}")
-        lines.append(f"    status: {p.get('status', 'active')}")
-        lines.append(f"    default_branch: {p.get('default_branch', 'auto')}")
-    return "\n".join(lines) + "\n"
+    import yaml
+
+    return yaml.safe_dump(data, sort_keys=False)
 
 
 SAMPLE_PROJECT: dict[str, Any] = {
@@ -234,7 +223,7 @@ def test_dev_cli_project_remove_no_confirm(tmp_path: Path) -> None:
         "--root",
         str(root),
     )
-    parsed = json.loads(result.stdout)
+    parsed = _parse_json(result)
     assert parsed["status"] == "blocked"
     assert parsed["tool"] == "portfolio_project_remove"
 

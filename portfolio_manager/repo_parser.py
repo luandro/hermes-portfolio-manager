@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 GITHUB_SSH_RE = re.compile(r"^git@github\.com:(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+?)(?:\.git)?$")
 GITHUB_HTTPS_RE = re.compile(r"^https://github\.com/(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+?)(?:\.git)?$")
-OWNER_REPO_RE = re.compile(r"^(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+)$")
+OWNER_REPO_RE = re.compile(r"^(?P<owner>[A-Za-z0-9._-]+)/(?P<repo>[A-Za-z0-9._-]+?)(?:\.git)?$")
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def parse_github_repo_ref(value: str) -> ParsedRepo:
             owner=owner,
             repo=repo,
             repo_url=f"git@github.com:{owner}/{repo}.git",
-            project_id=repo,
+            project_id=repo.lower().replace("_", "-").replace(".", "-"),
         )
 
     # HTTPS format: https://github.com/owner/repo[.git]
@@ -42,7 +42,7 @@ def parse_github_repo_ref(value: str) -> ParsedRepo:
             owner=owner,
             repo=repo,
             repo_url=f"git@github.com:{owner}/{repo}.git",
-            project_id=repo,
+            project_id=repo.lower().replace("_", "-").replace(".", "-"),
         )
 
     # Shorthand: owner/repo
@@ -53,7 +53,7 @@ def parse_github_repo_ref(value: str) -> ParsedRepo:
             owner=owner,
             repo=repo,
             repo_url=f"git@github.com:{owner}/{repo}.git",
-            project_id=repo,
+            project_id=repo.lower().replace("_", "-").replace(".", "-"),
         )
 
     raise ValueError(f"Not a recognizable GitHub repo reference: {value!r}")

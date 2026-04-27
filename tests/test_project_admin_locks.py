@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from portfolio_manager.state import acquire_lock, init_state, open_state
 
 # ---------------------------------------------------------------------------
@@ -63,15 +65,8 @@ def test_mutation_blocked_when_config_lock_held(tmp_path: Path) -> None:
     assert result.acquired is True
 
     # Attempting to acquire via with_config_lock should raise RuntimeError
-    try:
-        with with_config_lock(conn):
-            pass  # pragma: no cover — should not reach
-        raised = False
-    except RuntimeError as exc:
-        raised = True
-        assert "config_lock_already_held" in str(exc)
-
-    assert raised is True
+    with pytest.raises(RuntimeError, match="config_lock_already_held"), with_config_lock(conn):
+        pass  # pragma: no cover — should not reach
 
 
 # ---------------------------------------------------------------------------

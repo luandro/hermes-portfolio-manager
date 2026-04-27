@@ -28,7 +28,7 @@ VALID_PRIORITIES = frozenset({"critical", "high", "medium", "low", "paused"})
 VALID_STATUSES = frozenset({"active", "paused", "archived", "blocked", "missing"})
 VALID_MAX_RISKS = frozenset({"low", "medium"})
 
-PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
+PROJECT_ID_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 
 
 # ---------------------------------------------------------------------------
@@ -63,8 +63,8 @@ class AdminProjectConfig(BaseModel, extra="allow"):
     id: str
     name: str
     repo: str
-    github_owner: str = Field(alias="github_owner")
-    github_repo: str = Field(alias="github_repo")
+    github_owner: str
+    github_repo: str
     priority: str = "medium"
     status: str = "active"
     default_branch: str = "auto"
