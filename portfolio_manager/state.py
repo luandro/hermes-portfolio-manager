@@ -539,7 +539,7 @@ def list_issue_drafts(
     if state is not None:
         conditions.append("state = ?")
         params.append(state)
-    if not include_created:
+    if not include_created and state is None:
         conditions.append("state != 'created'")
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     rows = conn.execute(

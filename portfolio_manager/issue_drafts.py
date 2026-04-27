@@ -223,10 +223,10 @@ _DANGEROUS_PATTERNS = (
 )
 
 _PRIVATE_MARKERS = (
-    "readiness",
     "internal_notes",
     "private_metadata",
     "<!-- private",
+    '"readiness":',
 )
 
 
@@ -358,11 +358,19 @@ def find_duplicate_draft(conn: sqlite3.Connection, project_id: str, title: str) 
 
 def _ensure_project_row(conn: sqlite3.Connection, config: Any, project_id: str) -> None:
     """Insert a minimal project row if it doesn't exist (satisfies FK)."""
+    # Try to get the real repo URL from config
+    repo_url = f"https://github.com/test/{project_id}"
+    project_name = project_id
+    for p in getattr(config, "projects", []):
+        if p.id == project_id:
+            repo_url = p.repo
+            project_name = p.name
+            break
     now = _utcnow()
     conn.execute(
         "INSERT OR IGNORE INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
         "VALUES (?, ?, ?, 'medium', 'active', ?, ?)",
-        (project_id, project_id, f"https://github.com/test/{project_id}", now, now),
+        (project_id, project_name, repo_url, now, now),
     )
     conn.commit()
 
@@ -810,6 +818,18 @@ def create_issue_from_draft(
         # 9. Duplicate GitHub issue check
         dup = find_duplicate_github_issue(owner, repo, title)
         if dup and not allow_possible_duplicate:
+            write_creation_error(artifact_dir, f"possible_duplicate:{dup.get('number', '?')}")
+            upsert_issue_draft(
+                conn,
+                {
+                    "draft_id": draft_id,
+                    "project_id": project_id,
+                    "state": "blocked",
+                    "title": title,
+                    "readiness": row.get("readiness"),
+                    "artifact_path": row.get("artifact_path", ""),
+                },
+            )
             return {
                 "blocked": True,
                 "reason": "possible_duplicate",
@@ -821,8 +841,10 @@ def create_issue_from_draft(
 
         issue_number_raw = result["issue_number"]
         issue_url_raw = result["issue_url"]
-        assert isinstance(issue_number_raw, int), f"Expected int, got {type(issue_number_raw)}"
-        assert isinstance(issue_url_raw, str), f"Expected str, got {type(issue_url_raw)}"
+        if not isinstance(issue_number_raw, int):
+            raise RuntimeError(f"Expected int issue_number, got {type(issue_number_raw)}: {issue_number_raw!r}")
+        if not isinstance(issue_url_raw, str):
+            raise RuntimeError(f"Expected str issue_url, got {type(issue_url_raw)}: {issue_url_raw!r}")
 
         # 11. On success
         write_github_created(artifact_dir, issue_number_raw, issue_url_raw)

@@ -140,13 +140,14 @@ def find_duplicate_github_issue(owner: str, repo: str, title: str) -> dict[str, 
     norm = _normalize_title(title)
     for issue in issues:
         title_val = issue.get("title", "")
-        assert isinstance(title_val, str)
+        if not isinstance(title_val, str):
+            continue
         if _normalize_title(title_val) == norm:
             issue_num = issue["number"]
             issue_title_val = issue["title"]
             issue_url_val = issue.get("url", "")
-            assert isinstance(issue_num, int)
-            assert isinstance(issue_title_val, str)
+            if not isinstance(issue_num, int) or not isinstance(issue_title_val, str):
+                continue
             return {
                 "number": issue_num,
                 "title": issue_title_val,

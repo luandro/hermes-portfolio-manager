@@ -40,7 +40,7 @@ def issue_artifact_root(root: Path, project_id: str, draft_id: str) -> Path:
     _validate_project_id(project_id)
     validate_draft_id(draft_id)
     result = root / "artifacts" / "issues" / project_id / draft_id
-    if not str(result.resolve()).startswith(str(root.resolve())):
+    if not result.resolve().is_relative_to(root.resolve()):
         raise ValueError("Artifact path escapes root")
     return result
 

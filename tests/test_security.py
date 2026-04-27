@@ -450,9 +450,10 @@ class TestMvp3SubprocessArgumentArrays:
 
         importlib.reload(mod)
 
-        # Call check_gh_available — reuses the existing helper from github_client
-        # which is already tested. This just verifies issue_github.py itself
-        # doesn't create new subprocess calls with shell=True.
+        mod.check_gh_available()
+        mod.check_gh_auth()
+
+        assert len(calls) >= 1, "Expected at least one subprocess.run call"
         for call_args, call_kwargs in calls:
             cmd = call_args[0] if call_args else call_kwargs.get("args", [])
             assert isinstance(cmd, list), f"Expected list, got {type(cmd).__name__}: {cmd}"

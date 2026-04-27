@@ -140,7 +140,7 @@ def resolve_project(
     # Check for clear winner
     second_score = ranked[1][1] if len(ranked) > 1 else 0
 
-    if top_score >= 3 and second_score <= top_score - 2:
+    if top_score >= 3 and (top_score - second_score) >= 2:
         return ProjectResolutionResult(
             state="resolved",
             project_id=top_id,
