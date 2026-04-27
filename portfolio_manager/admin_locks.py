@@ -35,7 +35,11 @@ def with_config_lock(conn: sqlite3.Connection) -> Generator[None, None, None]:
         yield
     finally:
         try:
-            release_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER)
+            release_result = release_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER)
+            if not release_result.success:
+                import logging
+
+                logging.getLogger(__name__).warning("Config lock release unsuccessful: %s", release_result.reason)
         except Exception:
             import logging
 

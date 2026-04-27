@@ -371,7 +371,3 @@ class TestMvp2AdminDoesNotModifyRepositories:
         assert repo_files_before == repo_files_after, (
             f"Admin handler modified repo files: {set(repo_files_after) - set(repo_files_before)}"
         )
-
-        # Verify no new files created inside repo dir
-        new_files = set(repo_files_after) - set(repo_files_before)
-        assert not new_files, f"Admin handler created files in repo: {new_files}"

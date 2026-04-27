@@ -186,18 +186,20 @@ def resume_project_in_config(
     project_id: str,
 ) -> dict[str, Any]:
     """Set project status back to 'active'."""
-    cfg = update_project_in_config(config, project_id, {"status": "active"})
-    # Add resumed_at note
-    for p in cfg.get("projects", []):
-        if p.get("id") == project_id:
-            p.setdefault("notes", "")
-            if not isinstance(p.get("notes"), str):
-                p["notes"] = ""
-            ts = _utcnow()
-            p["notes"] = (p["notes"] + f"\nResumed at: {ts}").strip()
-            p["updated_at"] = ts
-            break
-    return cfg
+    existing = _find_project(config, project_id)
+    if existing is None:
+        raise ValueError(f"Project not found: {project_id}")
+    existing_notes = existing.get("notes", "") or ""
+    resume_note = f"Resumed at: {_utcnow()}"
+    new_notes = (existing_notes + "\n" + resume_note).strip() if existing_notes else resume_note
+    return update_project_in_config(
+        config,
+        project_id,
+        {
+            "status": "active",
+            "notes": new_notes,
+        },
+    )
 
 
 def archive_project_in_config(

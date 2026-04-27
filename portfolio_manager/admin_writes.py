@@ -6,6 +6,7 @@ All functions operate on a *root* directory containing config/ and backups/.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import uuid
@@ -48,11 +49,14 @@ def create_projects_config_backup(root: Path) -> dict[str, Any]:
         return {"backup_created": False, "backup_path": None}
 
     backup_dir = root / "backups"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        backup_dir.mkdir(parents=True, exist_ok=True)
 
-    ts = _timestamp()
-    backup_path = backup_dir / BACKUP_PATTERN.format(timestamp=ts)
-    shutil.copy2(config_path, backup_path)
+        ts = _timestamp()
+        backup_path = backup_dir / BACKUP_PATTERN.format(timestamp=ts)
+        shutil.copy2(config_path, backup_path)
+    except OSError as exc:
+        return {"backup_created": False, "backup_path": None, "error": str(exc)}
 
     return {"backup_created": True, "backup_path": str(backup_path)}
 
@@ -93,8 +97,8 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
         except OSError:
             pass
     except OSError as exc:
-        if tmp_path.exists():
-            tmp_path.unlink()
+        with contextlib.suppress(OSError):
+            tmp_path.unlink(missing_ok=True)
         return {"status": "failed", "error": f"Write failed: {exc}", "path": str(config_path)}
 
     # Validate after write: reload and compare with original

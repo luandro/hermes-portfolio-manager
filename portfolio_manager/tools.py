@@ -1184,14 +1184,21 @@ def _handle_portfolio_project_set_auto_merge(args: dict[str, Any], **kwargs: Any
                     return _failed(tool, write_result.get("error", "Write failed"))
                 _sync_project_to_state(conn, updated, project_id)
 
+                # Read back actual persisted auto_merge values (defaults applied)
+                actual_am = None
+                for p in updated.get("projects", []):
+                    if p.get("id") == project_id:
+                        actual_am = p.get("auto_merge", {})
+                        break
+
             return _result(
                 status="success",
                 tool=tool,
                 message=f"Set auto-merge for {project_id}: enabled={enabled}",
                 data={
                     "project_id": project_id,
-                    "enabled": enabled,
-                    "max_risk": max_risk,
+                    "enabled": actual_am.get("enabled", enabled) if actual_am else enabled,
+                    "max_risk": actual_am.get("max_risk", max_risk) if actual_am else max_risk,
                     "backup_created": backup_result.get("backup_created", False),
                     "backup_path": backup_result.get("backup_path"),
                 },

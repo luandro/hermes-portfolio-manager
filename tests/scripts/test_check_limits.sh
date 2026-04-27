@@ -4,7 +4,7 @@ set -euo pipefail
 # Test for check_limits.sh
 # Portable: use CHECK_LIMITS_SCRIPT env var, fallback to absolute path.
 
-CHECK_LIMITS_SCRIPT="${CHECK_LIMITS_SCRIPT:-/home/luandro/Dev/scripts/check_limits.sh}"
+CHECK_LIMITS_SCRIPT="${CHECK_LIMITS_SCRIPT:-$(command -v check_limits.sh || echo "${HOME}/Dev/scripts/check_limits.sh")}"
 
 if [[ ! -f "$CHECK_LIMITS_SCRIPT" ]]; then
     echo "SKIP: $CHECK_LIMITS_SCRIPT not found — skipping test"
@@ -18,8 +18,11 @@ codexbar() {
             claude) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}}]' ;;
             codex) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}, "credits": {"remaining": 100}}]' ;;
             gemini) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}}]' ;;
-            *) echo '[{}]' ;;
+            *) echo "codexbar mock: unexpected provider '${3:-}'" >&2; return 1 ;;
         esac
+    else
+        echo "codexbar mock: unexpected invocation '$*'" >&2
+        return 1
     fi
 }
 export -f codexbar

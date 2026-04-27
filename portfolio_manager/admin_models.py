@@ -106,7 +106,8 @@ class AdminProjectConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AdminPortfolioConfig(BaseModel, extra="allow"):
+class AdminPortfolioConfig(BaseModel):
+    model_config = {"extra": "allow"}
     version: int = 1
     projects: list[AdminProjectConfig] = Field(default_factory=list)
 
@@ -156,7 +157,8 @@ def expand_user_path(path_str: str) -> Path:
 
 def serialize_path_for_config(p: Path) -> str:
     try:
-        relative = p.relative_to(Path.home())
+        home = Path.home().resolve()
+        relative = p.resolve().relative_to(home)
         return f"~/{relative}"
     except ValueError:
         return str(p)
