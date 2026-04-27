@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import sqlite3  # noqa: TC003 - used at runtime in _setup_db / _insert_project
+
 import pytest
 
 from portfolio_manager.issue_artifacts import (
@@ -17,6 +19,7 @@ from portfolio_manager.issue_drafts import (
     update_issue_draft,
 )
 from portfolio_manager.state import (
+    _utcnow,
     get_issue_draft,
     init_state,
     open_state,
@@ -53,15 +56,13 @@ projects:
     return root
 
 
-def _setup_db(root: Path) -> sqlite3.Connection:  # noqa: F821
+def _setup_db(root: Path) -> sqlite3.Connection:
     conn = open_state(root)
     init_state(conn)
     return conn
 
 
-def _insert_project(conn: sqlite3.Connection, project_id: str) -> None:  # noqa: F821
-    from portfolio_manager.state import _utcnow
-
+def _insert_project(conn: sqlite3.Connection, project_id: str) -> None:
     now = _utcnow()
     conn.execute(
         "INSERT OR IGNORE INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
@@ -385,5 +386,88 @@ def test_force_ready_preserves_open_questions(tmp_path: Path) -> None:
     assert updated["state"] == "ready_for_creation"
     # Questions may still be present but state is ready
     assert "questions" in updated
+
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# 5.11 — update preserves user-edited github-issue.md
+# ---------------------------------------------------------------------------
+
+
+def test_update_preserves_user_edited_github_body(tmp_path: Path) -> None:
+    """User-edited github-issue.md artifact is not overwritten on update."""
+    root = _make_test_projects(tmp_path)
+    conn = _setup_db(root)
+    _insert_project(conn, "comapeo-cloud-app")
+
+    created = create_issue_draft(
+        root,
+        conn,
+        "Initial description for the issue.",
+        project_ref="comapeo-cloud-app",
+    )
+    draft_id = created["draft_id"]
+
+    # Simulate user editing the github-issue.md via brainstorm
+    from portfolio_manager.issue_artifacts import read_issue_artifact
+
+    artifact_dir = root / "artifacts" / "issues" / "comapeo-cloud-app" / draft_id
+    user_edited_body = "# User Edited Title\n\nThis was manually edited during brainstorm."
+    (artifact_dir / "github-issue.md").write_text(user_edited_body)
+
+    # Update the draft - should preserve the user-edited body
+    update_issue_draft(
+        root,
+        conn,
+        draft_id,
+        answers="Some additional context",
+    )
+
+    # Verify the preserved body is in the result artifacts
+    preserved = read_issue_artifact(root, "comapeo-cloud-app", draft_id, "github-issue.md")
+    assert preserved == user_edited_body
+
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# 5.12 — update regenerates github-issue.md when absent
+# ---------------------------------------------------------------------------
+
+
+def test_update_regenerates_github_body_when_absent(tmp_path: Path) -> None:
+    """github-issue.md is regenerated from spec when no user edit exists."""
+    root = _make_test_projects(tmp_path)
+    conn = _setup_db(root)
+    _insert_project(conn, "comapeo-cloud-app")
+
+    created = create_issue_draft(
+        root,
+        conn,
+        "Initial description for the issue.",
+        project_ref="comapeo-cloud-app",
+    )
+    draft_id = created["draft_id"]
+
+    # Remove the github-issue.md to simulate no user edit
+    artifact_dir = root / "artifacts" / "issues" / "comapeo-cloud-app" / draft_id
+    github_file = artifact_dir / "github-issue.md"
+    if github_file.exists():
+        github_file.unlink()
+
+    update_issue_draft(
+        root,
+        conn,
+        draft_id,
+        answers="Updated answer",
+    )
+
+    # A regenerated body should exist now
+    from portfolio_manager.issue_artifacts import read_issue_artifact
+
+    regenerated = read_issue_artifact(root, "comapeo-cloud-app", draft_id, "github-issue.md")
+    assert regenerated is not None
+    assert len(regenerated.strip()) > 0
 
     conn.close()

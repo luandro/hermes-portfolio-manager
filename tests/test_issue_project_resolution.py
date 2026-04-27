@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from portfolio_manager.config import GithubRef, PortfolioConfig, ProjectConfig
+from portfolio_manager.issue_resolver import resolve_project
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -18,7 +19,6 @@ from portfolio_manager.config import GithubRef, PortfolioConfig, ProjectConfig
 
 
 def _make_test_config(
-    tmp_path: Path,
     projects: list[tuple[str, str, str]],
     *,
     statuses: list[str] | None = None,
@@ -54,13 +54,11 @@ def _make_test_config(
 class TestResolveExactProjectId:
     def test_resolve_exact_id(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
                 ("comapeo-mobile", "CoMapeo Mobile", "digidem/comapeo-mobile"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, project_ref="comapeo-cloud-app")
         assert result.state == "resolved"
@@ -75,12 +73,10 @@ class TestResolveExactProjectId:
 class TestResolveExactOwnerRepo:
     def test_resolve_exact_owner_repo(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, project_ref="digidem/comapeo-cloud")
         assert result.state == "resolved"
@@ -95,12 +91,10 @@ class TestResolveExactOwnerRepo:
 class TestResolveExactProjectName:
     def test_resolve_exact_name(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, project_ref="CoMapeo Cloud App")
         assert result.state == "resolved"
@@ -114,13 +108,11 @@ class TestResolveExactProjectName:
 class TestResolveFuzzySingleMatch:
     def test_fuzzy_single_match(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
                 ("edt-migration", "EDT Migration", "digidem/edt-tool"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(
             config,
@@ -138,13 +130,11 @@ class TestResolveFuzzySingleMatch:
 class TestResolveAmbiguousProject:
     def test_ambiguous_project_returns_candidates(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
                 ("comapeo-mobile", "CoMapeo Mobile", "digidem/comapeo-mobile"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(
             config,
@@ -162,12 +152,10 @@ class TestResolveAmbiguousProject:
 class TestResolveProjectNotFound:
     def test_project_not_found(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("comapeo-cloud-app", "CoMapeo Cloud App", "digidem/comapeo-cloud"),
             ],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, text="Create an issue for nonexistent-project")
         assert result.state == "not_found"
@@ -181,28 +169,24 @@ class TestResolveProjectNotFound:
 class TestArchivedProjectsExcluded:
     def test_archived_excluded_by_default(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("old-project", "Old Project", "digidem/old-repo"),
                 ("new-project", "New Project", "digidem/new-repo"),
             ],
             statuses=["archived", "active"],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, project_ref="old-project")
         assert result.state == "not_found"
 
     def test_archived_included_when_requested(self, tmp_path: Path) -> None:
         config = _make_test_config(
-            tmp_path,
             [
                 ("old-project", "Old Project", "digidem/old-repo"),
                 ("new-project", "New Project", "digidem/new-repo"),
             ],
             statuses=["archived", "active"],
         )
-        from portfolio_manager.issue_resolver import resolve_project
 
         result = resolve_project(config, project_ref="old-project", include_archived=True)
         assert result.state == "resolved"

@@ -17,6 +17,7 @@ from portfolio_manager.issue_artifacts import (
     generate_draft_id,
     issue_artifact_root,
     read_github_created_if_exists,
+    read_issue_artifact,
     write_issue_artifact_files,
 )
 from portfolio_manager.issue_resolver import resolve_project
@@ -608,9 +609,7 @@ def update_issue_draft(
     _ensure_project_row(conn, config, effective_project_id)
 
     # Build updated content
-    # Read original input from artifact — may be under "unresolved" if ambiguous
-    from portfolio_manager.issue_artifacts import read_issue_artifact
-
+    # Read original input from artifact - may be under "unresolved" if ambiguous
     artifact_read_project = current_project_id if current_project_id else "unresolved"
     original_input = read_issue_artifact(root, artifact_read_project, draft_id, "original-input.md") or ""
 
@@ -636,7 +635,12 @@ def update_issue_draft(
     spec_body = generate_spec_body(combined_text, kind)
     questions_list = generate_questions(combined_text, kind)
     questions_text = "\n".join(f"- {q}" for q in questions_list)
-    github_body = generate_github_issue_body({"title": effective_title, "spec_body": spec_body})
+    # Preserve user-edited github-issue.md if it exists; only regenerate if missing
+    existing_github_body = read_issue_artifact(root, artifact_read_project, draft_id, "github-issue.md")
+    if existing_github_body and existing_github_body.strip():
+        github_body = existing_github_body
+    else:
+        github_body = generate_github_issue_body({"title": effective_title, "spec_body": spec_body})
 
     content = {
         "title": effective_title,

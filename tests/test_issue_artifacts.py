@@ -206,7 +206,7 @@ class TestReadArtifactFiles:
 
     def test_rejects_invalid_draft_id_in_read(self) -> None:
         with pytest.raises(ValueError):
-            read_issue_artifact(Path("/tmp"), "p", "../escape.md", "file.md") or True
+            read_issue_artifact(Path("/tmp"), "p", "../escape.md", "file.md")
 
     def test_read_metadata(self, tmp_path: Path) -> None:
         content = {"original_input": "test", "title": "Test issue", "project_id": "p"}
