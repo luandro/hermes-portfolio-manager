@@ -233,9 +233,13 @@ class TestCreateIssueWithBodyFile:
         create_github_issue("test-owner", "test-repo", "Test issue", "Body", labels=["bug", "priority:high"])
 
         call_args = mock.call_args[0][0]
-        assert "--label" in call_args
-        label_idx = call_args.index("--label")
-        assert call_args[label_idx + 1] == "bug,priority:high"
+        # Now each label gets its own --label flag
+        label_indices = [i for i, arg in enumerate(call_args) if arg == "--label"]
+        assert len(label_indices) == 2, f"Expected 2 --label flags, got {len(label_indices)}"
+        assert call_args[label_indices[0] + 1] == "bug", f"Expected 'bug', got {call_args[label_indices[0] + 1]}"
+        assert call_args[label_indices[1] + 1] == "priority:high", (
+            f"Expected 'priority:high', got {call_args[label_indices[1] + 1]}"
+        )
 
 
 # ===========================================================================

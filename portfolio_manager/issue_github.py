@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
+from portfolio_manager.issue_drafts import sanitize_public_issue_body, validate_public_issue_body
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,8 +195,12 @@ def create_github_issue(
     tmp_fd: int | None = None
     tmp_path: str | None = None
     try:
+        # Sanitize and validate before sending to GitHub
+        safe_body = sanitize_public_issue_body(body)
+        validate_public_issue_body(safe_body)
+
         tmp_fd, tmp_path = tempfile.mkstemp(suffix=".md")
-        os.write(tmp_fd, body.encode("utf-8"))
+        os.write(tmp_fd, safe_body.encode("utf-8"))
         os.close(tmp_fd)
         tmp_fd = None
 
@@ -210,7 +216,8 @@ def create_github_issue(
             tmp_path,
         ]
         if labels:
-            cmd.extend(["--label", ",".join(labels)])
+            for lbl in labels:
+                cmd.extend(["--label", lbl])
 
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=_gh_env())
         if proc.returncode != 0:

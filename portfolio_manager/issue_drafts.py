@@ -450,9 +450,10 @@ def create_issue_draft(
             "kind": kind,
         }
 
-    # Resolved — ensure project row exists for FK constraint
+    # Resolved — project_id should be set
+    if resolution.project_id is None:
+        return {"blocked": True, "state": "blocked", "reason": "resolution_failed"}
     project_id = resolution.project_id
-    assert project_id is not None
     _ensure_project_row(conn, config, project_id)
     draft_id = generate_draft_id()
 
