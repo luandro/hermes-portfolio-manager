@@ -120,19 +120,12 @@ def update_project_in_config(
     if "protected_paths" in updates:
         target["protected_paths"] = list(updates["protected_paths"])
 
-    # auto_merge
+    # auto_merge — validate through AutoMergeConfig
     if "auto_merge" in updates:
         am = updates["auto_merge"]
         if am is not None:
-            existing_am = target.get("auto_merge", {})
-            if isinstance(existing_am, dict):
-                if "enabled" in am:
-                    existing_am["enabled"] = am["enabled"]
-                if "max_risk" in am:
-                    existing_am["max_risk"] = am["max_risk"]
-                target["auto_merge"] = existing_am
-            else:
-                target["auto_merge"] = dict(am)
+            validated = AutoMergeConfig(**am)
+            target["auto_merge"] = {"enabled": validated.enabled, "max_risk": validated.max_risk}
 
     # notes
     if "notes" in updates:
@@ -147,18 +140,32 @@ def update_project_in_config(
 # ---------------------------------------------------------------------------
 
 
+def _find_project(config: dict[str, Any], project_id: str) -> dict[str, Any] | None:
+    """Find a project dict by ID in the config."""
+    for p in config.get("projects", []):
+        if p.get("id") == project_id:
+            return p
+    return None
+
+
 def pause_project_in_config(
     config: dict[str, Any],
     project_id: str,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    """Set project status to 'paused' with optional reason."""
+    """Set project status to 'paused' with optional reason appended to notes."""
+    existing = _find_project(config, project_id)
+    if existing is None:
+        raise ValueError(f"Project not found: {project_id}")
+    existing_notes = existing.get("notes", "") or ""
+    pause_note = f"Paused: {reason}" if reason else "Paused"
+    new_notes = (existing_notes + "\n" + pause_note).strip() if existing_notes else pause_note
     return update_project_in_config(
         config,
         project_id,
         {
             "status": "paused",
-            "notes": f"Paused: {reason}" if reason else "Paused",
+            "notes": new_notes,
         },
     )
 
@@ -187,10 +194,16 @@ def archive_project_in_config(
     project_id: str,
     reason: str | None = None,
 ) -> dict[str, Any]:
-    """Set project status to 'archived' with optional reason."""
+    """Set project status to 'archived' with optional reason appended to notes."""
     updates: dict[str, Any] = {"status": "archived"}
     if reason:
-        updates["notes"] = f"Archived: {reason}"
+        existing = _find_project(config, project_id)
+        if existing is None:
+            raise ValueError(f"Project not found: {project_id}")
+        existing_notes = existing.get("notes", "") or ""
+        archive_note = f"Archived: {reason}"
+        new_notes = (existing_notes + "\n" + archive_note).strip() if existing_notes else archive_note
+        updates["notes"] = new_notes
     return update_project_in_config(config, project_id, updates)
 
 
@@ -208,6 +221,10 @@ def remove_project_from_config(
     if not confirm:
         raise ValueError("Cannot remove project without confirmation (confirm=True). Consider archiving instead.")
     cfg = copy.deepcopy(config)
+    # Check if project exists before removal
+    found = any(p.get("id") == project_id for p in cfg.get("projects", []))
+    if not found:
+        raise ValueError(f"Project not found: {project_id}")
     cfg["projects"] = [p for p in cfg.get("projects", []) if p.get("id") != project_id]
     return cfg
 

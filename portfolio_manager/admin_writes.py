@@ -7,6 +7,7 @@ All functions operate on a *root* directory containing config/ and backups/.
 from __future__ import annotations
 
 import os
+import shutil
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -17,10 +18,6 @@ if TYPE_CHECKING:
 import yaml
 
 BACKUP_PATTERN = "projects.yaml.{timestamp}.bak"
-
-
-def _utcnow() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _timestamp() -> str:
@@ -36,7 +33,7 @@ def load_config_dict(root: Path) -> dict[str, Any] | None:
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         if isinstance(raw, dict):
             return raw
-        return {"version": 1, "projects": []}
+        return None  # Not a dict (list, scalar, etc.) is corrupt/missing config
     except yaml.YAMLError:
         return None
 
@@ -55,7 +52,7 @@ def create_projects_config_backup(root: Path) -> dict[str, Any]:
 
     ts = _timestamp()
     backup_path = backup_dir / BACKUP_PATTERN.format(timestamp=ts)
-    backup_path.write_text(config_path.read_text(encoding="utf-8"), encoding="utf-8")
+    shutil.copy2(config_path, backup_path)
 
     return {"backup_created": True, "backup_path": str(backup_path)}
 
@@ -89,11 +86,14 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
             tmp_path.unlink()
         return {"status": "failed", "error": f"Write failed: {exc}", "path": str(config_path)}
 
-    # Validate after write: reload
+    # Validate after write: reload and compare with original
     try:
         reloaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         if not isinstance(reloaded, dict):
             return {"status": "failed", "error": "Written config failed reload validation", "path": str(config_path)}
+        # Check that reloaded data matches what we tried to write
+        if reloaded != config_dict:
+            return {"status": "failed", "error": "Written config data mismatch after reload", "path": str(config_path)}
     except yaml.YAMLError as exc:
         return {"status": "failed", "error": f"Written config failed reload: {exc}", "path": str(config_path)}
 
