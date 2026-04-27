@@ -17,6 +17,8 @@ from portfolio_manager.admin_models import (
     VALID_PRIORITIES,
     AutoMergeConfig,
     validate_auto_merge,
+    validate_priority,
+    validate_status,
 )
 
 
@@ -110,10 +112,15 @@ def update_project_in_config(
 
     now = _utcnow()
 
-    # Scalar fields
-    for key in ("name", "priority", "status", "default_branch"):
+    for key in ("name", "default_branch"):
         if key in updates:
             target[key] = updates[key]
+    if "priority" in updates:
+        validate_priority(updates["priority"])
+        target["priority"] = updates["priority"]
+    if "status" in updates:
+        validate_status(updates["status"])
+        target["status"] = updates["status"]
 
     # protected_paths
     if "protected_paths" in updates:

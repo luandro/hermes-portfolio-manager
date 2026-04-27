@@ -1,8 +1,17 @@
 #!/bin/bash
+set -euo pipefail
 
-# Test for /home/luandro/Dev/scripts/check_limits.sh
+# Test for check_limits.sh
+# Portable: use CHECK_LIMITS_SCRIPT env var, fallback to absolute path.
 
-# Mocking codexbar
+CHECK_LIMITS_SCRIPT="${CHECK_LIMITS_SCRIPT:-/home/luandro/Dev/scripts/check_limits.sh}"
+
+if [[ ! -f "$CHECK_LIMITS_SCRIPT" ]]; then
+    echo "SKIP: $CHECK_LIMITS_SCRIPT not found — skipping test"
+    exit 0
+fi
+
+# Mock codexbar so the test is deterministic and network-free
 codexbar() {
     if [[ "$1" == "usage" && "$2" == "--provider" ]]; then
         case "$3" in
@@ -13,23 +22,30 @@ codexbar() {
     fi
 }
 export -f codexbar
-
-# Mocking zai_usage.sh (just echoing a mock JSON)
-# We need to ensure the script calls our mock. Since the script uses absolute path
-# /home/luandro/Dev/scripts/zai_usage.sh, we need to be careful.
-# We can use a temporary directory and PATH, but this might be overkill.
-
-# Given I cannot easily mock the path /home/luandro/Dev/scripts/zai_usage.sh
-# without creating a fake script there (which I should not do),
-# I will assume the script is mostly correct as tested before.
+unset ZAI_TOKEN
 
 echo "Running check_limits.sh with --json"
-RESULT=$(bash /home/luandro/Dev/scripts/check_limits.sh --json)
+RESULT=$(bash "$CHECK_LIMITS_SCRIPT" --json)
 
-if echo "$RESULT" | jq -e . >/dev/null 2>&1; then
-    echo "PASS: Valid JSON output"
-    exit 0
-else
+if ! echo "$RESULT" | jq -e . >/dev/null 2>&1; then
     echo "FAIL: Invalid JSON output"
+    echo "$RESULT"
     exit 1
 fi
+
+for key in claude codex gemini zai recommended; do
+    if ! echo "$RESULT" | jq -e --arg k "$key" 'has($k)' >/dev/null 2>&1; then
+        echo "FAIL: missing top-level key '$key' in output"
+        echo "$RESULT"
+        exit 1
+    fi
+done
+
+if ! echo "$RESULT" | jq -e '.recommended | has("model") and has("provider") and has("reason")' >/dev/null 2>&1; then
+    echo "FAIL: recommended object missing model/provider/reason"
+    echo "$RESULT"
+    exit 1
+fi
+
+echo "PASS: Valid JSON output with expected keys"
+exit 0

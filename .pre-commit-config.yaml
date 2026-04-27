@@ -19,6 +19,7 @@ repos:
       - id: mypy
         additional_dependencies:
           - pyyaml
+          - pydantic>=2
         args: ['--strict', '--ignore-missing-imports', 'portfolio_manager']
         pass_filenames: false
 
