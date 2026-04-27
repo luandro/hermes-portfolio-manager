@@ -654,3 +654,286 @@ def update_issue_draft(
         "questions": questions_list,
         "kind": kind,
     }
+
+
+# ---------------------------------------------------------------------------
+# Create issue from draft (Phase 6+7)
+# ---------------------------------------------------------------------------
+
+
+def create_issue_from_draft(
+    root: Path,
+    conn: sqlite3.Connection,
+    draft_id: str,
+    *,
+    confirm: bool = False,
+    allow_open_questions: bool = False,
+    allow_possible_duplicate: bool = False,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Create a GitHub issue from an existing draft.
+
+    Steps:
+    1. Get draft from DB
+    2. Check github-created.json exists -> idempotent recovery
+    3. Validate state
+    4. Require confirm (unless dry_run)
+    5. Load config, get project owner/repo
+    6. Dry-run returns preview without mutation
+    7. Acquire project-level lock
+    8. Write creation-attempt.json
+    9. Duplicate GitHub issue check
+    10. Call create_github_issue
+    11. On success: write github-created.json, update metadata, upsert state, release lock
+    12. On failure: write creation-error.json, set state creating_failed
+    """
+    from portfolio_manager.errors import redact_secrets
+    from portfolio_manager.issue_artifacts import (
+        issue_artifact_root,
+        read_github_created_if_exists,
+        read_issue_metadata,
+        write_creation_attempt,
+        write_creation_error,
+        write_github_created,
+        write_issue_artifact_files,
+    )
+    from portfolio_manager.issue_github import (
+        create_github_issue,
+        find_duplicate_github_issue,
+    )
+    from portfolio_manager.state import acquire_lock, release_lock, upsert_issue_draft
+
+    # 1. Get draft from DB
+    row = get_issue_draft(conn, draft_id)
+    if row is None:
+        return {"blocked": True, "reason": "not_found"}
+
+    project_id = row.get("project_id")
+    title = row.get("title", "")
+
+    if not project_id:
+        return {"blocked": True, "reason": "no_project_id"}
+
+    artifact_dir = issue_artifact_root(root, project_id, draft_id)
+
+    # 2. Check github-created.json -> idempotent recovery
+    existing = read_github_created_if_exists(artifact_dir)
+    if existing is not None:
+        issue_number_rec: object = existing.get("issue_number")
+        issue_url_rec: object = existing.get("issue_url")
+        # Ensure DB is in sync
+        upsert_issue_draft(
+            conn,
+            {
+                "draft_id": draft_id,
+                "project_id": project_id,
+                "state": "created",
+                "title": title,
+                "readiness": row.get("readiness"),
+                "artifact_path": row.get("artifact_path", ""),
+                "github_issue_number": issue_number_rec,
+                "github_issue_url": issue_url_rec,
+            },
+        )
+        return {
+            "draft_id": draft_id,
+            "state": "created",
+            "issue_number": issue_number_rec,
+            "issue_url": issue_url_rec,
+            "recovered": True,
+        }
+
+    # 3. Validate state
+    current_state = row["state"]
+    allowed_states = {"ready_for_creation", "creating_failed"}
+    if allow_open_questions:
+        allowed_states.add("needs_user_questions")
+    if current_state not in allowed_states:
+        return {
+            "blocked": True,
+            "reason": f"invalid_state:{current_state}",
+        }
+
+    # 4. Require confirm (unless dry_run)
+    if not confirm and not dry_run:
+        return {
+            "blocked": True,
+            "reason": "confirm_required",
+            "title": title,
+            "project_id": project_id,
+        }
+
+    # 5. Load config, get project owner/repo
+    config = load_projects_config(root)
+    project = None
+    for p in config.projects:
+        if p.id == project_id:
+            project = p
+            break
+    if project is None:
+        return {"blocked": True, "reason": f"project_not_found:{project_id}"}
+
+    owner = project.github.owner
+    repo = project.github.repo
+
+    # Read github body from artifacts
+    from portfolio_manager.issue_artifacts import read_issue_artifact
+
+    github_body = read_issue_artifact(root, project_id, draft_id, "github-issue.md") or ""
+    metadata = read_issue_metadata(root, project_id, draft_id) or {}
+
+    # 6. Dry-run returns preview without mutation
+    if dry_run:
+        return {
+            "draft_id": draft_id,
+            "dry_run": True,
+            "title": title,
+            "project_id": project_id,
+            "owner": owner,
+            "repo": repo,
+            "body_length": len(github_body),
+            "state": current_state,
+        }
+
+    # 7. Acquire project-level lock
+    lock_name = f"github_issue_create:{project_id}"
+    lock_owner = f"draft:{draft_id}"
+    lock_result = acquire_lock(conn, lock_name, lock_owner, ttl_seconds=120)
+    if not lock_result.acquired:
+        return {"blocked": True, "reason": f"lock_failed:{lock_result.reason}"}
+
+    try:
+        # 8. Write creation-attempt.json
+        write_creation_attempt(artifact_dir)
+
+        # 9. Duplicate GitHub issue check
+        dup = find_duplicate_github_issue(owner, repo, title)
+        if dup and not allow_possible_duplicate:
+            return {
+                "blocked": True,
+                "reason": "possible_duplicate",
+                "duplicate_issue": dup,
+            }
+
+        # 10. Call create_github_issue
+        result = create_github_issue(owner, repo, title, github_body)
+
+        issue_number_raw = result["issue_number"]
+        issue_url_raw = result["issue_url"]
+        assert isinstance(issue_number_raw, int), f"Expected int, got {type(issue_number_raw)}"
+        assert isinstance(issue_url_raw, str), f"Expected str, got {type(issue_url_raw)}"
+
+        # 11. On success
+        write_github_created(artifact_dir, issue_number_raw, issue_url_raw)
+
+        # Update metadata
+        metadata["github_issue_number"] = issue_number_raw
+        metadata["github_issue_url"] = issue_url_raw
+        write_issue_artifact_files(
+            root,
+            project_id,
+            draft_id,
+            {
+                "original_input": read_issue_artifact(root, project_id, draft_id, "original-input.md") or "",
+                "title": title,
+                "project_id": project_id,
+                "issue_kind": metadata.get("issue_kind", ""),
+                "readiness": metadata.get("readiness", 0.0),
+                "spec_body": read_issue_artifact(root, project_id, draft_id, "spec.md") or "",
+                "github_body": github_body,
+                "questions": read_issue_artifact(root, project_id, draft_id, "questions.md") or "",
+                "brainstorm_notes": read_issue_artifact(root, project_id, draft_id, "brainstorm.md") or "",
+            },
+        )
+
+        upsert_issue_draft(
+            conn,
+            {
+                "draft_id": draft_id,
+                "project_id": project_id,
+                "state": "created",
+                "title": title,
+                "readiness": row.get("readiness"),
+                "artifact_path": row.get("artifact_path", ""),
+                "github_issue_number": issue_number_raw,
+                "github_issue_url": issue_url_raw,
+            },
+        )
+
+        return {
+            "draft_id": draft_id,
+            "state": "created",
+            "issue_number": issue_number_raw,
+            "issue_url": issue_url_raw,
+        }
+
+    except Exception as exc:
+        # 12. On failure
+        error_msg = redact_secrets(str(exc))
+        write_creation_error(artifact_dir, error_msg)
+        upsert_issue_draft(
+            conn,
+            {
+                "draft_id": draft_id,
+                "project_id": project_id,
+                "state": "creating_failed",
+                "title": title,
+                "readiness": row.get("readiness"),
+                "artifact_path": row.get("artifact_path", ""),
+            },
+        )
+        return {
+            "blocked": True,
+            "reason": "creation_failed",
+            "error": error_msg,
+        }
+
+    finally:
+        release_lock(conn, lock_name, lock_owner)
+
+
+# ---------------------------------------------------------------------------
+# Convenience: create_issue (draft + create)
+# ---------------------------------------------------------------------------
+
+
+def create_issue(
+    root: Path,
+    conn: sqlite3.Connection,
+    text: str,
+    title: str,
+    body: str,
+    *,
+    project_ref: str | None = None,
+    confirm: bool = False,
+    dry_run: bool = False,
+    allow_possible_duplicate: bool = False,
+) -> dict[str, Any]:
+    """Create a local draft and then create the GitHub issue.
+
+    1. Create a local draft via create_issue_draft
+    2. Call create_issue_from_draft with the draft_id
+    """
+    draft_result = create_issue_draft(
+        root,
+        conn,
+        text,
+        project_ref=project_ref,
+        title=title,
+    )
+
+    if draft_result.get("blocked"):
+        return draft_result
+
+    draft_id = draft_result.get("draft_id")
+    if not draft_id:
+        return {"blocked": True, "reason": "draft_creation_failed"}
+
+    return create_issue_from_draft(
+        root,
+        conn,
+        draft_id,
+        confirm=confirm,
+        dry_run=dry_run,
+        allow_possible_duplicate=allow_possible_duplicate,
+    )

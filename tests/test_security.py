@@ -203,7 +203,6 @@ class TestMvp1ReadOnlyBoundary:
     """Verify no code paths exist for write operations (MVP-2 features)."""
 
     BANNED_FUNCTIONS: ClassVar[list[str]] = [
-        "create_issue",
         "create_pr",
         "merge_pr",
         "create_branch",
