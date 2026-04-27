@@ -6,7 +6,26 @@ Deterministic draft generation and validation.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import sqlite3
+    from pathlib import Path
+
+from portfolio_manager.config import load_projects_config
+from portfolio_manager.issue_artifacts import (
+    generate_draft_id,
+    issue_artifact_root,
+    read_github_created_if_exists,
+    write_issue_artifact_files,
+)
+from portfolio_manager.issue_resolver import resolve_project
+from portfolio_manager.state import (
+    _utcnow,
+    get_issue_draft,
+    list_issue_drafts,
+    upsert_issue_draft,
+)
 
 # ---------------------------------------------------------------------------
 # Input validation
@@ -267,3 +286,371 @@ def detect_large_feature(text: str) -> bool:
     )
     count = sum(1 for indicator in feature_indicators if indicator in lower)
     return count >= 4
+
+
+# ---------------------------------------------------------------------------
+# Draft state computation
+# ---------------------------------------------------------------------------
+
+
+def compute_draft_state(content: dict[str, Any], *, force_rough_issue: bool = False) -> str:
+    """Determine draft state based on readiness and project resolution.
+
+    If content has ambiguous_project=True -> 'needs_project_confirmation'
+    If content has no project_id -> 'needs_project_confirmation'
+    If readiness >= 0.75 -> 'ready_for_creation'
+    If 0.5 <= readiness < 0.75 and force_rough_issue -> 'ready_for_creation'
+    Otherwise -> 'needs_user_questions'
+    """
+    if content.get("ambiguous_project"):
+        return "needs_project_confirmation"
+    if not content.get("project_id"):
+        return "needs_project_confirmation"
+    readiness = content.get("readiness", 0.0)
+    if readiness >= 0.75:
+        return "ready_for_creation"
+    if 0.5 <= readiness < 0.75 and force_rough_issue:
+        return "ready_for_creation"
+    return "needs_user_questions"
+
+
+# ---------------------------------------------------------------------------
+# Title normalization
+# ---------------------------------------------------------------------------
+
+
+def normalize_title(title: str) -> str:
+    """Normalize title: lowercase, strip, collapse whitespace, remove punctuation."""
+    title = title.lower().strip()
+    title = re.sub(r"[^\w\s]", "", title)
+    title = re.sub(r"\s+", " ", title)
+    return title.strip()
+
+
+# ---------------------------------------------------------------------------
+# Duplicate detection
+# ---------------------------------------------------------------------------
+
+_TERMINAL_STATES = frozenset({"created", "discarded", "blocked"})
+
+
+def find_duplicate_draft(conn: sqlite3.Connection, project_id: str, title: str) -> str | None:
+    """Check existing non-terminal drafts for same project + normalized title.
+
+    Terminal states: created, discarded, blocked.
+    Returns draft_id if duplicate found, None otherwise.
+    """
+    norm = normalize_title(title)
+    drafts = list_issue_drafts(conn, project_id=project_id, include_created=True)
+    for draft in drafts:
+        if draft["state"] in _TERMINAL_STATES:
+            continue
+        if draft.get("title") and normalize_title(draft["title"]) == norm:
+            draft_id: str | None = draft["draft_id"]
+            return draft_id
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Helper: ensure project row exists for FK
+# ---------------------------------------------------------------------------
+
+
+def _ensure_project_row(conn: sqlite3.Connection, config: Any, project_id: str) -> None:
+    """Insert a minimal project row if it doesn't exist (satisfies FK)."""
+    now = _utcnow()
+    conn.execute(
+        "INSERT OR IGNORE INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'medium', 'active', ?, ?)",
+        (project_id, project_id, f"https://github.com/test/{project_id}", now, now),
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Draft creation
+# ---------------------------------------------------------------------------
+
+
+def create_issue_draft(
+    root: Path,
+    conn: sqlite3.Connection,
+    text: str,
+    *,
+    project_ref: str | None = None,
+    title: str | None = None,
+    force_rough_issue: bool = False,
+) -> dict[str, Any]:
+    """Create a new issue draft.
+
+    1. Validate input length
+    2. Determine project via resolve_project or project_ref
+    3. Generate draft_id, title, kind, spec_body, questions
+    4. Check for duplicate drafts
+    5. Write artifact files
+    6. Upsert to state DB
+    7. Return result dict
+    """
+    validate_input_length(text, 20000, "text")
+
+    # Resolve project
+    config = load_projects_config(root)
+    resolution = resolve_project(config, project_ref=project_ref, text=text)
+
+    if resolution.state == "not_found":
+        return {"blocked": True, "state": "blocked", "reason": resolution.message}
+
+    # For ambiguous: still create a draft so user can confirm project later
+    if resolution.state == "ambiguous":
+        project_id = None
+        draft_id = generate_draft_id()
+        final_title = title or generate_issue_title(text)
+        kind = classify_issue_kind(text)
+        spec_body = generate_spec_body(text, kind)
+        questions_list = generate_questions(text, kind)
+        questions_text = "\n".join(f"- {q}" for q in questions_list)
+        github_body = generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+
+        # Use a placeholder project for artifact storage
+        placeholder_project = "unresolved"
+        artifact_content = {
+            "original_input": text,
+            "title": final_title,
+            "project_id": placeholder_project,
+            "issue_kind": kind,
+            "readiness": 0.0,
+            "spec_body": spec_body,
+            "github_body": github_body,
+            "questions": questions_text,
+            "brainstorm_notes": "",
+        }
+        write_issue_artifact_files(root, placeholder_project, draft_id, artifact_content)
+
+        artifact_path = f"artifacts/issues/{placeholder_project}/{draft_id}"
+        upsert_issue_draft(
+            conn,
+            {
+                "draft_id": draft_id,
+                "project_id": None,
+                "state": "needs_project_confirmation",
+                "title": final_title,
+                "readiness": 0.0,
+                "artifact_path": artifact_path,
+            },
+        )
+
+        return {
+            "draft_id": draft_id,
+            "state": "needs_project_confirmation",
+            "candidates": resolution.candidates,
+            "message": resolution.message,
+            "title": final_title,
+            "readiness": 0.0,
+            "questions": questions_list,
+            "kind": kind,
+        }
+
+    # Resolved — ensure project row exists for FK constraint
+    project_id = resolution.project_id
+    assert project_id is not None
+    _ensure_project_row(conn, config, project_id)
+    draft_id = generate_draft_id()
+
+    # Generate title
+    final_title = title if title else generate_issue_title(text)
+
+    # Classify and generate content
+    kind = classify_issue_kind(text)
+    spec_body = generate_spec_body(text, kind)
+    questions_list = generate_questions(text, kind)
+    questions_text = "\n".join(f"- {q}" for q in questions_list)
+    github_body = generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+
+    # Check for duplicates
+    dup = find_duplicate_draft(conn, project_id, final_title)
+    if dup:
+        return {
+            "blocked": True,
+            "reason": "duplicate",
+            "duplicate_of": dup,
+            "state": "blocked",
+        }
+
+    # Compute readiness and state
+    content: dict[str, Any] = {
+        "title": final_title,
+        "project_id": project_id,
+        "text": text,
+    }
+    readiness = compute_readiness(content)
+    content["readiness"] = readiness
+    state = compute_draft_state(content, force_rough_issue=force_rough_issue)
+
+    # Write artifacts
+    artifact_content = {
+        "original_input": text,
+        "title": final_title,
+        "project_id": project_id,
+        "issue_kind": kind,
+        "readiness": readiness,
+        "spec_body": spec_body,
+        "github_body": github_body,
+        "questions": questions_text,
+        "brainstorm_notes": "",
+    }
+    write_issue_artifact_files(root, project_id, draft_id, artifact_content)
+
+    # Upsert to DB
+    artifact_path = f"artifacts/issues/{project_id}/{draft_id}"
+    upsert_issue_draft(
+        conn,
+        {
+            "draft_id": draft_id,
+            "project_id": project_id,
+            "state": state,
+            "title": final_title,
+            "readiness": readiness,
+            "artifact_path": artifact_path,
+        },
+    )
+
+    return {
+        "draft_id": draft_id,
+        "project_id": project_id,
+        "state": state,
+        "title": final_title,
+        "readiness": readiness,
+        "questions": questions_list,
+        "kind": kind,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Draft update
+# ---------------------------------------------------------------------------
+
+
+def update_issue_draft(
+    root: Path,
+    conn: sqlite3.Connection,
+    draft_id: str,
+    *,
+    answers: str | None = None,
+    project_id: str | None = None,
+    title: str | None = None,
+    force_ready: bool = False,
+) -> dict[str, Any]:
+    """Update an existing issue draft.
+
+    1. Get existing draft
+    2. Validate state is mutable (not terminal)
+    3. If creating_failed, allow edit if no github-created.json
+    4. Update content with answers/project_id/title
+    5. Regenerate spec, questions, readiness
+    6. Write updated artifact files
+    7. Upsert updated state
+    8. Return result
+    """
+    row = get_issue_draft(conn, draft_id)
+    if row is None:
+        return {"blocked": True, "reason": "not_found"}
+
+    current_state = row["state"]
+    current_project_id = row.get("project_id")
+    current_title = row.get("title", "")
+
+    # Terminal state check
+    if current_state in _TERMINAL_STATES:
+        return {
+            "blocked": True,
+            "reason": f"terminal_state:{current_state}",
+        }
+
+    # creating_failed: allow retry only if no github-created.json
+    if current_state == "creating_failed" and current_project_id:
+        artifact_dir = issue_artifact_root(root, current_project_id, draft_id)
+        if read_github_created_if_exists(artifact_dir) is not None:
+            return {
+                "blocked": True,
+                "reason": "terminal_state:creating_failed with github-created.json",
+            }
+
+    # Resolve effective project_id
+    effective_project_id = project_id or current_project_id
+    if not effective_project_id:
+        return {"blocked": True, "reason": "no_project_id"}
+
+    # Ensure project row exists for FK
+    config = load_projects_config(root)
+    _ensure_project_row(conn, config, effective_project_id)
+
+    # Build updated content
+    # Read original input from artifact — may be under "unresolved" if ambiguous
+    from portfolio_manager.issue_artifacts import read_issue_artifact
+
+    artifact_read_project = current_project_id if current_project_id else "unresolved"
+    original_input = read_issue_artifact(root, artifact_read_project, draft_id, "original-input.md") or ""
+    combined_text = original_input
+    if answers:
+        combined_text = f"{original_input}\n\n## Answers\n{answers}" if original_input else answers
+
+    effective_title = title or current_title
+
+    # Regenerate
+    kind = classify_issue_kind(combined_text)
+    spec_body = generate_spec_body(combined_text, kind)
+    questions_list = generate_questions(combined_text, kind)
+    questions_text = "\n".join(f"- {q}" for q in questions_list)
+    github_body = generate_github_issue_body({"title": effective_title, "spec_body": spec_body})
+
+    content = {
+        "title": effective_title,
+        "project_id": effective_project_id,
+        "text": combined_text,
+    }
+    readiness = compute_readiness(content)
+
+    # Determine state
+    if force_ready:
+        state = "ready_for_creation"
+    else:
+        content["readiness"] = readiness
+        state = compute_draft_state(content)
+
+    # Write updated artifacts
+    artifact_content = {
+        "original_input": original_input,
+        "title": effective_title,
+        "project_id": effective_project_id,
+        "issue_kind": kind,
+        "readiness": readiness,
+        "spec_body": spec_body,
+        "github_body": github_body,
+        "questions": questions_text,
+        "brainstorm_notes": "",
+    }
+    write_issue_artifact_files(root, effective_project_id, draft_id, artifact_content)
+
+    # Upsert
+    artifact_path = f"artifacts/issues/{effective_project_id}/{draft_id}"
+    upsert_issue_draft(
+        conn,
+        {
+            "draft_id": draft_id,
+            "project_id": effective_project_id,
+            "state": state,
+            "title": effective_title,
+            "readiness": readiness,
+            "artifact_path": artifact_path,
+        },
+    )
+
+    return {
+        "draft_id": draft_id,
+        "project_id": effective_project_id,
+        "state": state,
+        "title": effective_title,
+        "readiness": readiness,
+        "questions": questions_list,
+        "kind": kind,
+    }
