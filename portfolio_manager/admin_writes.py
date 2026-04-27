@@ -86,8 +86,10 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
         os.replace(str(tmp_path), str(config_path))
         try:
             dir_fd = os.open(str(config_dir), os.O_RDONLY)
-            os.fsync(dir_fd)
-            os.close(dir_fd)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
         except OSError:
             pass
     except OSError as exc:

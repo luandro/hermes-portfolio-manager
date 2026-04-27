@@ -13,11 +13,12 @@ fi
 
 # Mock codexbar so the test is deterministic and network-free
 codexbar() {
-    if [[ "$1" == "usage" && "$2" == "--provider" ]]; then
-        case "$3" in
+    if [[ "${1:-}" == "usage" && "${2:-}" == "--provider" ]]; then
+        case "${3:-}" in
             claude) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}}]' ;;
             codex) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}, "credits": {"remaining": 100}}]' ;;
             gemini) echo '[{"usage": {"primary": {"usedPercent": 10}, "secondary": {"usedPercent": 5}}}]' ;;
+            *) echo '[{}]' ;;
         esac
     fi
 }

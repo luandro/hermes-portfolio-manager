@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     import sqlite3
     from pathlib import Path
 
+from pydantic import ValidationError as PydanticValidationError
+
 from portfolio_manager.admin_functions import (
     add_project_to_config,
     archive_project_in_config,
@@ -868,6 +870,8 @@ def _handle_portfolio_project_add(args: dict[str, Any], **kwargs: Any) -> str:
             conn.close()
     except ValueError as exc:
         return _blocked(tool, str(exc))
+    except PydanticValidationError as exc:
+        return _blocked(tool, f"Validation error: {exc}")
     except Exception as exc:
         logger.exception("Failed to add project")
         return _failed(tool, str(exc))

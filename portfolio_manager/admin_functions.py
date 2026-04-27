@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from portfolio_manager.admin_models import (
     VALID_PRIORITIES,
     AutoMergeConfig,
+    _warn_auto_merge_policy_only,
     validate_auto_merge,
     validate_priority,
     validate_status,
@@ -44,8 +45,11 @@ def add_project_to_config(
     for existing in projects:
         if existing.get("id") == project.id:
             raise ValueError(f"duplicate_project_id: {project.id}")
+        # Check nested github: {owner, repo} shape
         existing_github = existing.get("github", {}) if isinstance(existing.get("github"), dict) else {}
-        if existing_github.get("owner") == project.github_owner and existing_github.get("repo") == project.github_repo:
+        e_owner = existing_github.get("owner") or existing.get("github_owner")
+        e_repo = existing_github.get("repo") or existing.get("github_repo")
+        if e_owner == project.github_owner and e_repo == project.github_repo:
             raise ValueError(f"duplicate_github_repo: {project.github_owner}/{project.github_repo}")
 
     # Build project dict
@@ -131,6 +135,8 @@ def update_project_in_config(
         am = updates["auto_merge"]
         if am is not None:
             validated = AutoMergeConfig(**am)
+            if validated.enabled:
+                _warn_auto_merge_policy_only()
             target["auto_merge"] = {"enabled": validated.enabled, "max_risk": validated.max_risk}
 
     # notes

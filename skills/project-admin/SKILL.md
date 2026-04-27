@@ -71,7 +71,7 @@ Each tool returns the shared Hermes result format:
 
 ```json
 {
-  "status": "success|blocked|failed",
+  "status": "success|blocked|error",
   "tool": "portfolio_project_...",
   "message": "Human-readable result",
   "data": {},
