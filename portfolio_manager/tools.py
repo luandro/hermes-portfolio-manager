@@ -1468,6 +1468,8 @@ def _handle_portfolio_issue_draft(args: dict[str, Any], **kwargs: Any) -> str:
             data=result,
             summary=f"Draft created for {result.get('project_id', 'unknown')}. State: {result.get('state', '')}",
         )
+    except ValueError as exc:
+        return _blocked(tool, str(exc), reason="validation_error")
     finally:
         conn.close()
 
@@ -1558,6 +1560,8 @@ def _handle_portfolio_issue_update_draft(args: dict[str, Any], **kwargs: Any) ->
             data=result,
             summary=f"Draft {draft_id} updated. State: {result.get('state', '')}",
         )
+    except ValueError as exc:
+        return _blocked(tool, str(exc), reason="validation_error")
     finally:
         conn.close()
 
