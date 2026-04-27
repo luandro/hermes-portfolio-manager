@@ -750,6 +750,17 @@ PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA = {
             "state": {
                 "type": "string",
                 "description": "Optional state filter.",
+                "enum": [
+                    "draft",
+                    "needs_project_confirmation",
+                    "needs_user_questions",
+                    "ready_for_creation",
+                    "creating",
+                    "creating_failed",
+                    "created",
+                    "discarded",
+                    "blocked",
+                ],
             },
             "include_created": {
                 "type": "boolean",

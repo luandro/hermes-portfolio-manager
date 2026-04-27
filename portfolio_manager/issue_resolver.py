@@ -162,9 +162,7 @@ def resolve_project(
             message=f"Ambiguous match: {len(tied)} candidates with similar scores.",
         )
 
-    # Single candidate above threshold but not meeting resolved criteria.
-    # top_score >= 2 is guaranteed here: we returned early when < 2 above, and
-    # we only reach this point if the ambiguous branch (len(tied) >= 2) didn't match.
+    # Single candidate above threshold — resolved.
     return ProjectResolutionResult(
         state="resolved",
         project_id=top_id,

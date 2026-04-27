@@ -121,8 +121,7 @@ def find_duplicate_github_issue(owner: str, repo: str, title: str) -> dict[str, 
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=_gh_env())
     if proc.returncode != 0:
-        logger.warning("gh issue list failed: %s", proc.stderr.strip())
-        return None
+        raise RuntimeError(f"gh issue list failed: {proc.stderr.strip()}")
 
     try:
         issues: list[dict[str, object]] = json.loads(proc.stdout)

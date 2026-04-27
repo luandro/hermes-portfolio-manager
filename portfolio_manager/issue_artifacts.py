@@ -9,6 +9,7 @@ import contextlib
 import json
 import os
 import re
+import tempfile
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -48,16 +49,27 @@ def issue_artifact_root(root: Path, project_id: str, draft_id: str) -> Path:
 
 def write_text_atomic(path: Path, content: str) -> None:
     """Write content to a temp file, then atomically replace the target."""
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path: str | None = None
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            mode="w",
+            encoding="utf-8",
+        ) as f:
+            tmp_path = f.name
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(str(tmp), str(path))
+        os.replace(tmp_path, str(path))
+        tmp_path = None  # replaced successfully, no cleanup needed
     except Exception:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(tmp)
+        if tmp_path is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
         raise
     # Best-effort fsync on parent directory
     try:

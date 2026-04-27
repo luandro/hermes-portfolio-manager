@@ -360,20 +360,20 @@ def find_duplicate_draft(conn: sqlite3.Connection, project_id: str, title: str) 
 
 
 def _ensure_project_row(conn: sqlite3.Connection, config: Any, project_id: str) -> None:
-    """Insert a minimal project row if it doesn't exist (satisfies FK)."""
-    # Try to get the real repo URL from config
-    repo_url = f"https://github.com/test/{project_id}"
-    project_name = project_id
+    """Insert a project row from config if it doesn't exist (satisfies FK)."""
+    project = None
     for p in getattr(config, "projects", []):
         if p.id == project_id:
-            repo_url = p.repo
-            project_name = p.name
+            project = p
             break
+    if project is None:
+        raise ValueError(f"Project {project_id!r} not found in config")
+
     now = _utcnow()
     conn.execute(
         "INSERT OR IGNORE INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
-        "VALUES (?, ?, ?, 'medium', 'active', ?, ?)",
-        (project_id, project_name, repo_url, now, now),
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (project_id, project.name, project.repo, project.priority, project.status, now, now),
     )
     conn.commit()
 
@@ -613,9 +613,20 @@ def update_issue_draft(
 
     artifact_read_project = current_project_id if current_project_id else "unresolved"
     original_input = read_issue_artifact(root, artifact_read_project, draft_id, "original-input.md") or ""
-    combined_text = original_input
+
+    # Preserve previously supplied answers from the answers.md artifact
+    preserved_answers = read_issue_artifact(root, artifact_read_project, draft_id, "answers.md") or ""
+    effective_answers = ""
     if answers:
-        combined_text = f"{original_input}\n\n## Answers\n{answers}" if original_input else answers
+        # New answers supplied — use them (they override preserved)
+        effective_answers = answers
+    elif preserved_answers:
+        # No new answers, but we have previously stored answers — carry them forward
+        effective_answers = preserved_answers
+
+    combined_text = original_input
+    if effective_answers:
+        combined_text = f"{original_input}\n\n## Answers\n{effective_answers}" if original_input else effective_answers
 
     effective_title = title or current_title
     validate_issue_title(effective_title)
@@ -644,7 +655,7 @@ def update_issue_draft(
     # Preserve existing brainstorm notes if present
     existing_brainstorm = read_issue_artifact(root, artifact_read_project, draft_id, "brainstorm.md")
 
-    # Write updated artifacts
+    # Write updated artifacts (including persisted answers)
     artifact_content = {
         "original_input": original_input,
         "title": effective_title,
@@ -657,6 +668,13 @@ def update_issue_draft(
         "brainstorm_notes": existing_brainstorm or "",
     }
     write_issue_artifact_files(root, effective_project_id, draft_id, artifact_content)
+
+    # Persist answers to answers.md so they survive future regenerations
+    if effective_answers:
+        from portfolio_manager.issue_artifacts import write_text_atomic
+
+        artifact_dir = issue_artifact_root(root, effective_project_id, draft_id)
+        write_text_atomic(artifact_dir / "answers.md", effective_answers)
 
     # Upsert
     artifact_path = f"artifacts/issues/{effective_project_id}/{draft_id}"
@@ -801,10 +819,12 @@ def create_issue_from_draft(
     owner = project.github.owner
     repo = project.github.repo
 
-    # Read github body from artifacts
+    # Read github body from artifacts — block if missing or unreadable
     from portfolio_manager.issue_artifacts import read_issue_artifact
 
-    github_body = read_issue_artifact(root, project_id, draft_id, "github-issue.md") or ""
+    github_body = read_issue_artifact(root, project_id, draft_id, "github-issue.md")
+    if github_body is None:
+        return {"blocked": True, "reason": "missing_github_body"}
 
     # 6. Dry-run returns preview without mutation
     if dry_run:
@@ -857,9 +877,9 @@ def create_issue_from_draft(
         issue_number_raw = result["issue_number"]
         issue_url_raw = result["issue_url"]
         if not isinstance(issue_number_raw, int):
-            raise RuntimeError(f"Expected int issue_number, got {type(issue_number_raw)}: {issue_number_raw!r}")
+            raise TypeError(f"Expected int issue_number, got {type(issue_number_raw).__name__}: {issue_number_raw!r}")
         if not isinstance(issue_url_raw, str):
-            raise RuntimeError(f"Expected str issue_url, got {type(issue_url_raw)}: {issue_url_raw!r}")
+            raise TypeError(f"Expected str issue_url, got {type(issue_url_raw).__name__}: {issue_url_raw!r}")
 
         # 11. On success
         write_github_created(artifact_dir, issue_number_raw, issue_url_raw)
@@ -945,6 +965,15 @@ def create_issue(
 
     if draft_result.get("blocked"):
         return draft_result
+
+    # Ambiguous project resolution — return blocked with disambiguation info
+    if draft_result.get("state") == "needs_project_confirmation":
+        return {
+            "blocked": True,
+            "draft_id": draft_result.get("draft_id"),
+            "candidates": draft_result.get("candidates", []),
+            "message": draft_result.get("message", "Ambiguous project resolution"),
+        }
 
     draft_id = draft_result.get("draft_id")
     if not draft_id:
