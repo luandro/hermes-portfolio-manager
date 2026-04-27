@@ -321,11 +321,28 @@ def test_dev_cli_project_update(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _make_mvp3_config(tmp_path: Path) -> Path:
+    """Set up a valid config with two projects for MVP 3 tests."""
+    root = tmp_path / "agent-system"
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "projects.yaml").write_text(
+        "version: 1\nprojects:\n"
+        "  - id: comapeo-cloud-app\n    name: CoMapeo Cloud App\n"
+        "    repo: git@github.com:digidem/comapeo-cloud-app.git\n"
+        "    github: {owner: digidem, repo: comapeo-cloud-app}\n"
+        "    priority: medium\n    status: active\n"
+        "  - id: comapeo-mobile\n    name: CoMapeo Mobile\n"
+        "    repo: git@github.com:digidem/comapeo-mobile.git\n"
+        "    github: {owner: digidem, repo: comapeo-mobile}\n"
+        "    priority: medium\n    status: active\n"
+    )
+    return root
+
+
 def test_dev_cli_issue_resolve_and_draft(tmp_path: Path) -> None:
     """portfolio_project_resolve + portfolio_issue_draft via CLI."""
-    from tests.test_issue_tools import _make_config
-
-    root = _make_config(tmp_path)
+    root = _make_mvp3_config(tmp_path)
     resolve_result = _run_cli(
         "portfolio_project_resolve",
         "--project-ref",
@@ -352,9 +369,7 @@ def test_dev_cli_issue_resolve_and_draft(tmp_path: Path) -> None:
 
 def test_dev_cli_issue_draft_management(tmp_path: Path) -> None:
     """Draft lifecycle via CLI: create → questions → update → explain → list → discard."""
-    from tests.test_issue_tools import _make_config
-
-    root = _make_config(tmp_path)
+    root = _make_mvp3_config(tmp_path)
 
     # Create draft
     result = _run_cli(

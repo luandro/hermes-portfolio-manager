@@ -101,7 +101,10 @@ def read_github_created_if_exists(artifact_dir: Path) -> dict[str, object] | Non
     path = artifact_dir / "github-created.json"
     if not path.exists():
         return None
-    data: object = json.loads(path.read_text())
+    try:
+        data: object = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
     if not isinstance(data, dict):
         return None
     return data
@@ -127,7 +130,10 @@ def read_issue_metadata(root: Path, project_id: str, draft_id: str) -> dict[str,
     path = root / "artifacts" / "issues" / project_id / draft_id / "metadata.json"
     if not path.exists():
         return None
-    data: object = json.loads(path.read_text())
+    try:
+        data: object = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
     if not isinstance(data, dict):
         return None
     return data

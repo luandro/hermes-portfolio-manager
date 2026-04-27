@@ -65,6 +65,8 @@ def generate_issue_title(text: str) -> str:
     # Take first sentence (up to period, question mark, or exclamation)
     sentence_end = re.search(r"[.!?]", text)
     candidate = text[: sentence_end.start()].strip() if sentence_end else text.strip()
+    if not candidate:
+        candidate = text.strip()
 
     # Truncate to 120 chars if needed
     if len(candidate) > 120:
@@ -700,11 +702,9 @@ def create_issue_from_draft(
     from portfolio_manager.issue_artifacts import (
         issue_artifact_root,
         read_github_created_if_exists,
-        read_issue_metadata,
         write_creation_attempt,
         write_creation_error,
         write_github_created,
-        write_issue_artifact_files,
     )
     from portfolio_manager.issue_github import (
         create_github_issue,
@@ -789,7 +789,6 @@ def create_issue_from_draft(
     from portfolio_manager.issue_artifacts import read_issue_artifact
 
     github_body = read_issue_artifact(root, project_id, draft_id, "github-issue.md") or ""
-    metadata = read_issue_metadata(root, project_id, draft_id) or {}
 
     # 6. Dry-run returns preview without mutation
     if dry_run:
@@ -849,25 +848,7 @@ def create_issue_from_draft(
         # 11. On success
         write_github_created(artifact_dir, issue_number_raw, issue_url_raw)
 
-        # Update metadata
-        metadata["github_issue_number"] = issue_number_raw
-        metadata["github_issue_url"] = issue_url_raw
-        write_issue_artifact_files(
-            root,
-            project_id,
-            draft_id,
-            {
-                "original_input": read_issue_artifact(root, project_id, draft_id, "original-input.md") or "",
-                "title": title,
-                "project_id": project_id,
-                "issue_kind": metadata.get("issue_kind", ""),
-                "readiness": metadata.get("readiness", 0.0),
-                "spec_body": read_issue_artifact(root, project_id, draft_id, "spec.md") or "",
-                "github_body": github_body,
-                "questions": read_issue_artifact(root, project_id, draft_id, "questions.md") or "",
-                "brainstorm_notes": read_issue_artifact(root, project_id, draft_id, "brainstorm.md") or "",
-            },
-        )
+        # github-created.json is the authoritative record; nothing else needs rewriting.
 
         upsert_issue_draft(
             conn,
@@ -959,4 +940,5 @@ def create_issue(
         confirm=confirm,
         dry_run=dry_run,
         allow_possible_duplicate=allow_possible_duplicate,
+        allow_open_questions=True,
     )

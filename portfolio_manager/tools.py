@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import sqlite3
     from pathlib import Path
 
+
 from pydantic import ValidationError as PydanticValidationError
 
 from portfolio_manager.admin_functions import (
@@ -85,6 +86,16 @@ from portfolio_manager.summary import (
     summarize_worktrees,
 )
 from portfolio_manager.worktree import inspect_project_worktrees
+
+
+def _coerce_bool(value: object, *, default: bool = False) -> bool:
+    """Coerce string/bool args to proper bool (handles JSON string 'true'/'false')."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    return default
+
 
 logger = logging.getLogger(__name__)
 
@@ -1439,7 +1450,7 @@ def _handle_portfolio_issue_draft(args: dict[str, Any], **kwargs: Any) -> str:
             text,
             project_ref=args.get("project_ref"),
             title=args.get("title"),
-            force_rough_issue=args.get("force_rough_issue", False),
+            force_rough_issue=_coerce_bool(args.get("force_rough_issue")),
         )
 
         if result.get("blocked"):
@@ -1486,7 +1497,11 @@ def _handle_portfolio_issue_questions(args: dict[str, Any], **kwargs: Any) -> st
 
         project_id = row.get("project_id") or "unresolved"
         questions_text = read_issue_artifact(root, project_id, draft_id, "questions.md")
-        questions = [q.lstrip("- ") for q in (questions_text or "").splitlines() if q.strip()] if questions_text else []
+        questions = (
+            [q.removeprefix("- ").strip() for q in (questions_text or "").splitlines() if q.strip()]
+            if questions_text
+            else []
+        )
 
         return _result(
             status="success",
@@ -1525,7 +1540,7 @@ def _handle_portfolio_issue_update_draft(args: dict[str, Any], **kwargs: Any) ->
             answers=args.get("answers"),
             project_id=args.get("project_id"),
             title=args.get("title"),
-            force_ready=args.get("force_ready", False),
+            force_ready=_coerce_bool(args.get("force_ready")),
         )
 
         if result.get("blocked"):
@@ -1580,9 +1595,9 @@ def _handle_portfolio_issue_create(args: dict[str, Any], **kwargs: Any) -> str:
             title=title,
             body=body,
             project_ref=project_id,
-            confirm=args.get("confirm", False),
-            dry_run=args.get("dry_run", False),
-            allow_possible_duplicate=args.get("allow_possible_duplicate", False),
+            confirm=_coerce_bool(args.get("confirm")),
+            dry_run=_coerce_bool(args.get("dry_run")),
+            allow_possible_duplicate=_coerce_bool(args.get("allow_possible_duplicate")),
         )
 
         if result.get("blocked"):
@@ -1636,10 +1651,10 @@ def _handle_portfolio_issue_create_from_draft(args: dict[str, Any], **kwargs: An
             root,
             conn,
             draft_id,
-            confirm=args.get("confirm", False),
-            allow_open_questions=args.get("allow_open_questions", False),
-            allow_possible_duplicate=args.get("allow_possible_duplicate", False),
-            dry_run=args.get("dry_run", False),
+            confirm=_coerce_bool(args.get("confirm")),
+            allow_open_questions=_coerce_bool(args.get("allow_open_questions")),
+            allow_possible_duplicate=_coerce_bool(args.get("allow_possible_duplicate")),
+            dry_run=_coerce_bool(args.get("dry_run")),
         )
 
         if result.get("blocked"):
@@ -1741,7 +1756,7 @@ def _handle_portfolio_issue_list_drafts(args: dict[str, Any], **kwargs: Any) -> 
             conn,
             project_id=args.get("project_id"),
             state=args.get("state"),
-            include_created=args.get("include_created", False),
+            include_created=_coerce_bool(args.get("include_created")),
         )
 
         draft_summaries = [

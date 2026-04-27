@@ -542,10 +542,8 @@ def list_issue_drafts(
     if not include_created and state is None:
         conditions.append("state != 'created'")
     where_clause = " AND ".join(conditions) if conditions else "1=1"
-    rows = conn.execute(
-        f"SELECT * FROM issue_drafts WHERE {where_clause} ORDER BY updated_at DESC",
-        params,
-    ).fetchall()
+    query = f"SELECT * FROM issue_drafts WHERE {where_clause} ORDER BY updated_at DESC"  # nosec B608
+    rows = conn.execute(query, params).fetchall()
     cols = [d[1] for d in conn.execute("PRAGMA table_info('issue_drafts')").fetchall()]
     return [dict(zip(cols, row, strict=False)) for row in rows]
 
