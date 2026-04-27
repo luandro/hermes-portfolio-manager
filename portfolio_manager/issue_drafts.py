@@ -415,6 +415,7 @@ def create_issue_draft(
         project_id = None
         draft_id = generate_draft_id()
         final_title = title or generate_issue_title(text)
+        validate_issue_title(final_title)
         kind = classify_issue_kind(text)
         spec_body = generate_spec_body(text, kind)
         questions_list = generate_questions(text, kind)
@@ -469,6 +470,7 @@ def create_issue_draft(
 
     # Generate title
     final_title = title if title else generate_issue_title(text)
+    validate_issue_title(final_title)
 
     # Classify and generate content
     kind = classify_issue_kind(text)
@@ -606,6 +608,7 @@ def update_issue_draft(
         combined_text = f"{original_input}\n\n## Answers\n{answers}" if original_input else answers
 
     effective_title = title or current_title
+    validate_issue_title(effective_title)
 
     # Regenerate
     kind = classify_issue_kind(combined_text)
