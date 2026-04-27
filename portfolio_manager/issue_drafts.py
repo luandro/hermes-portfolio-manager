@@ -641,6 +641,9 @@ def update_issue_draft(
         content["readiness"] = readiness
         state = compute_draft_state(content)
 
+    # Preserve existing brainstorm notes if present
+    existing_brainstorm = read_issue_artifact(root, artifact_read_project, draft_id, "brainstorm.md")
+
     # Write updated artifacts
     artifact_content = {
         "original_input": original_input,
@@ -651,7 +654,7 @@ def update_issue_draft(
         "spec_body": spec_body,
         "github_body": github_body,
         "questions": questions_text,
-        "brainstorm_notes": "",
+        "brainstorm_notes": existing_brainstorm or "",
     }
     write_issue_artifact_files(root, effective_project_id, draft_id, artifact_content)
 
