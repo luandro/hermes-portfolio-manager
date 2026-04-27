@@ -15,8 +15,6 @@ if TYPE_CHECKING:
 
 from portfolio_manager.admin_models import (
     VALID_PRIORITIES,
-    AutoMergeConfig,
-    _warn_auto_merge_policy_only,
     validate_auto_merge,
     validate_priority,
     validate_status,
@@ -122,6 +120,8 @@ def update_project_in_config(
     if "priority" in updates:
         validate_priority(updates["priority"])
         target["priority"] = updates["priority"]
+        if updates["priority"] == "paused":
+            target["status"] = "paused"
     if "status" in updates:
         validate_status(updates["status"])
         target["status"] = updates["status"]
@@ -130,13 +130,11 @@ def update_project_in_config(
     if "protected_paths" in updates:
         target["protected_paths"] = list(updates["protected_paths"])
 
-    # auto_merge — validate through AutoMergeConfig
+    # auto_merge — validate through validate_auto_merge for consistent warnings
     if "auto_merge" in updates:
         am = updates["auto_merge"]
         if am is not None:
-            validated = AutoMergeConfig(**am)
-            if validated.enabled:
-                _warn_auto_merge_policy_only()
+            validated = validate_auto_merge(enabled=am.get("enabled", False), max_risk=am.get("max_risk"))
             target["auto_merge"] = {"enabled": validated.enabled, "max_risk": validated.max_risk}
 
     # notes

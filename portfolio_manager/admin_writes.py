@@ -105,7 +105,7 @@ def write_projects_config_atomic(root: Path, config_dict: dict[str, Any]) -> dic
         # Check that reloaded data matches what we tried to write
         if reloaded != parsed_back:
             return {"status": "failed", "error": "Written config data mismatch after reload", "path": str(config_path)}
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         return {"status": "failed", "error": f"Written config failed reload: {exc}", "path": str(config_path)}
 
     return {"status": "success", "path": str(config_path)}

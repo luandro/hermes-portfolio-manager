@@ -75,13 +75,14 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
     ),
 ]
 
-# Skills directory relative to this file
+# Skills directory: check repo-root skills/ first, fall back to plugin-local
 _PLUGIN_DIR = Path(__file__).parent
-_SKILLS_DIR = _PLUGIN_DIR / "skills"
+_SKILLS_DIR = _PLUGIN_DIR.parent / "skills" if (_PLUGIN_DIR.parent / "skills").exists() else _PLUGIN_DIR / "skills"
 
 _SKILL_DESCRIPTIONS: dict[str, str] = {
     "portfolio-status": "View portfolio status — projects, issues, PRs, worktrees.",
     "portfolio-heartbeat": "Periodic health check across all portfolio projects.",
+    "project-admin": "Administer portfolio projects — add, update, pause, resume, archive, remove, set priority, explain, manage auto-merge, create config backups.",
 }
 
 
