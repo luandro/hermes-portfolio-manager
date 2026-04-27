@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
-from portfolio_manager.issue_drafts import sanitize_public_issue_body, validate_public_issue_body
+from portfolio_manager.issue_drafts import normalize_title, sanitize_public_issue_body, validate_public_issue_body
 
 logger = logging.getLogger(__name__)
 
@@ -101,14 +101,6 @@ def check_gh_auth() -> AvailableCheck:
 # ---------------------------------------------------------------------------
 
 
-def _normalize_title(title: str) -> str:
-    """Normalize title for comparison: lowercase, strip, remove punctuation."""
-    title = title.lower().strip()
-    title = re.sub(r"[^\w\s]", "", title)
-    title = re.sub(r"\s+", " ", title)
-    return title.strip()
-
-
 def find_duplicate_github_issue(owner: str, repo: str, title: str) -> dict[str, object] | None:
     """Search for an open GitHub issue with the same normalized title.
 
@@ -137,12 +129,12 @@ def find_duplicate_github_issue(owner: str, repo: str, title: str) -> dict[str, 
     except json.JSONDecodeError:
         return None
 
-    norm = _normalize_title(title)
+    norm = normalize_title(title)
     for issue in issues:
         title_val = issue.get("title", "")
         if not isinstance(title_val, str):
             continue
-        if _normalize_title(title_val) == norm:
+        if normalize_title(title_val) == norm:
             issue_num = issue["number"]
             issue_title_val = issue["title"]
             issue_url_val = issue.get("url", "")
@@ -196,6 +188,15 @@ def create_github_issue(
     tmp_fd: int | None = None
     tmp_path: str | None = None
     try:
+        # Validate title
+        title = title.strip()
+        if not title:
+            raise ValueError("Title must not be empty")
+        if "\n" in title:
+            raise ValueError("Title must not contain newline characters")
+        if len(title) > 256:
+            raise ValueError(f"Title too long: {len(title)} characters (max 256)")
+
         # Sanitize and validate before sending to GitHub
         safe_body = sanitize_public_issue_body(body)
         validate_public_issue_body(safe_body)

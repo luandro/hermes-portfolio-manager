@@ -5,6 +5,7 @@ Handles draft ID validation, artifact root resolution, atomic writes.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -48,8 +49,25 @@ def issue_artifact_root(root: Path, project_id: str, draft_id: str) -> Path:
 def write_text_atomic(path: Path, content: str) -> None:
     """Write content to a temp file, then atomically replace the target."""
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content)
-    os.replace(str(tmp), str(path))
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(str(tmp), str(path))
+    except Exception:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+        raise
+    # Best-effort fsync on parent directory
+    try:
+        dir_fd = os.open(str(path.parent), os.O_DIRECTORY)
+    except (OSError, AttributeError):
+        return
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
 
 
 def write_json_atomic(path: Path, data: dict[str, object]) -> None:
@@ -103,7 +121,7 @@ def read_github_created_if_exists(artifact_dir: Path) -> dict[str, object] | Non
         return None
     try:
         data: object = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return None
     if not isinstance(data, dict):
         return None
@@ -112,29 +130,29 @@ def read_github_created_if_exists(artifact_dir: Path) -> dict[str, object] | Non
 
 def read_issue_artifact(root: Path, project_id: str, draft_id: str, filename: str) -> str | None:
     """Read a single artifact file. Returns None if not found."""
-    _validate_project_id(project_id)
-    validate_draft_id(draft_id)
+    artifact_dir = issue_artifact_root(root, project_id, draft_id)
     if "/" in filename or ".." in filename or filename.startswith("."):
         raise ValueError(f"Invalid filename: {filename!r}")
-    artifact_dir = root / "artifacts" / "issues" / project_id / draft_id
     path = artifact_dir / filename
     if not path.resolve().is_relative_to(artifact_dir.resolve()):
         raise ValueError(f"Path traversal detected: {filename!r}")
     if not path.exists():
         return None
-    return path.read_text()
+    try:
+        return path.read_text()
+    except (UnicodeDecodeError, OSError):
+        return None
 
 
 def read_issue_metadata(root: Path, project_id: str, draft_id: str) -> dict[str, object] | None:
     """Read metadata.json for a draft. Returns None if not found."""
-    _validate_project_id(project_id)
-    validate_draft_id(draft_id)
-    path = root / "artifacts" / "issues" / project_id / draft_id / "metadata.json"
+    artifact_dir = issue_artifact_root(root, project_id, draft_id)
+    path = artifact_dir / "metadata.json"
     if not path.exists():
         return None
     try:
         data: object = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return None
     if not isinstance(data, dict):
         return None

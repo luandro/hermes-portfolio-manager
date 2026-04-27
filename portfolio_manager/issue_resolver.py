@@ -66,9 +66,9 @@ def _score_project(
 
     # Exact matches (only via project_ref)
     if project_ref:
-        if project_ref == project.id:
+        if ref_lower == project.id.lower():
             score += 5
-        if project_ref == owner_repo:
+        if ref_lower == owner_repo.lower():
             score += 5
         if ref_lower == project.name.lower():
             score += 4
@@ -162,15 +162,11 @@ def resolve_project(
             message=f"Ambiguous match: {len(tied)} candidates with similar scores.",
         )
 
-    # Single candidate above threshold but not meeting resolved criteria
-    if top_score >= 2:
-        return ProjectResolutionResult(
-            state="resolved",
-            project_id=top_id,
-            message=f"Resolved to {top_id} (score {top_score}).",
-        )
-
+    # Single candidate above threshold but not meeting resolved criteria.
+    # top_score >= 2 is guaranteed here: we returned early when < 2 above, and
+    # we only reach this point if the ambiguous branch (len(tied) >= 2) didn't match.
     return ProjectResolutionResult(
-        state="not_found",
-        message=f"No project matched the given reference (best score {top_score}).",
+        state="resolved",
+        project_id=top_id,
+        message=f"Resolved to {top_id} (score {top_score}).",
     )

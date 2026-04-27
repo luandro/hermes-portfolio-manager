@@ -252,7 +252,7 @@ def _handle_portfolio_project_list(args: dict[str, Any], **kwargs: Any) -> str:
         return _blocked(tool, str(exc))
 
     status_filter = args.get("status")
-    include_archived = args.get("include_archived", False)
+    include_archived = _coerce_bool(args.get("include_archived"))
 
     projects = select_projects(config, status=status_filter, include_archived=include_archived)
 
@@ -310,7 +310,7 @@ def _handle_portfolio_github_sync(args: dict[str, Any], **kwargs: Any) -> str:
 
     # Select projects
     project_id = args.get("project_id")
-    include_paused = args.get("include_paused", False)
+    include_paused = _coerce_bool(args.get("include_paused"))
     max_items = args.get("max_items_per_project", 50)
 
     if project_id:
@@ -381,7 +381,7 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
         return _blocked(tool, str(exc))
 
     project_id = args.get("project_id")
-    include_paused = args.get("include_paused", False)
+    include_paused = _coerce_bool(args.get("include_paused"))
     if project_id:
         projects = [p for p in config.projects if p.id == project_id]
         if not projects:
@@ -485,7 +485,7 @@ def _handle_portfolio_status(args: dict[str, Any], **kwargs: Any) -> str:
     tool = "portfolio_status"
     root = resolve_root(args.get("root"))
 
-    refresh = args.get("refresh", False)
+    refresh = _coerce_bool(args.get("refresh"))
     filter_val = args.get("filter", "all")
 
     _ensure_dirs(root)
@@ -836,9 +836,7 @@ def _handle_portfolio_project_add(args: dict[str, Any], **kwargs: Any) -> str:
             status=args.get("status", "active"),
         )
 
-        validate = args.get("validate_github", True)
-        if isinstance(validate, str):
-            validate = validate.lower() == "true"
+        validate = _coerce_bool(args.get("validate_github"), default=True)
 
         if validate:
             validation = check_gh_available_for_project_add(True, parsed.owner, parsed.repo)
@@ -1184,9 +1182,7 @@ def _handle_portfolio_project_set_auto_merge(args: dict[str, Any], **kwargs: Any
         if "enabled" not in args:
             return _blocked(tool, "enabled is required")
 
-        enabled = args["enabled"]
-        if isinstance(enabled, str):
-            enabled = enabled.lower() == "true"
+        enabled = _coerce_bool(args["enabled"])
 
         max_risk = args.get("max_risk")
 
@@ -1249,9 +1245,7 @@ def _handle_portfolio_project_remove(args: dict[str, Any], **kwargs: Any) -> str
         if not project_id:
             return _blocked(tool, "project_id is required")
 
-        confirm = args.get("confirm", False)
-        if isinstance(confirm, str):
-            confirm = confirm.lower() == "true"
+        confirm = _coerce_bool(args.get("confirm"))
 
         _ensure_dirs(root)
         conn = open_state(root)
@@ -1735,7 +1729,7 @@ def _handle_portfolio_issue_explain_draft(args: dict[str, Any], **kwargs: Any) -
             tool=tool,
             message=f"Explanation for draft {draft_id}",
             data={
-                "draft": {k: row[k] for k in row},
+                "draft": dict(row),
                 "spec": spec,
                 "questions": questions,
             },

@@ -116,15 +116,16 @@ def compute_readiness(content: dict[str, Any]) -> float:
         score += 0.20
 
     text = content.get("text", "")
+    lower_text = text.lower()
 
     # +0.20 if text mentions expected behavior keywords
     expectation_keywords = ("should", "need", "would")
-    if any(kw in text.lower() for kw in expectation_keywords):
+    if any(kw in lower_text for kw in expectation_keywords):
         score += 0.20
 
     # +0.15 if acceptance criteria can be derived (goal-like text)
     goal_keywords = ("goal", "objective", "acceptance criteria", "so that", "in order to")
-    if any(kw in text.lower() for kw in goal_keywords):
+    if any(kw in lower_text for kw in goal_keywords):
         score += 0.15
 
     # +0.10 if scope seems small (short text, single topic)
@@ -140,7 +141,7 @@ def compute_readiness(content: dict[str, Any]) -> float:
     feature_count = 0
     feature_markers = (" and ", ", ", " also ", " plus ", "; ")
     for marker in feature_markers:
-        feature_count += text.lower().count(marker)
+        feature_count += lower_text.count(marker)
     if feature_count >= 4:
         score -= 0.15
 
@@ -389,6 +390,7 @@ def create_issue_draft(
     *,
     project_ref: str | None = None,
     title: str | None = None,
+    body: str | None = None,
     force_rough_issue: bool = False,
 ) -> dict[str, Any]:
     """Create a new issue draft.
@@ -420,7 +422,11 @@ def create_issue_draft(
         spec_body = generate_spec_body(text, kind)
         questions_list = generate_questions(text, kind)
         questions_text = "\n".join(f"- {q}" for q in questions_list)
-        github_body = generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+        github_body = (
+            body.strip()
+            if body and body.strip()
+            else generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+        )
 
         # Use a placeholder project for artifact storage
         placeholder_project = "unresolved"
@@ -477,7 +483,11 @@ def create_issue_draft(
     spec_body = generate_spec_body(text, kind)
     questions_list = generate_questions(text, kind)
     questions_text = "\n".join(f"- {q}" for q in questions_list)
-    github_body = generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+    github_body = (
+        body.strip()
+        if body and body.strip()
+        else generate_github_issue_body({"title": final_title, "spec_body": spec_body})
+    )
 
     # Check for duplicates
     dup = find_duplicate_draft(conn, project_id, final_title)
@@ -927,6 +937,7 @@ def create_issue(
         text,
         project_ref=project_ref,
         title=title,
+        body=body,
     )
 
     if draft_result.get("blocked"):
