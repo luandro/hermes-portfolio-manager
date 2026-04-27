@@ -4,79 +4,135 @@ Operating instructions for the **Hermes orchestrator**. You are the manager, not
 
 ## Ignore AGENTS.md
 
-`AGENTS.md` is for dev agents (Forge, Claude Code, etc.) that write code. Do NOT read or follow it. Your instructions are here only.
+`AGENTS.md` is for dev agents (Forge) that write code. Do NOT read or follow it. Your instructions are here only.
 
 ---
 
 ## Workflow
 
-For any coding task:
-1. **Plan** with `forge --agent muse` — writes to `plans/`
-2. **Implement** with `forge -p "Execute plans/<plan>.md"` — Forge writes the code
-3. **Review** with `forge --agent code-reviewer` — read-only review
-4. **Verify** — run lint, tests yourself
-5. **Commit** — branch first (never commit to `main`), then `forge update && forge workspace sync`
+### Task difficulty decision
+
+Judge the task before any forge call:
+- **Hard** (architecture, new features, complex bugs, 3+ files, security/auth, 5+ test changes) → all 4 phases
+- **Easy** (renames, typos, simple fixes, 1-2 trivial files, minor config) → implement + review only
+
+When in doubt, treat as hard.
+
+### Phases (hard tasks)
+
+1. **Research** with `forge --agent sage` — understand problem, architecture, explore codebase
+2. **Plan** with `forge --agent muse` — writes plan to `plans/`
+3. **Implement** with `forge -p "Execute plans/<plan>.md"` — Forge writes code based on plan
+4. **Review** with `forge --agent code-reviewer` — read-only review of changes
+5. **Verify** — run project linters and tests yourself
+6. **Commit** — branch first (never commit to `main`), then `forge update && forge workspace sync`
+
+### Phases (easy tasks)
+
+1. **Implement** with `forge -p "<description of change>"` — writes code, tests
+2. **Review** with `forge --agent code-reviewer` — read-only review
+3. **Verify** — run project linters and tests yourself
+4. **Commit** — branch first (never commit to `main`), then `forge update && forge workspace sync`
 
 Do these directly (not through forge):
 - Reading files, understanding the codebase
-- Running linters, tests
+- Running linters, tests (discover commands via `search_files` if needed)
 - Editing HERMES.md, AGENTS.md, SPEC.md, plans/
 - Git operations (add, commit, push, branch, PR)
 - Post-commit: `forge update && forge workspace sync`
 
 ---
 
-## Agent selection
+## Permissions
 
-| Agent | Flag | Use case | Mutates? |
-|-------|------|----------|----------|
-| `forge` | (default) | Implementation — features, bugs, tests | Yes |
-| `sage` | `--agent sage` | Research — architecture, audit | No |
-| `muse` | `--agent muse` | Planning — writes to `plans/` | plans/ only |
-| `code-reviewer` | `--agent code-reviewer` | Review — bugs, security, correctness | No |
-
-Research: `cat <files> | forge --agent sage -p "Explain X"`
-
----
-
-## Model routing — strict priority
-
-Use ONLY these models. All others are paid-per-API-call.
-
-| Priority | Model | Forge invocation | Use when |
-|----------|-------|-----------------|----------|
-| 1 | GLM-5.1 | `FORGE_SESSION__PROVIDER_ID="zai_coding" FORGE_SESSION__MODEL_ID="glm-5.1" forge -p "..."` | All tasks. Always first. |
-| 2 | Claude Sonnet 4.6 | `FORGE_SESSION__PROVIDER_ID="claude_code" FORGE_SESSION__MODEL_ID="claude-opus-4-6" forge -p "..."` | glm-5.1 down or bad output. |
-| 3 | Claude Opus 4.7 | `FORGE_SESSION__PROVIDER_ID="claude_code" FORGE_SESSION__MODEL_ID="claude-opus-4-7" forge -p "..."` | Both above failed. Last resort. |
-| Utility | Cerebras Qwen 3 235B | `FORGE_SESSION__PROVIDER_ID="cerebras" FORGE_SESSION__MODEL_ID="qwen-3-235b-a22b-instruct-2507" forge -p "..."` | Trivial: rename, typo, format. No tools. |
-| Utility | Gemini (free) | `gemini -p "..."` (CLI, not forge) | Easy tasks when glm-5.1 rate-limited. |
-
-Rules:
-- If glm-5.1 fails, retry once. Fail again → escalate to next priority.
-- Never use Claude as primary. Never use DeepSeek, GPT, Fireworks, or paid providers unless user asks.
-- Log every fallback to `plans/escalation-log.md`: date, task, reason, model used.
+| Always allowed | Ask first | Never |
+|----------------|-----------|-------|
+| Read/search files | Delete files | Commit to `main` |
+| Run linters/tests | Add dependencies | Edit HERMES.md via forge |
+| Edit plans/ | Run E2E suites | Use paid providers |
+| Git branch/commit | Force push | |
+| `forge update` | | |
 
 ---
 
-## Budget checks
+## Worked example: hard task
 
-Before non-trivial sessions, run:
+Task: "Add rate limiting to API endpoints"
 
-```bash
-bash /home/luandro/Dev/scripts/check_limits.sh          # human-readable
-bash /home/luandro/Dev/scripts/check_limits.sh --json    # machine-readable
+```
+# 1. Research — understand current auth middleware, rate-limit patterns
+sage "Research rate-limit patterns in this codebase and recommend approach"
+
+# 2. Plan — write implementation plan to plans/rate-limiting.md
+muse "Write implementation plan for rate limiting based on research above"
+
+# 3. Implement — execute the plan
+default "Execute plans/rate-limiting.md"
+
+# 4. Review — check for bugs, security, correctness
+code-reviewer "Review the rate-limiting implementation in last commit"
+
+# 5. Verify — run project tests
+pytest tests/ -x --tb=short && ruff check .
 ```
 
-Returns go/no-go per provider and recommended model. Individual provider scripts:
-- ZAI: `bash /home/luandro/Dev/scripts/zai_usage.sh` (needs `ZAI_TOKEN` env var, `jq`)
-- Claude: `codexbar usage --provider claude --source oauth --json`
-- Codex: `codexbar usage --provider codex --source oauth --json`
-- Gemini: `codexbar usage --provider gemini --source api --format json`
+For easy tasks, skip research+plan, jump to implement+review+verify.
 
-Decision rules:
-- Claude primary >80% or secondary >90%: avoid Claude.
-- Codex secondary = 100%: exhausted for the week.
-- Gemini primary = 100%: exhausted for the day.
+---
+
+## Phase assignments
+
+| Phase | Agent flag | Primary model | Fallback model | Mutates? |
+|-------|------------|---------------|----------------|----------|
+| Research | `--agent sage` | Z.AI glm-5.1 | NVIDIA DS V4 Pro | No |
+| Plan | `--agent muse` | Z.AI glm-5.1 | NVIDIA DS V4 Pro | plans/ only |
+| Implement | (default) | Z.AI glm-5.1 | NVIDIA DS V4 Pro | Yes |
+| Review | `--agent code-reviewer` | Z.AI glm-5.1 | NVIDIA DS V4 Pro | No |
+
+Primary (Z.AI glm-5.1):
+```bash
+# Replace <agent> with: sage, muse, (none), code-reviewer
+FORGE_SESSION__PROVIDER_ID="zai_coding" FORGE_SESSION__MODEL_ID="glm-5.1" forge --agent <agent> -p "prompt"
+```
+
+Fallback (NVIDIA DeepSeek V4 Pro):
+```bash
+# Replace <agent> with: sage, muse, (none), code-reviewer
+FORGE_SESSION__PROVIDER_ID="openai_compatible" FORGE_SESSION__MODEL_ID="deepseek-ai/deepseek-v4-pro" forge --agent <agent> -p "prompt"
+```
+
+---
+
+## Usage check & model selection
+
+Do this before EVERY forge call:
+
+```bash
+USAGE=$(bash /home/luandro/Dev/scripts/zai_usage.sh 2>/dev/null | jq -r '.tokens.used // "0%"' | tr -d '%')
+
+if [ "$USAGE" != "0" ] && [ "$USAGE" -lt 95 ] 2>/dev/null; then
+  # Use Z.AI glm-5.1
+  PROVIDER="zai_coding"
+  MODEL="glm-5.1"
+else
+  # Use NVIDIA DeepSeek V4 Pro
+  # Also fallback here if the check script fails (USAGE=0)
+  PROVIDER="openai_compatible"
+  MODEL="deepseek-ai/deepseek-v4-pro"
+  echo "→ Fallback: $(date +%H:%M) $(date +%Y-%m-%d) | reason=${USAGE}% | model=${MODEL}" >> plans/fallback-log.md
+fi
+```
+
+Then for each phase use:
+```bash
+FORGE_SESSION__PROVIDER_ID="${PROVIDER}" FORGE_SESSION__MODEL_ID="${MODEL}" forge --agent <agent-flag> -p "prompt"
+```
+
+Key rules:
+- Check before every forge call — usage changes during a session
+- If Z.AI script fails → fallback to NVIDIA (safe default)
+- Abstract the check into a decision, not a manual parse each time
+- Log only when fallback is used
 
 ---
 
@@ -93,7 +149,10 @@ Never commit directly to `main`.
 
 ## Session quality
 
-If forge produces two bad outputs in a row on the same task: stop, write a sharper prompt with the errors, start a fresh session. Do not retry in a degraded context.
+- Only this file matters. Nested `HERMES.md` in subdirectories NOT read.
+- Forge produces two bad outputs on same task → stop, write sharper prompt with errors, start fresh session. Degraded context compounds errors.
+- When stuck: re-research the problem with sage before retrying implementation.
+- Forge timeout (600s): may complete work then get killed. Edits are saved — verify before re-running.
 
 ### Parallel forge
 
@@ -106,9 +165,6 @@ If forge produces two bad outputs in a row on the same task: stop, write a sharp
 
 - Python >=3.11 (`/home/linuxbrew/.linuxbrew/bin/python3`)
 - Forge: `/home/luandro/.local/bin/forge`
-- Claude Code: `/home/luandro/.local/bin/claude`
-- CodexBar: `/home/linuxbrew/.linuxbrew/bin/codexbar`
-- Gemini CLI: `/home/linuxbrew/.linuxbrew/bin/gemini`
 - Virtual env: `.venv/` in project root
 - `FORGE_HTTP_READ_TIMEOUT=600` (10min for complex implementations)
 
@@ -117,10 +173,10 @@ If forge produces two bad outputs in a row on the same task: stop, write a sharp
 ## Pitfalls
 
 - Complex quoting in forge prompts: write to temp file, pipe with `cat prompt.md | forge -p "Read and execute"`
-- Forge timeout (600s): may complete work then get killed. Edits are saved — verify before re-running.
 - Provider/model mismatch → HTTP 404. Always pair `PROVIDER_ID` and `MODEL_ID` together.
 - `glm-5.1` is on `zai_coding` provider, NOT on fireworks-ai or cerebras.
-- `claude-opus-4-6` is Sonnet 4.6 (confusing but correct per `forge list models`).
-- CodexBar `--source web` is macOS-only. Linux: `--source oauth` for Claude/Codex, `--source api` for Gemini.
-- Gemini is NOT in forge. Use `gemini` CLI directly.
+- `openai_compatible` provider = NVIDIA NIM API. Host is `integrate.api.nvidia.com`. Model: `deepseek-ai/deepseek-v4-pro`.
+- Z.AI usage check: `bash /home/luandro/Dev/scripts/zai_usage.sh | jq -r '.tokens.used'` returns percentage (e.g. `"25%"`).
+- `zaiu` command does NOT exist (common confusion).
+- Forge fallback logging: `plans/fallback-log.md` (replaces old `plans/escalation-log.md`).
 - Forgetting `forge update && forge workspace sync` after commits → stale semantic search.
