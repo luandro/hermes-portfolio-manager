@@ -9,6 +9,16 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
+from portfolio_manager.issue_drafts import (
+    classify_issue_kind,
+    compute_readiness,
+    generate_github_issue_body,
+    generate_issue_title,
+    sanitize_public_issue_body,
+    validate_input_length,
+    validate_issue_title,
+    validate_public_issue_body,
+)
 from portfolio_manager.state import _utcnow, init_state, open_state
 
 
@@ -364,3 +374,125 @@ class TestProjectIssueCreationLock:
         acquire_lock(conn, "github_issue_create:proj-a", "owner-1", 120)
         result = acquire_lock(conn, "github_issue_create:proj-b", "owner-2", 120)
         assert result.acquired
+
+
+# ---------------------------------------------------------------------------
+# 4.x — Deterministic draft generation and readiness
+# ---------------------------------------------------------------------------
+
+
+class TestInputLengthLimits:
+    def test_accepts_short_input(self) -> None:
+        validate_input_length("short text", 20000, "text")
+
+    def test_rejects_over_limit(self) -> None:
+        with pytest.raises(ValueError, match="too long"):
+            validate_input_length("x" * 20001, 20000, "text")
+
+
+class TestIssueTitleValidation:
+    def test_accepts_valid_title(self) -> None:
+        validate_issue_title("Export selected layers as SMP")
+
+    def test_rejects_empty_title(self) -> None:
+        with pytest.raises(ValueError):
+            validate_issue_title("")
+
+    def test_rejects_too_short(self) -> None:
+        with pytest.raises(ValueError):
+            validate_issue_title("A")
+
+    def test_rejects_too_long(self) -> None:
+        with pytest.raises(ValueError):
+            validate_issue_title("x" * 121)
+
+    def test_rejects_newline(self) -> None:
+        with pytest.raises(ValueError):
+            validate_issue_title("Title\nSecond line")
+
+
+class TestGenerateIssueTitle:
+    def test_generates_title_from_clear_text(self) -> None:
+        title = generate_issue_title(
+            "Users should be able to export selected styled layers as an SMP file for CoMapeo Mobile."
+        )
+        assert len(title) >= 5
+        assert len(title) <= 120
+        assert "export" in title.lower()
+
+
+class TestClassifyIssueKind:
+    def test_classifies_bug(self) -> None:
+        assert classify_issue_kind("The app crashes when uploading") == "bug"
+        assert classify_issue_kind("This is broken, it fails to load") == "bug"
+
+    def test_classifies_feature(self) -> None:
+        assert classify_issue_kind("Users should be able to export layers") == "feature"
+        assert classify_issue_kind("Add support for Markdown import") == "feature"
+
+    def test_classifies_unknown(self) -> None:
+        assert classify_issue_kind("We need to think about this more") == "unknown"
+
+
+class TestReadinessScoring:
+    def test_clear_request_high_readiness(self) -> None:
+        content = {
+            "title": "Export layers as SMP",
+            "project_id": "comapeo-cloud-app",
+            "text": "Users should export selected styled layers as an SMP file.",
+        }
+        readiness = compute_readiness(content)
+        assert readiness >= 0.5
+
+    def test_vague_request_low_readiness(self) -> None:
+        content = {
+            "title": "",
+            "text": "We need to make the stories better.",
+        }
+        readiness = compute_readiness(content)
+        assert readiness < 0.5
+
+
+class TestGenerateGithubIssueBody:
+    def test_includes_required_sections(self) -> None:
+        body = generate_github_issue_body(
+            {
+                "title": "Export layers",
+                "spec_body": "## Goal\nUsers can export.",
+                "questions": [],
+                "issue_kind": "feature",
+                "readiness": 0.8,
+            }
+        )
+        assert "## Goal" in body
+        assert "## Acceptance Criteria" in body
+
+    def test_excludes_private_metadata(self) -> None:
+        body = generate_github_issue_body(
+            {
+                "title": "Export layers",
+                "spec_body": "## Goal\nUsers can export.",
+                "questions": [],
+                "issue_kind": "feature",
+                "readiness": 0.8,
+            }
+        )
+        assert "readiness" not in body
+
+
+class TestMarkdownSafety:
+    def test_rejects_script_tags(self) -> None:
+        with pytest.raises(ValueError):
+            validate_public_issue_body("<script>alert('xss')</script>")
+
+    def test_rejects_style_tags(self) -> None:
+        with pytest.raises(ValueError):
+            validate_public_issue_body("<style>body{}</style>")
+
+    def test_rejects_event_handlers(self) -> None:
+        with pytest.raises(ValueError):
+            validate_public_issue_body("click here <div onclick='steal()'>")
+
+    def test_normalizes_excessive_blank_lines(self) -> None:
+        body = sanitize_public_issue_body("Line 1\n\n\n\n\nLine 2")
+        assert body.count("\n") <= 3
