@@ -1628,6 +1628,8 @@ def _handle_portfolio_issue_create(args: dict[str, Any], **kwargs: Any) -> str:
             data=result,
             summary=f"Created issue #{result.get('issue_number', '')} — {result.get('issue_url', '')}",
         )
+    except ValueError as exc:
+        return _blocked(tool, str(exc), reason="validation_error")
     finally:
         conn.close()
 
