@@ -314,3 +314,114 @@ def test_dev_cli_project_update(tmp_path: Path) -> None:
     assert parsed["status"] == "success"
     assert parsed["tool"] == "portfolio_project_update"
     assert "test-project" in parsed["message"]
+
+
+# ---------------------------------------------------------------------------
+# MVP 3 — CLI tests
+# ---------------------------------------------------------------------------
+
+
+def test_dev_cli_issue_resolve_and_draft(tmp_path: Path) -> None:
+    """portfolio_project_resolve + portfolio_issue_draft via CLI."""
+    from tests.test_issue_tools import _make_config
+
+    root = _make_config(tmp_path)
+    resolve_result = _run_cli(
+        "portfolio_project_resolve",
+        "--project-ref",
+        "comapeo-cloud-app",
+        "--root",
+        str(root),
+    )
+    resolved = _parse_json(resolve_result)
+    assert resolved["status"] == "success"
+
+    draft_result = _run_cli(
+        "portfolio_issue_draft",
+        "--text",
+        "Users should export selected layers as SMP",
+        "--project-ref",
+        "comapeo-cloud-app",
+        "--root",
+        str(root),
+    )
+    draft = _parse_json(draft_result)
+    assert draft["status"] == "success"
+    assert "draft_id" in draft["data"]
+
+
+def test_dev_cli_issue_draft_management(tmp_path: Path) -> None:
+    """Draft lifecycle via CLI: create → questions → update → explain → list → discard."""
+    from tests.test_issue_tools import _make_config
+
+    root = _make_config(tmp_path)
+
+    # Create draft
+    result = _run_cli(
+        "portfolio_issue_draft",
+        "--text",
+        "Make the stories better",
+        "--project-ref",
+        "comapeo-cloud-app",
+        "--root",
+        str(root),
+    )
+    draft = _parse_json(result)
+    draft_id = draft["data"]["draft_id"]
+
+    # Questions
+    questions_result = _run_cli(
+        "portfolio_issue_questions",
+        "--draft-id",
+        draft_id,
+        "--root",
+        str(root),
+    )
+    questions = _parse_json(questions_result)
+    assert questions["status"] == "success"
+
+    # Update
+    update_result = _run_cli(
+        "portfolio_issue_update_draft",
+        "--draft-id",
+        draft_id,
+        "--answers",
+        "Target CoMapeo Mobile first",
+        "--root",
+        str(root),
+    )
+    updated = _parse_json(update_result)
+    assert updated["status"] == "success"
+
+    # Explain
+    explain_result = _run_cli(
+        "portfolio_issue_explain_draft",
+        "--draft-id",
+        draft_id,
+        "--root",
+        str(root),
+    )
+    explained = _parse_json(explain_result)
+    assert explained["status"] == "success"
+
+    # List
+    list_result = _run_cli(
+        "portfolio_issue_list_drafts",
+        "--root",
+        str(root),
+    )
+    listed = _parse_json(list_result)
+    assert listed["status"] == "success"
+
+    # Discard
+    discard_result = _run_cli(
+        "portfolio_issue_discard_draft",
+        "--draft-id",
+        draft_id,
+        "--confirm",
+        "true",
+        "--root",
+        str(root),
+    )
+    discarded = _parse_json(discard_result)
+    assert discarded["status"] == "success"

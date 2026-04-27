@@ -51,17 +51,28 @@ from portfolio_manager.github_client import (
     check_gh_available,
     sync_project_github,
 )
+from portfolio_manager.issue_artifacts import read_issue_artifact
+from portfolio_manager.issue_drafts import (
+    create_issue,
+    create_issue_draft,
+    create_issue_from_draft,
+    update_issue_draft,
+)
+from portfolio_manager.issue_resolver import resolve_project
 from portfolio_manager.repo_parser import parse_github_repo_ref
 from portfolio_manager.repo_validation import check_gh_available_for_project_add
 from portfolio_manager.state import (
     acquire_lock,
     add_event,
     finish_heartbeat,
+    get_issue_draft,
     init_state,
+    list_issue_drafts,
     open_state,
     release_lock,
     start_heartbeat,
     upsert_issue,
+    upsert_issue_draft,
     upsert_project,
     upsert_pull_request,
     upsert_worktree,
@@ -1361,3 +1372,452 @@ def _handle_portfolio_project_config_backup(args: dict[str, Any], **kwargs: Any)
     except Exception as exc:
         logger.exception("Failed to create config backup")
         return _failed(tool, str(exc))
+
+
+# ---------------------------------------------------------------------------
+# portfolio_project_resolve (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_project_resolve(args: dict[str, Any], **kwargs: Any) -> str:
+    """Resolve a project reference to a project ID."""
+    tool = "portfolio_project_resolve"
+    root = resolve_root(args.get("root"))
+
+    try:
+        config = load_projects_config(root)
+    except ConfigError as exc:
+        return _blocked(tool, str(exc))
+
+    resolution = resolve_project(
+        config,
+        project_ref=args.get("project_ref"),
+        text=args.get("text"),
+    )
+
+    if resolution.state == "resolved":
+        return _result(
+            status="success",
+            tool=tool,
+            message=resolution.message,
+            data={"state": "resolved", "project_id": resolution.project_id},
+            summary=resolution.message,
+        )
+    if resolution.state == "ambiguous":
+        return _result(
+            status="success",
+            tool=tool,
+            message=resolution.message,
+            data={"state": "ambiguous", "candidates": resolution.candidates},
+            summary=resolution.message,
+        )
+    return _blocked(tool, resolution.message, reason="not_found")
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_draft(args: dict[str, Any], **kwargs: Any) -> str:
+    """Create an issue draft from user-supplied text."""
+    tool = "portfolio_issue_draft"
+    root = resolve_root(args.get("root"))
+
+    text = args.get("text", "")
+    if not text:
+        return _blocked(tool, "text is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        result = create_issue_draft(
+            root,
+            conn,
+            text,
+            project_ref=args.get("project_ref"),
+            title=args.get("title"),
+            force_rough_issue=args.get("force_rough_issue", False),
+        )
+
+        if result.get("blocked"):
+            return _blocked(
+                tool,
+                result.get("reason", "Draft creation blocked"),
+                reason=result.get("reason"),
+                data=result,
+            )
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Draft created: {result.get('draft_id', '')}",
+            data=result,
+            summary=f"Draft created for {result.get('project_id', 'unknown')}. State: {result.get('state', '')}",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_questions (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_questions(args: dict[str, Any], **kwargs: Any) -> str:
+    """Read clarifying questions for an existing draft."""
+    tool = "portfolio_issue_questions"
+    root = resolve_root(args.get("root"))
+
+    draft_id = args.get("draft_id", "")
+    if not draft_id:
+        return _blocked(tool, "draft_id is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        row = get_issue_draft(conn, draft_id)
+        if row is None:
+            return _blocked(tool, f"Draft not found: {draft_id}", reason="not_found")
+
+        project_id = row.get("project_id") or "unresolved"
+        questions_text = read_issue_artifact(root, project_id, draft_id, "questions.md")
+        questions = [q.lstrip("- ") for q in (questions_text or "").splitlines() if q.strip()] if questions_text else []
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Questions for draft {draft_id}",
+            data={"draft_id": draft_id, "questions": questions},
+            summary="\n".join(questions) if questions else "No questions found.",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_update_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_update_draft(args: dict[str, Any], **kwargs: Any) -> str:
+    """Update an existing issue draft."""
+    tool = "portfolio_issue_update_draft"
+    root = resolve_root(args.get("root"))
+
+    draft_id = args.get("draft_id", "")
+    if not draft_id:
+        return _blocked(tool, "draft_id is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        result = update_issue_draft(
+            root,
+            conn,
+            draft_id,
+            answers=args.get("answers"),
+            project_id=args.get("project_id"),
+            title=args.get("title"),
+            force_ready=args.get("force_ready", False),
+        )
+
+        if result.get("blocked"):
+            return _blocked(
+                tool,
+                result.get("reason", "Update blocked"),
+                reason=result.get("reason"),
+                data=result,
+            )
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Draft updated: {draft_id}",
+            data=result,
+            summary=f"Draft {draft_id} updated. State: {result.get('state', '')}",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_create (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_create(args: dict[str, Any], **kwargs: Any) -> str:
+    """Create a GitHub issue directly (draft + create)."""
+    tool = "portfolio_issue_create"
+    root = resolve_root(args.get("root"))
+
+    project_id = args.get("project_id", "")
+    title = args.get("title", "")
+    body = args.get("body", "")
+
+    if not project_id:
+        return _blocked(tool, "project_id is required")
+    if not title:
+        return _blocked(tool, "title is required")
+    if not body:
+        return _blocked(tool, "body is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        result = create_issue(
+            root,
+            conn,
+            text=body,
+            title=title,
+            body=body,
+            project_ref=project_id,
+            confirm=args.get("confirm", False),
+            dry_run=args.get("dry_run", False),
+            allow_possible_duplicate=args.get("allow_possible_duplicate", False),
+        )
+
+        if result.get("blocked"):
+            return _blocked(
+                tool,
+                result.get("reason", "Issue creation blocked"),
+                reason=result.get("reason"),
+                data=result,
+            )
+
+        if result.get("dry_run"):
+            return _result(
+                status="success",
+                tool=tool,
+                message="Dry run preview",
+                data=result,
+                summary="Dry run — no issue created.",
+            )
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Issue created: #{result.get('issue_number', '')}",
+            data=result,
+            summary=f"Created issue #{result.get('issue_number', '')} — {result.get('issue_url', '')}",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_create_from_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_create_from_draft(args: dict[str, Any], **kwargs: Any) -> str:
+    """Create a GitHub issue from an existing draft."""
+    tool = "portfolio_issue_create_from_draft"
+    root = resolve_root(args.get("root"))
+
+    draft_id = args.get("draft_id", "")
+    if not draft_id:
+        return _blocked(tool, "draft_id is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        result = create_issue_from_draft(
+            root,
+            conn,
+            draft_id,
+            confirm=args.get("confirm", False),
+            allow_open_questions=args.get("allow_open_questions", False),
+            allow_possible_duplicate=args.get("allow_possible_duplicate", False),
+            dry_run=args.get("dry_run", False),
+        )
+
+        if result.get("blocked"):
+            return _blocked(
+                tool,
+                result.get("reason", "Issue creation blocked"),
+                reason=result.get("reason"),
+                data=result,
+            )
+
+        if result.get("dry_run"):
+            return _result(
+                status="success",
+                tool=tool,
+                message="Dry run preview",
+                data=result,
+                summary="Dry run — no issue created.",
+            )
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Issue created from draft: #{result.get('issue_number', '')}",
+            data=result,
+            summary=f"Created issue #{result.get('issue_number', '')} — {result.get('issue_url', '')}",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_explain_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_explain_draft(args: dict[str, Any], **kwargs: Any) -> str:
+    """Explain the current state and content of an issue draft."""
+    tool = "portfolio_issue_explain_draft"
+    root = resolve_root(args.get("root"))
+
+    draft_id = args.get("draft_id", "")
+    if not draft_id:
+        return _blocked(tool, "draft_id is required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        row = get_issue_draft(conn, draft_id)
+        if row is None:
+            return _blocked(tool, f"Draft not found: {draft_id}", reason="not_found")
+
+        project_id = row.get("project_id") or "unresolved"
+        spec = read_issue_artifact(root, project_id, draft_id, "spec.md")
+        questions = read_issue_artifact(root, project_id, draft_id, "questions.md")
+
+        summary_lines = [
+            f"Draft: {draft_id}",
+            f"State: {row.get('state', '')}",
+            f"Title: {row.get('title', '')}",
+            f"Project: {row.get('project_id', 'unresolved')}",
+            f"Readiness: {row.get('readiness', 0.0)}",
+        ]
+        if row.get("github_issue_number"):
+            summary_lines.append(f"GitHub Issue: #{row['github_issue_number']}")
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Explanation for draft {draft_id}",
+            data={
+                "draft": {k: row[k] for k in row},
+                "spec": spec,
+                "questions": questions,
+            },
+            summary="\n".join(summary_lines),
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_list_drafts (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_list_drafts(args: dict[str, Any], **kwargs: Any) -> str:
+    """List issue drafts with optional filters."""
+    tool = "portfolio_issue_list_drafts"
+    root = resolve_root(args.get("root"))
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        drafts = list_issue_drafts(
+            conn,
+            project_id=args.get("project_id"),
+            state=args.get("state"),
+            include_created=args.get("include_created", False),
+        )
+
+        draft_summaries = [
+            {
+                "draft_id": d.get("draft_id"),
+                "project_id": d.get("project_id"),
+                "state": d.get("state"),
+                "title": d.get("title"),
+                "readiness": d.get("readiness"),
+            }
+            for d in drafts
+        ]
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Found {len(drafts)} drafts.",
+            data={"drafts": draft_summaries, "count": len(drafts)},
+            summary=f"{len(drafts)} drafts found.",
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_discard_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_issue_discard_draft(args: dict[str, Any], **kwargs: Any) -> str:
+    """Discard an issue draft."""
+    tool = "portfolio_issue_discard_draft"
+    root = resolve_root(args.get("root"))
+
+    draft_id = args.get("draft_id", "")
+    if not draft_id:
+        return _blocked(tool, "draft_id is required")
+
+    confirm = args.get("confirm", False)
+    if isinstance(confirm, str):
+        confirm = confirm.lower() == "true"
+    if not confirm:
+        return _blocked(tool, "confirm=true is required to discard", reason="confirm_required")
+
+    _ensure_dirs(root)
+    conn = open_state(root)
+    init_state(conn)
+
+    try:
+        row = get_issue_draft(conn, draft_id)
+        if row is None:
+            return _blocked(tool, f"Draft not found: {draft_id}", reason="not_found")
+
+        current_state = row.get("state", "")
+        if current_state == "created":
+            return _blocked(tool, "Cannot discard a draft already created as a GitHub issue", reason="already_created")
+
+        # Update state to discarded
+        upsert_issue_draft(
+            conn,
+            {
+                "draft_id": draft_id,
+                "project_id": row.get("project_id"),
+                "state": "discarded",
+                "title": row.get("title"),
+                "readiness": row.get("readiness"),
+                "artifact_path": row.get("artifact_path", ""),
+            },
+        )
+
+        return _result(
+            status="success",
+            tool=tool,
+            message=f"Draft discarded: {draft_id}",
+            data={"draft_id": draft_id, "state": "discarded"},
+            summary=f"Draft {draft_id} discarded.",
+        )
+    finally:
+        conn.close()
