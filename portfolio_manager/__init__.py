@@ -1,4 +1,4 @@
-"""Hermes Portfolio Manager plugin — MVP 1 (read-only)."""
+"""Hermes Portfolio Manager plugin — MVP 1 + MVP 2."""
 
 from __future__ import annotations
 
@@ -10,7 +10,17 @@ from portfolio_manager.schemas import (
     PORTFOLIO_GITHUB_SYNC_SCHEMA,
     PORTFOLIO_HEARTBEAT_SCHEMA,
     PORTFOLIO_PING_SCHEMA,
+    PORTFOLIO_PROJECT_ADD_SCHEMA,
+    PORTFOLIO_PROJECT_ARCHIVE_SCHEMA,
+    PORTFOLIO_PROJECT_CONFIG_BACKUP_SCHEMA,
+    PORTFOLIO_PROJECT_EXPLAIN_SCHEMA,
     PORTFOLIO_PROJECT_LIST_SCHEMA,
+    PORTFOLIO_PROJECT_PAUSE_SCHEMA,
+    PORTFOLIO_PROJECT_REMOVE_SCHEMA,
+    PORTFOLIO_PROJECT_RESUME_SCHEMA,
+    PORTFOLIO_PROJECT_SET_AUTO_MERGE_SCHEMA,
+    PORTFOLIO_PROJECT_SET_PRIORITY_SCHEMA,
+    PORTFOLIO_PROJECT_UPDATE_SCHEMA,
     PORTFOLIO_STATUS_SCHEMA,
     PORTFOLIO_WORKTREE_INSPECT_SCHEMA,
 )
@@ -19,13 +29,24 @@ from portfolio_manager.tools import (
     _handle_portfolio_github_sync,
     _handle_portfolio_heartbeat,
     _handle_portfolio_ping,
+    _handle_portfolio_project_add,
+    _handle_portfolio_project_archive,
+    _handle_portfolio_project_config_backup,
+    _handle_portfolio_project_explain,
     _handle_portfolio_project_list,
+    _handle_portfolio_project_pause,
+    _handle_portfolio_project_remove,
+    _handle_portfolio_project_resume,
+    _handle_portfolio_project_set_auto_merge,
+    _handle_portfolio_project_set_priority,
+    _handle_portfolio_project_update,
     _handle_portfolio_status,
     _handle_portfolio_worktree_inspect,
 )
 
 # Tool name -> (schema, handler) mapping
 _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
+    # MVP 1 tools
     ("portfolio_ping", PORTFOLIO_PING_SCHEMA, _handle_portfolio_ping),
     ("portfolio_config_validate", PORTFOLIO_CONFIG_VALIDATE_SCHEMA, _handle_portfolio_config_validate),
     ("portfolio_project_list", PORTFOLIO_PROJECT_LIST_SCHEMA, _handle_portfolio_project_list),
@@ -33,15 +54,35 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
     ("portfolio_worktree_inspect", PORTFOLIO_WORKTREE_INSPECT_SCHEMA, _handle_portfolio_worktree_inspect),
     ("portfolio_status", PORTFOLIO_STATUS_SCHEMA, _handle_portfolio_status),
     ("portfolio_heartbeat", PORTFOLIO_HEARTBEAT_SCHEMA, _handle_portfolio_heartbeat),
+    # MVP 2 tools
+    ("portfolio_project_add", PORTFOLIO_PROJECT_ADD_SCHEMA, _handle_portfolio_project_add),
+    ("portfolio_project_update", PORTFOLIO_PROJECT_UPDATE_SCHEMA, _handle_portfolio_project_update),
+    ("portfolio_project_pause", PORTFOLIO_PROJECT_PAUSE_SCHEMA, _handle_portfolio_project_pause),
+    ("portfolio_project_resume", PORTFOLIO_PROJECT_RESUME_SCHEMA, _handle_portfolio_project_resume),
+    ("portfolio_project_archive", PORTFOLIO_PROJECT_ARCHIVE_SCHEMA, _handle_portfolio_project_archive),
+    ("portfolio_project_set_priority", PORTFOLIO_PROJECT_SET_PRIORITY_SCHEMA, _handle_portfolio_project_set_priority),
+    (
+        "portfolio_project_set_auto_merge",
+        PORTFOLIO_PROJECT_SET_AUTO_MERGE_SCHEMA,
+        _handle_portfolio_project_set_auto_merge,
+    ),
+    ("portfolio_project_remove", PORTFOLIO_PROJECT_REMOVE_SCHEMA, _handle_portfolio_project_remove),
+    ("portfolio_project_explain", PORTFOLIO_PROJECT_EXPLAIN_SCHEMA, _handle_portfolio_project_explain),
+    (
+        "portfolio_project_config_backup",
+        PORTFOLIO_PROJECT_CONFIG_BACKUP_SCHEMA,
+        _handle_portfolio_project_config_backup,
+    ),
 ]
 
-# Skills directory relative to this file
+# Skills directory: check repo-root skills/ first, fall back to plugin-local
 _PLUGIN_DIR = Path(__file__).parent
-_SKILLS_DIR = _PLUGIN_DIR / "skills"
+_SKILLS_DIR = _PLUGIN_DIR.parent / "skills" if (_PLUGIN_DIR.parent / "skills").exists() else _PLUGIN_DIR / "skills"
 
 _SKILL_DESCRIPTIONS: dict[str, str] = {
     "portfolio-status": "View portfolio status — projects, issues, PRs, worktrees.",
     "portfolio-heartbeat": "Periodic health check across all portfolio projects.",
+    "project-admin": "Administer portfolio projects — add, update, pause, resume, archive, remove, set priority, explain, manage auto-merge, create config backups.",
 }
 
 

@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
     "pyyaml>=6",
+    "pydantic>=2",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +57,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
+plugins = ["pydantic.mypy"]
 exclude = [
     "(^|/)__init__\\.py$",
     "(^|/)tests/",
