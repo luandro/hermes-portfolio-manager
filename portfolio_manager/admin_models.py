@@ -36,7 +36,8 @@ PROJECT_ID_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 # ---------------------------------------------------------------------------
 
 
-class AutoMergeConfig(BaseModel, extra="forbid"):
+class AutoMergeConfig(BaseModel):
+    model_config = {"extra": "forbid"}
     enabled: bool = False
     max_risk: str | None = None
 
@@ -59,7 +60,9 @@ class AutoMergeConfig(BaseModel, extra="forbid"):
 # ---------------------------------------------------------------------------
 
 
-class AdminProjectConfig(BaseModel, extra="allow"):
+class AdminProjectConfig(BaseModel):
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
     id: str
     name: str
     repo: str
@@ -75,8 +78,6 @@ class AdminProjectConfig(BaseModel, extra="allow"):
     updated_at: str | None = None
     protected_paths: list[str] = Field(default_factory=lambda: list(DEFAULT_PROTECTED_PATHS))
     labels: list[str] = Field(default_factory=list)
-
-    model_config = {"populate_by_name": True}
 
     @field_validator("id")
     @classmethod

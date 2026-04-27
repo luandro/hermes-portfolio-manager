@@ -141,7 +141,8 @@ def update_project_in_config(
 
 def _find_project(config: dict[str, Any], project_id: str) -> dict[str, Any] | None:
     """Find a project dict by ID in the config."""
-    for p in config.get("projects", []):
+    projects: list[dict[str, Any]] = config.get("projects", [])  # type: ignore[assignment]
+    for p in projects:
         if p.get("id") == project_id:
             return p
     return None
