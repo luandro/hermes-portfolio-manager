@@ -1822,6 +1822,16 @@ def _handle_portfolio_issue_discard_draft(args: dict[str, Any], **kwargs: Any) -
         if current_state == "created":
             return _blocked(tool, "Cannot discard a draft already created as a GitHub issue", reason="already_created")
 
+        # creating_failed + github-created.json means the issue was actually created
+        if current_state == "creating_failed" and row.get("project_id"):
+            from portfolio_manager.issue_artifacts import issue_artifact_root, read_github_created_if_exists
+
+            artifact_dir = issue_artifact_root(root, row["project_id"], draft_id)
+            if read_github_created_if_exists(artifact_dir) is not None:
+                return _blocked(
+                    tool, "Cannot discard: GitHub issue was created despite failure state", reason="already_created"
+                )
+
         # Update state to discarded
         upsert_issue_draft(
             conn,
