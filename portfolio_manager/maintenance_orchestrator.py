@@ -70,7 +70,8 @@ def _refresh_github_data(
     if project_filter:
         placeholders = ",".join("?" for _ in project_filter)
         cur = conn.execute(
-            f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})", project_filter
+            f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})",
+            project_filter,  # nosec B608 — placeholders is only comma-joined "?", values are parameterized
         )
     else:
         cur = conn.execute("SELECT id FROM projects WHERE status IN ('active', 'paused')")
@@ -270,6 +271,72 @@ def run_maintenance(
                     "findings_count": 0,
                 }
             )
+
+    # Step 5b: Create issue drafts if configured
+    if config.get("create_issue_drafts", False) and runs:
+        try:
+            from portfolio_manager.maintenance_drafts import (
+                create_maintenance_drafts,
+                plan_maintenance_issue_drafts,
+            )
+
+            # Collect findings by (project_id, skill_id, run_id) for draft planning
+            findings_map: dict[tuple[str, str, str], Any] = {}
+            for run_info in runs:
+                if run_info.get("status") != "success" or run_info.get("findings_count", 0) == 0:
+                    continue
+                # Fetch findings for this run
+                cur = conn.execute(
+                    "SELECT fingerprint, severity, title, body, source_type, source_id, source_url, metadata, draftable "
+                    "FROM maintenance_findings WHERE run_id=?",
+                    (run_info["run_id"],),
+                )
+                from portfolio_manager.maintenance_models import MaintenanceFinding, MaintenanceSkillResult
+
+                run_findings = []
+                for frow in cur.fetchall():
+                    meta = frow[7]
+                    if isinstance(meta, str):
+                        try:
+                            import json as _json
+
+                            meta = _json.loads(meta)
+                        except (ValueError, TypeError):
+                            meta = {}
+                    run_findings.append(
+                        MaintenanceFinding(
+                            fingerprint=frow[0],
+                            severity=frow[1],
+                            title=frow[2],
+                            body=frow[3] or "",
+                            source_type=frow[4] or "",
+                            source_id=frow[5] or "",
+                            source_url=frow[6] or "",
+                            metadata=meta or {},
+                            draftable=bool(frow[8]),
+                        )
+                    )
+                if run_findings:
+                    key = (run_info["project_id"], run_info["skill_id"], run_info["run_id"])
+                    findings_map[key] = MaintenanceSkillResult(
+                        skill_id=run_info["skill_id"],
+                        project_id=run_info["project_id"],
+                        status="success",
+                        findings=run_findings,
+                        summary="",
+                    )
+
+            if findings_map:
+                draft_plans = plan_maintenance_issue_drafts(findings_map, config, conn=conn)
+                if draft_plans:
+                    draft_results = create_maintenance_drafts(root, conn, draft_plans, config)
+                    for dr in draft_results:
+                        if "warning" in dr:
+                            warnings.append(dr["warning"])
+        except Exception as exc:
+            msg = f"Draft creation failed: {exc}"
+            logger.warning(msg)
+            warnings.append(msg)
 
     return {
         "runs": runs,

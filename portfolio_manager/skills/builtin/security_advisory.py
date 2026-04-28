@@ -39,6 +39,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
 
     for row in rows:
         cve_id, severity, summary = row[0], row[1], row[2]
+        safe_summary = summary or "No advisory summary provided."
         fp = make_finding_fingerprint(
             skill_id=SPEC.id,
             project_id=ctx.project.id,
@@ -51,7 +52,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
                 fingerprint=fp,
                 severity=severity,
                 title=f"Security advisory: {cve_id}",
-                body=summary,
+                body=safe_summary,
                 source_type="cve",
                 source_id=cve_id,
                 source_url=f"https://nvd.nist.gov/vuln/detail/{cve_id}",

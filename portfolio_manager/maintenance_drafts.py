@@ -247,9 +247,10 @@ def create_maintenance_drafts(
         conn.commit()
 
         # Write draft-created.json artifact
-        first_fingerprint = plan.findings[0].fingerprint if plan.findings else ""
+        finding_fingerprints = [f.fingerprint for f in plan.findings]
         draft_created_data = {
-            "finding_fingerprint": first_fingerprint,
+            "finding_fingerprints": finding_fingerprints,
+            "finding_fingerprint": finding_fingerprints[0] if finding_fingerprints else "",
             "project_id": plan.project_id,
             "skill_id": plan.skill_id,
             "draft_id": draft_id,
@@ -303,29 +304,31 @@ def repair_draft_references(root: Path, conn: sqlite3.Connection) -> int:
         except (json.JSONDecodeError, OSError):
             continue
 
-        fingerprint = data.get("finding_fingerprint")
+        # Support both new (list) and legacy (single) fingerprint formats
+        fingerprints = data.get("finding_fingerprints", [])
+        if not fingerprints:
+            single_fp = data.get("finding_fingerprint")
+            if single_fp:
+                fingerprints = [single_fp]
         draft_id = data.get("draft_id")
-        if not fingerprint or not draft_id:
+        if not fingerprints or not draft_id:
             continue
 
-        # Check if finding already has issue_draft_id
-        row = conn.execute(
-            "SELECT issue_draft_id FROM maintenance_findings WHERE fingerprint=?",
-            (fingerprint,),
-        ).fetchone()
-        if row is None:
-            continue
+        for fingerprint in fingerprints:
+            # Check whether ANY row already has a draft reference
+            existing = conn.execute(
+                "SELECT COUNT(*) FROM maintenance_findings WHERE fingerprint=? AND issue_draft_id IS NOT NULL",
+                (fingerprint,),
+            ).fetchone()
+            if existing and existing[0] > 0:
+                continue
 
-        existing_draft_id = row[0]
-        if existing_draft_id:
-            # Already has a reference — don't duplicate
-            continue
-
-        conn.execute(
-            "UPDATE maintenance_findings SET issue_draft_id=? WHERE fingerprint=?",
-            (draft_id, fingerprint),
-        )
-        conn.commit()
-        repairs += 1
+            # Only update rows that are still NULL
+            conn.execute(
+                "UPDATE maintenance_findings SET issue_draft_id=? WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
+                (draft_id, fingerprint),
+            )
+            conn.commit()
+            repairs += 1
 
     return repairs

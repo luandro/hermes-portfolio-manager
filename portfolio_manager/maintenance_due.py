@@ -108,7 +108,13 @@ def compute_due_checks(
                 )
                 continue
 
-            interval_hours = skill_cfg.get("interval_hours", 24)
+            raw_interval = skill_cfg.get("interval_hours", 24)
+            try:
+                interval_hours = int(raw_interval)
+            except (TypeError, ValueError):
+                interval_hours = 24
+            if interval_hours < 1:
+                interval_hours = 24
             next_due = last_finished + timedelta(hours=interval_hours)
 
             if now >= next_due:

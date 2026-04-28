@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 import portfolio_manager.skills.builtin  # noqa: F401 — triggers register_all()
@@ -150,6 +151,8 @@ def _handle_portfolio_maintenance_skill_enable(args: dict[str, Any], **kwargs: A
     skill_id = args.get("skill_id", "")
     if not skill_id:
         return _blocked(tool, "skill_id is required")
+    if not re.match(r"^[a-z][a-z0-9_]{2,63}$", skill_id):
+        return _blocked(tool, "invalid skill_id: must match ^[a-z][a-z0-9_]{2,63}$")
 
     interval_hours = args.get("interval_hours")
     if interval_hours is not None:
@@ -207,6 +210,8 @@ def _handle_portfolio_maintenance_skill_disable(args: dict[str, Any], **kwargs: 
     skill_id = args.get("skill_id", "")
     if not skill_id:
         return _blocked(tool, "skill_id is required")
+    if not re.match(r"^[a-z][a-z0-9_]{2,63}$", skill_id):
+        return _blocked(tool, "invalid skill_id: must match ^[a-z][a-z0-9_]{2,63}$")
 
     try:
         updated = disable_skill(root, skill_id)
@@ -375,6 +380,7 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
         config = load_config(root)
         dry_run = _parse_bool(args.get("dry_run"), default=False)
 
+        config["refresh_github"] = _parse_bool(args.get("refresh_github"), default=False)
         config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
 
         result = run_maintenance(
