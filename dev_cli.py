@@ -12,6 +12,14 @@ from portfolio_manager.tools import (
     _handle_portfolio_config_validate,
     _handle_portfolio_github_sync,
     _handle_portfolio_heartbeat,
+    _handle_portfolio_issue_create,
+    _handle_portfolio_issue_create_from_draft,
+    _handle_portfolio_issue_discard_draft,
+    _handle_portfolio_issue_draft,
+    _handle_portfolio_issue_explain_draft,
+    _handle_portfolio_issue_list_drafts,
+    _handle_portfolio_issue_questions,
+    _handle_portfolio_issue_update_draft,
     _handle_portfolio_ping,
     _handle_portfolio_project_add,
     _handle_portfolio_project_archive,
@@ -20,6 +28,7 @@ from portfolio_manager.tools import (
     _handle_portfolio_project_list,
     _handle_portfolio_project_pause,
     _handle_portfolio_project_remove,
+    _handle_portfolio_project_resolve,
     _handle_portfolio_project_resume,
     _handle_portfolio_project_set_auto_merge,
     _handle_portfolio_project_set_priority,
@@ -46,6 +55,16 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_project_remove": _handle_portfolio_project_remove,
     "portfolio_project_explain": _handle_portfolio_project_explain,
     "portfolio_project_config_backup": _handle_portfolio_project_config_backup,
+    # MVP 3
+    "portfolio_project_resolve": _handle_portfolio_project_resolve,
+    "portfolio_issue_draft": _handle_portfolio_issue_draft,
+    "portfolio_issue_questions": _handle_portfolio_issue_questions,
+    "portfolio_issue_update_draft": _handle_portfolio_issue_update_draft,
+    "portfolio_issue_create": _handle_portfolio_issue_create,
+    "portfolio_issue_create_from_draft": _handle_portfolio_issue_create_from_draft,
+    "portfolio_issue_explain_draft": _handle_portfolio_issue_explain_draft,
+    "portfolio_issue_list_drafts": _handle_portfolio_issue_list_drafts,
+    "portfolio_issue_discard_draft": _handle_portfolio_issue_discard_draft,
 }
 
 
@@ -75,6 +94,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--validate-github", type=str, help="Validate GitHub repo (true/false)")
     parser.add_argument("--confirm", type=str, help="Confirm destructive operation (true/false)")
     parser.add_argument("--reason", help="Reason for pause/archive/remove")
+    parser.add_argument("--text", help="Text for issue draft creation")
+    parser.add_argument("--project-ref", help="Project reference for resolution/draft")
+    parser.add_argument("--draft-id", help="Draft ID for issue operations")
+    parser.add_argument("--answers", help="Answers to clarifying questions")
+    parser.add_argument("--body", help="Issue body text")
+    parser.add_argument("--force-ready", type=str, help="Force draft ready (true/false)")
+    parser.add_argument("--force-rough-issue", type=str, help="Force rough issue (true/false)")
+    parser.add_argument("--dry-run", type=str, help="Dry run mode (true/false)")
+    parser.add_argument("--allow-open-questions", type=str, help="Allow open questions (true/false)")
+    parser.add_argument("--allow-possible-duplicate", type=str, help="Allow possible duplicate (true/false)")
+    parser.add_argument("--include-created", type=str, help="Include created drafts (true/false)")
     parser.add_argument("--root", help="System root path override")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args(argv)
@@ -106,6 +136,28 @@ def main(argv: list[str] | None = None) -> None:
         handler_args["confirm"] = _to_bool(args.confirm)
     if args.reason is not None:
         handler_args["reason"] = args.reason
+    if args.text is not None:
+        handler_args["text"] = args.text
+    if args.project_ref is not None:
+        handler_args["project_ref"] = args.project_ref
+    if args.draft_id is not None:
+        handler_args["draft_id"] = args.draft_id
+    if args.answers is not None:
+        handler_args["answers"] = args.answers
+    if args.body is not None:
+        handler_args["body"] = args.body
+    if args.force_ready is not None:
+        handler_args["force_ready"] = _to_bool(args.force_ready)
+    if args.force_rough_issue is not None:
+        handler_args["force_rough_issue"] = _to_bool(args.force_rough_issue)
+    if args.dry_run is not None:
+        handler_args["dry_run"] = _to_bool(args.dry_run)
+    if args.allow_open_questions is not None:
+        handler_args["allow_open_questions"] = _to_bool(args.allow_open_questions)
+    if args.allow_possible_duplicate is not None:
+        handler_args["allow_possible_duplicate"] = _to_bool(args.allow_possible_duplicate)
+    if args.include_created is not None:
+        handler_args["include_created"] = _to_bool(args.include_created)
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

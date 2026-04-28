@@ -20,7 +20,21 @@ REQUIRED_FILES = [
     "skills/portfolio-heartbeat/SKILL.md",
 ]
 
+MVP3_FILES = [
+    "portfolio_manager/issue_resolver.py",
+    "portfolio_manager/issue_drafts.py",
+    "portfolio_manager/issue_artifacts.py",
+    "portfolio_manager/issue_github.py",
+    "skills/issue-brainstorm/SKILL.md",
+    "skills/issue-create/SKILL.md",
+]
+
 
 def test_all_required_files_exist() -> None:
     missing = [f for f in REQUIRED_FILES if not (ROOT / f).is_file()]
     assert not missing, f"Missing required files: {missing}"
+
+
+def test_mvp3_files_exist() -> None:
+    missing = [f for f in MVP3_FILES if not (ROOT / f).is_file()]
+    assert not missing, f"Missing MVP 3 required files: {missing}"

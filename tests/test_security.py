@@ -133,10 +133,16 @@ class TestNoGithubMutations:
         "gh api --method DELETE",
     ]
 
+    # Files where gh issue create is intentionally allowed (MVP 3)
+    _GH_ISSUE_CREATE_EXEMPT: ClassVar[set[str]] = {"issue_github.py"}
+
     @pytest.mark.parametrize("banned", BANNED_GH)
     def test_banned_gh_command_not_present(self, banned: str) -> None:
         """Verify banned gh command '{banned}' appears nowhere in source."""
         for src_file in SOURCE_FILES:
+            # Skip exempt files for gh issue create (intentionally allowed)
+            if banned == "gh issue create" and src_file.name in self._GH_ISSUE_CREATE_EXEMPT:
+                continue
             content = src_file.read_text()
             assert banned not in content, (
                 f"Banned gh command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
@@ -197,7 +203,6 @@ class TestMvp1ReadOnlyBoundary:
     """Verify no code paths exist for write operations (MVP-2 features)."""
 
     BANNED_FUNCTIONS: ClassVar[list[str]] = [
-        "create_issue",
         "create_pr",
         "merge_pr",
         "create_branch",
@@ -371,3 +376,85 @@ class TestMvp2AdminDoesNotModifyRepositories:
         assert repo_files_before == repo_files_after, (
             f"Admin handler modified repo files: {set(repo_files_after) - set(repo_files_before)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 12 — MVP 3 security hardening
+# ---------------------------------------------------------------------------
+
+# MVP 3 source files for security scanning
+MVP3_FILES = sorted(
+    p
+    for p in SRC_DIR.rglob("*.py")
+    if p.name
+    in {
+        "issue_resolver.py",
+        "issue_drafts.py",
+        "issue_artifacts.py",
+        "issue_github.py",
+    }
+)
+
+# Allowed gh mutation commands in MVP 3 (issue creation only)
+ALLOWED_GH_MUTATIONS: list[str] = [
+    "gh issue create",
+]
+
+
+class TestMvp3NoGitCommands:
+    """MVP 3 modules must not contain git commands."""
+
+    BANNED_GIT: ClassVar[list[str]] = TestNoUnsafeGitCommands.BANNED_GIT
+
+    @pytest.mark.parametrize("banned", BANNED_GIT)
+    def test_no_git_commands_in_mvp3_code(self, banned: str) -> None:
+        """Verify banned git command '{banned}' not in MVP 3 modules."""
+        for src_file in MVP3_FILES:
+            content = src_file.read_text()
+            assert banned not in content, (
+                f"Banned git command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
+
+
+class TestMvp3OnlyAllowsGhIssueCreateMutation:
+    """MVP 3 modules must only use gh issue create for mutation."""
+
+    # All other GH mutation commands are banned
+    BANNED_GH: ClassVar[list[str]] = [cmd for cmd in TestNoGithubMutations.BANNED_GH if cmd not in ALLOWED_GH_MUTATIONS]
+
+    @pytest.mark.parametrize("banned", BANNED_GH)
+    def test_no_banned_gh_mutations_in_mvp3_code(self, banned: str) -> None:
+        """Verify banned gh command '{banned}' not in MVP 3 modules."""
+        for src_file in MVP3_FILES:
+            content = src_file.read_text()
+            assert banned not in content, (
+                f"Banned gh command '{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
+
+
+class TestMvp3SubprocessArgumentArrays:
+    """MVP 3 modules must use argument arrays, not shell strings."""
+
+    def test_issue_github_uses_argument_arrays(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Every subprocess.run call in issue_github.py uses a list, not a string."""
+        calls: list[tuple] = []
+        original_run = subprocess.run
+
+        def tracking_run(*args: object, **kwargs: object) -> object:
+            calls.append((args, kwargs))
+            return original_run(["true"], capture_output=True, text=True)
+
+        monkeypatch.setattr(subprocess, "run", tracking_run)
+
+        import portfolio_manager.issue_github as mod
+
+        importlib.reload(mod)
+
+        mod.check_gh_available()
+        mod.check_gh_auth()
+
+        assert len(calls) >= 1, "Expected at least one subprocess.run call"
+        for call_args, call_kwargs in calls:
+            cmd = call_args[0] if call_args else call_kwargs.get("args", [])
+            assert isinstance(cmd, list), f"Expected list, got {type(cmd).__name__}: {cmd}"
+            assert not call_kwargs.get("shell", False), f"shell=True found in call: {cmd}"

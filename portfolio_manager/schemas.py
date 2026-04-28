@@ -493,6 +493,316 @@ PORTFOLIO_PROJECT_CONFIG_BACKUP_SCHEMA = {
 }
 
 # ---------------------------------------------------------------------------
+# portfolio_project_resolve (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_PROJECT_RESOLVE_SCHEMA = {
+    "name": "portfolio_project_resolve",
+    "description": (
+        "Resolve a project reference (name, ID, or owner/repo) to a project ID. "
+        "Uses deterministic token scoring. Returns resolved, ambiguous, or not_found."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {
+                "type": "string",
+                "description": "Project reference: ID, name, or owner/repo string.",
+            },
+            "text": {
+                "type": "string",
+                "description": "Optional free-form text to help resolve the project.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": [],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_DRAFT_SCHEMA = {
+    "name": "portfolio_issue_draft",
+    "description": (
+        "Create an issue draft from user-supplied text. Resolves the project, "
+        "generates a title, classifies the issue, computes readiness, and writes artifacts."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "Raw user text describing the issue or feature request.",
+            },
+            "project_ref": {
+                "type": "string",
+                "description": "Optional project reference to associate the draft with.",
+            },
+            "title": {
+                "type": "string",
+                "description": "Optional explicit title (auto-generated if omitted).",
+            },
+            "force_rough_issue": {
+                "type": "boolean",
+                "description": "If true, allow creation even with lower readiness. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["text"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_questions (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_QUESTIONS_SCHEMA = {
+    "name": "portfolio_issue_questions",
+    "description": "Read the clarifying questions for an existing issue draft.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "draft_id": {
+                "type": "string",
+                "description": "Draft ID to read questions for.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["draft_id"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_update_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_UPDATE_DRAFT_SCHEMA = {
+    "name": "portfolio_issue_update_draft",
+    "description": (
+        "Update an existing issue draft with answers, project assignment, title change, "
+        "or force readiness. Regenerates spec, questions, and readiness score."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "draft_id": {
+                "type": "string",
+                "description": "Draft ID to update.",
+            },
+            "answers": {
+                "type": "string",
+                "description": "User answers to clarifying questions.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Assign or reassign the draft to a project.",
+            },
+            "title": {
+                "type": "string",
+                "description": "New title for the draft.",
+            },
+            "force_ready": {
+                "type": "boolean",
+                "description": "Force the draft into ready_for_creation state. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["draft_id"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_create (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_CREATE_SCHEMA = {
+    "name": "portfolio_issue_create",
+    "description": (
+        "Create a GitHub issue directly from text. Creates a local draft first, "
+        "then creates the GitHub issue from that draft."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_id": {
+                "type": "string",
+                "description": "Project ID to create the issue in.",
+            },
+            "title": {
+                "type": "string",
+                "description": "Issue title.",
+            },
+            "body": {
+                "type": "string",
+                "description": "Issue body text.",
+            },
+            "confirm": {
+                "type": "boolean",
+                "description": "Must be true to actually create the issue. Defaults to false.",
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, preview without creating. Defaults to false.",
+            },
+            "allow_possible_duplicate": {
+                "type": "boolean",
+                "description": "If true, allow creation even if a duplicate GitHub issue exists. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["project_id", "title", "body"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_create_from_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_CREATE_FROM_DRAFT_SCHEMA = {
+    "name": "portfolio_issue_create_from_draft",
+    "description": ("Create a GitHub issue from an existing draft. Requires confirm=true unless dry_run."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "draft_id": {
+                "type": "string",
+                "description": "Draft ID to create the issue from.",
+            },
+            "confirm": {
+                "type": "boolean",
+                "description": "Must be true to actually create the issue. Defaults to false.",
+            },
+            "allow_open_questions": {
+                "type": "boolean",
+                "description": "If true, allow creation even with open questions. Defaults to false.",
+            },
+            "allow_possible_duplicate": {
+                "type": "boolean",
+                "description": "If true, skip duplicate GitHub issue check. Defaults to false.",
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, preview without creating. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["draft_id"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_explain_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_EXPLAIN_DRAFT_SCHEMA = {
+    "name": "portfolio_issue_explain_draft",
+    "description": "Explain the current state and content of an issue draft. Read-only.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "draft_id": {
+                "type": "string",
+                "description": "Draft ID to explain.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["draft_id"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_list_drafts (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA = {
+    "name": "portfolio_issue_list_drafts",
+    "description": "List issue drafts, optionally filtered by project and state.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID to filter drafts.",
+            },
+            "state": {
+                "type": "string",
+                "description": "Optional state filter.",
+                "enum": [
+                    "draft",
+                    "needs_project_confirmation",
+                    "needs_user_questions",
+                    "ready_for_creation",
+                    "creating",
+                    "creating_failed",
+                    "created",
+                    "discarded",
+                    "blocked",
+                ],
+            },
+            "include_created": {
+                "type": "boolean",
+                "description": "Whether to include drafts already created as GitHub issues. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": [],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# portfolio_issue_discard_draft (MVP 3)
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA = {
+    "name": "portfolio_issue_discard_draft",
+    "description": "Discard an issue draft. Requires confirm=true.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "draft_id": {
+                "type": "string",
+                "description": "Draft ID to discard.",
+            },
+            "confirm": {
+                "type": "boolean",
+                "description": "Must be true to confirm discard.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["draft_id", "confirm"],
+    },
+}
+
+# ---------------------------------------------------------------------------
 # All schemas in order
 # ---------------------------------------------------------------------------
 
@@ -516,4 +826,14 @@ ALL_SCHEMAS = [
     PORTFOLIO_PROJECT_REMOVE_SCHEMA,
     PORTFOLIO_PROJECT_EXPLAIN_SCHEMA,
     PORTFOLIO_PROJECT_CONFIG_BACKUP_SCHEMA,
+    # MVP 3
+    PORTFOLIO_PROJECT_RESOLVE_SCHEMA,
+    PORTFOLIO_ISSUE_DRAFT_SCHEMA,
+    PORTFOLIO_ISSUE_QUESTIONS_SCHEMA,
+    PORTFOLIO_ISSUE_UPDATE_DRAFT_SCHEMA,
+    PORTFOLIO_ISSUE_CREATE_SCHEMA,
+    PORTFOLIO_ISSUE_CREATE_FROM_DRAFT_SCHEMA,
+    PORTFOLIO_ISSUE_EXPLAIN_DRAFT_SCHEMA,
+    PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA,
+    PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA,
 ]

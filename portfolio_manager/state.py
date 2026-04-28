@@ -121,6 +121,22 @@ CREATE INDEX IF NOT EXISTS idx_prs_project_state ON pull_requests(project_id, st
 CREATE INDEX IF NOT EXISTS idx_worktrees_project_state ON worktrees(project_id, state);
 CREATE INDEX IF NOT EXISTS idx_events_heartbeat ON heartbeat_events(heartbeat_id);
 CREATE INDEX IF NOT EXISTS idx_locks_expires_at ON locks(expires_at);
+
+CREATE TABLE IF NOT EXISTS issue_drafts (
+  draft_id TEXT PRIMARY KEY,
+  project_id TEXT,
+  state TEXT NOT NULL,
+  title TEXT,
+  readiness REAL,
+  artifact_path TEXT NOT NULL,
+  github_issue_number INTEGER,
+  github_issue_url TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_drafts_project_state ON issue_drafts(project_id, state);
 """
 
 # ---------------------------------------------------------------------------
@@ -130,6 +146,31 @@ CREATE INDEX IF NOT EXISTS idx_locks_expires_at ON locks(expires_at);
 
 def _utcnow() -> str:
     return datetime.now(UTC).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Draft state validation
+# ---------------------------------------------------------------------------
+
+VALID_DRAFT_STATES = frozenset(
+    {
+        "draft",
+        "needs_project_confirmation",
+        "needs_user_questions",
+        "ready_for_creation",
+        "creating",
+        "creating_failed",
+        "created",
+        "discarded",
+        "blocked",
+    }
+)
+
+
+def validate_draft_state(state: str) -> None:
+    """Raise ValueError if *state* is not a recognised draft state."""
+    if state not in VALID_DRAFT_STATES:
+        raise ValueError(f"Invalid draft state: {state!r}. Valid: {sorted(VALID_DRAFT_STATES)}")
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +471,81 @@ def acquire_lock(conn: sqlite3.Connection, name: str, owner: str, ttl_seconds: i
         return LockResult(acquired=True)
 
     return LockResult(acquired=False, reason="lock contention on expiry")
+
+
+# ---------------------------------------------------------------------------
+# Issue drafts CRUD
+# ---------------------------------------------------------------------------
+
+
+def upsert_issue_draft(conn: sqlite3.Connection, draft: dict[str, Any]) -> None:
+    """Insert or update an issue draft row."""
+    validate_draft_state(draft["state"])
+    readiness = draft.get("readiness")
+    if readiness is not None and not (0.0 <= readiness <= 1.0):
+        raise ValueError(f"readiness must be between 0 and 1, got {readiness}")
+    now = _utcnow()
+    conn.execute(
+        """INSERT INTO issue_drafts
+           (draft_id, project_id, state, title, readiness, artifact_path,
+            github_issue_number, github_issue_url, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(draft_id) DO UPDATE SET
+             project_id=excluded.project_id,
+             state=excluded.state,
+             title=excluded.title,
+             readiness=excluded.readiness,
+             artifact_path=excluded.artifact_path,
+             github_issue_number=excluded.github_issue_number,
+             github_issue_url=excluded.github_issue_url,
+             updated_at=excluded.updated_at""",
+        (
+            draft["draft_id"],
+            draft.get("project_id"),
+            draft["state"],
+            draft.get("title"),
+            readiness,
+            draft["artifact_path"],
+            draft.get("github_issue_number"),
+            draft.get("github_issue_url"),
+            draft.get("created_at", now),
+            now,
+        ),
+    )
+    conn.commit()
+
+
+def get_issue_draft(conn: sqlite3.Connection, draft_id: str) -> dict[str, Any] | None:
+    """Return a single draft as a dict, or None if not found."""
+    row = conn.execute("SELECT * FROM issue_drafts WHERE draft_id=?", (draft_id,)).fetchone()
+    if row is None:
+        return None
+    cols = [d[1] for d in conn.execute("PRAGMA table_info('issue_drafts')").fetchall()]
+    return dict(zip(cols, row, strict=False))
+
+
+def list_issue_drafts(
+    conn: sqlite3.Connection,
+    project_id: str | None = None,
+    state: str | None = None,
+    include_created: bool = False,
+) -> list[dict[str, Any]]:
+    """Return drafts matching the given filters, newest-updated first."""
+    conditions: list[str] = []
+    params: list[Any] = []
+    if project_id is not None:
+        conditions.append("project_id = ?")
+        params.append(project_id)
+    if state is not None:
+        conditions.append("state = ?")
+        params.append(state)
+    if not include_created and state is None:
+        conditions.append("state != 'created'")
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+    query = f"SELECT * FROM issue_drafts WHERE {where_clause} ORDER BY updated_at DESC"  # nosec B608
+    rows = conn.execute(query, params).fetchall()
+    cols = [d[1] for d in conn.execute("PRAGMA table_info('issue_drafts')").fetchall()]
+    return [dict(zip(cols, row, strict=False)) for row in rows]
 
 
 def release_lock(conn: sqlite3.Connection, name: str, owner: str) -> ReleaseResult:
