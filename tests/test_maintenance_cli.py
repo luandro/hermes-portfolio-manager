@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+import sys
+from pathlib import Path
+
+# dev_cli.py lives in the project root, not in a package — add it to sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import portfolio_manager.skills.builtin  # noqa: F401 — triggers self-registration
 from dev_cli import TOOL_HANDLERS
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 MAINTENANCE_COMMANDS = [
     "maintenance-skill-list",

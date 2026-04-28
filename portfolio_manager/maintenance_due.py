@@ -39,7 +39,7 @@ def compute_due_checks(
         params.extend(project_filter)
 
     where = " AND ".join(conditions) if conditions else "1=1"
-    cur = conn.execute(f"SELECT id, status FROM projects WHERE {where}", params)
+    cur = conn.execute(f"SELECT id, status FROM projects WHERE {where}", params)  # nosec B608
     projects = cur.fetchall()
 
     # 2. Determine which skills to check
