@@ -48,8 +48,23 @@ def backup_dir(root: Path) -> Path:
     return root / "backups" / "maintenance"
 
 
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge override into base. Returns new dict."""
+    merged = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
 def load_config(root: Path) -> dict[str, Any]:
-    """Load maintenance config. Returns defaults if file doesn't exist."""
+    """Load maintenance config. Returns defaults if file doesn't exist.
+
+    User YAML is deep-merged on top of DEFAULT_CONFIG so partial overrides
+    (e.g. a single skill interval) don't silently drop other default skills.
+    """
     cp = config_path(root)
     if cp.is_file():
         with open(cp) as f:
@@ -57,7 +72,7 @@ def load_config(root: Path) -> dict[str, Any]:
         if data is None:
             return copy.deepcopy(DEFAULT_CONFIG)
         if isinstance(data, dict):
-            return data
+            return _deep_merge(DEFAULT_CONFIG, data)
         raise ValueError(f"maintenance.yaml must be a YAML mapping, got {type(data).__name__}")
     return copy.deepcopy(DEFAULT_CONFIG)
 

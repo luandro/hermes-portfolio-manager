@@ -316,26 +316,32 @@ remote_base = os.path.expanduser(sys.argv[1])
 remote_config = os.path.join(remote_base, "config.yaml")
 temp_file = sys.argv[2]
 
-# Load existing remote config
-existing = {}
-if os.path.isfile(remote_config):
-    with open(remote_config) as f:
-        existing = yaml.safe_load(f) or {}
+try:
+    os.chmod(temp_file, 0o600)
 
-# Load incoming sections
-with open(temp_file) as f:
-    incoming = yaml.safe_load(f) or {}
+    # Load existing remote config
+    existing = {}
+    if os.path.isfile(remote_config):
+        with open(remote_config) as f:
+            existing = yaml.safe_load(f) or {}
 
-# Merge (incoming overwrites existing keys)
-existing.update(incoming)
+    # Load incoming sections
+    with open(temp_file) as f:
+        incoming = yaml.safe_load(f) or {}
 
-# Write back
-with open(remote_config, "w") as f:
-    yaml.dump(existing, f, default_flow_style=False)
+    # Merge (incoming overwrites existing keys)
+    existing.update(incoming)
 
-# Cleanup temp
-os.remove(temp_file)
-print("Config merged successfully.")
+    # Write back
+    with open(remote_config, "w") as f:
+        yaml.dump(existing, f, default_flow_style=False)
+
+    print("Config merged successfully.")
+finally:
+    try:
+        os.remove(temp_file)
+    except OSError:
+        pass
 PYEOF
 
     ok "Config synced and merged."

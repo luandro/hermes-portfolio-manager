@@ -134,6 +134,16 @@ def run_maintenance(
 
     recover_stale_runs(conn)
 
+    # Step 2b: Repair draft references from crash recovery
+    from portfolio_manager.maintenance_drafts import repair_draft_references
+
+    try:
+        repairs = repair_draft_references(root, conn)
+        if repairs:
+            logger.info("Repaired %d draft reference(s) from crash recovery", repairs)
+    except Exception as exc:
+        logger.warning("Draft repair failed (non-fatal): %s", exc)
+
     # Step 3: Optional GitHub refresh
     warnings: list[str] = []
     refresh_github = config.get("refresh_github", False)
