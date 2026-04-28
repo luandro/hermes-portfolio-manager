@@ -198,7 +198,7 @@ class TestCreateMaintenanceDrafts:
             should_create=True,
         )
 
-        with patch("portfolio_manager.issue_drafts.create_issue_draft") as mock_create:
+        with patch("portfolio_manager.maintenance_drafts.create_issue_draft") as mock_create:
             mock_create.return_value = {
                 "draft_id": "draft-abc",
                 "project_id": "proj-1",
@@ -243,7 +243,7 @@ class TestCreateMaintenanceDrafts:
             }
 
         with patch(
-            "portfolio_manager.issue_drafts.create_issue_draft",
+            "portfolio_manager.maintenance_drafts.create_issue_draft",
             side_effect=_capture_create,
         ):
             create_maintenance_drafts(tmp_path, conn, [plan], config)
@@ -289,7 +289,7 @@ class TestCreateMaintenanceDrafts:
             }
 
         with patch(
-            "portfolio_manager.issue_drafts.create_issue_draft",
+            "portfolio_manager.maintenance_drafts.create_issue_draft",
             side_effect=_capture_create,
         ):
             create_maintenance_drafts(tmp_path, conn, [plan], config)
@@ -319,7 +319,7 @@ class TestCreateMaintenanceDrafts:
             should_create=True,
         )
 
-        with patch("portfolio_manager.issue_drafts.create_issue_draft") as mock_create:
+        with patch("portfolio_manager.maintenance_drafts.create_issue_draft") as mock_create:
             mock_create.return_value = {
                 "blocked": True,
                 "reason": "duplicate",
@@ -359,7 +359,7 @@ class TestCreateMaintenanceDrafts:
             should_create=True,
         )
 
-        with patch("portfolio_manager.issue_drafts.create_issue_draft") as mock_create:
+        with patch("portfolio_manager.maintenance_drafts.create_issue_draft") as mock_create:
             mock_create.return_value = {
                 "draft_id": "draft-new-456",
                 "project_id": "proj-1",
@@ -416,7 +416,7 @@ class TestCreateMaintenanceDrafts:
             should_create=True,
         )
 
-        with patch("portfolio_manager.issue_drafts.create_issue_draft") as mock_create:
+        with patch("portfolio_manager.maintenance_drafts.create_issue_draft") as mock_create:
             mock_create.return_value = {
                 "draft_id": "draft-artifact-789",
                 "project_id": "proj-1",

@@ -87,9 +87,9 @@ ensure_config_dir() {
 
 load_config() {
     if [[ -f "${CONFIG_FILE}" ]]; then
-        CONFIG_USERNAME=$(python3 -c "import json; d=json.load(open('${CONFIG_FILE}')); print(d.get('username',''))")
-        CONFIG_HOST=$(python3 -c "import json; d=json.load(open('${CONFIG_FILE}')); print(d.get('host',''))")
-        CONFIG_REMOTE_BASE=$(python3 -c "import json; d=json.load(open('${CONFIG_FILE}')); print(d.get('remote_base','${REMOTE_BASE_DEFAULT}'))")
+        CONFIG_USERNAME=$(CONFIG_FILE="${CONFIG_FILE}" python3 -c 'import json, os; d=json.load(open(os.environ["CONFIG_FILE"])); print(d.get("username",""))')
+        CONFIG_HOST=$(CONFIG_FILE="${CONFIG_FILE}" python3 -c 'import json, os; d=json.load(open(os.environ["CONFIG_FILE"])); print(d.get("host",""))')
+        CONFIG_REMOTE_BASE=$(CONFIG_FILE="${CONFIG_FILE}" REMOTE_BASE_DEFAULT="${REMOTE_BASE_DEFAULT}" python3 -c 'import json, os; d=json.load(open(os.environ["CONFIG_FILE"])); print(d.get("remote_base",os.environ.get("REMOTE_BASE_DEFAULT","~/.hermes")))')
     else
         CONFIG_USERNAME=""
         CONFIG_HOST=""
@@ -99,14 +99,15 @@ load_config() {
 
 save_config() {
     ensure_config_dir
-    python3 -c "
-import json, pathlib
-pathlib.Path('${CONFIG_FILE}').write_text(json.dumps({
-    'username': '${SAVE_USER}',
-    'host': '${SAVE_HOST}',
-    'remote_base': '${SAVE_REMOTE_BASE}'
-}, indent=2) + '\n')
-"
+    CONFIG_FILE="${CONFIG_FILE}" SAVE_USER="${SAVE_USER}" SAVE_HOST="${SAVE_HOST}" SAVE_REMOTE_BASE="${SAVE_REMOTE_BASE}" \
+    python3 - <<'PY'
+import json, os, pathlib
+pathlib.Path(os.environ["CONFIG_FILE"]).write_text(json.dumps({
+    "username": os.environ["SAVE_USER"],
+    "host": os.environ["SAVE_HOST"],
+    "remote_base": os.environ["SAVE_REMOTE_BASE"],
+}, indent=2) + "\n")
+PY
     ok "Config saved to ${CONFIG_FILE}"
 }
 
@@ -245,15 +246,15 @@ sync_config_selective() {
 
     # Extract section names
     local sections
-    sections=$(python3 -c "
-import yaml, sys
-with open('${local_config}') as f:
+    sections=$(LOCAL_CONFIG="${local_config}" python3 -c '
+import yaml, sys, os
+with open(os.environ["LOCAL_CONFIG"]) as f:
     data = yaml.safe_load(f)
 if not isinstance(data, dict):
     sys.exit(1)
 for i, key in enumerate(data.keys(), 1):
-    print(f'{i}) {key}')
-")
+    print(f"{i}) {key}")
+')
     if [[ -z "${sections}" ]]; then
         warn "No sections found in config.yaml."
         return
@@ -271,13 +272,13 @@ for i, key in enumerate(data.keys(), 1):
         cp "${local_config}" "${temp_local}"
     else
         # Build yaml with only selected sections
-        python3 -c "
-import yaml, sys
-with open('${local_config}') as f:
+        LOCAL_CONFIG="${local_config}" SELECTION="${selection}" TEMP_LOCAL="${temp_local}" python3 -c '
+import yaml, sys, os
+with open(os.environ["LOCAL_CONFIG"]) as f:
     data = yaml.safe_load(f)
 keys = list(data.keys())
 selected = []
-for part in '${selection}'.split():
+for part in os.environ["SELECTION"].split():
     try:
         idx = int(part) - 1
         if 0 <= idx < len(keys):
@@ -285,22 +286,22 @@ for part in '${selection}'.split():
     except ValueError:
         pass
 subset = {k: data[k] for k in selected if k in data}
-with open('${temp_local}', 'w') as f:
+with open(os.environ["TEMP_LOCAL"], "w") as f:
     yaml.dump(subset, f, default_flow_style=False)
-"
+'
     fi
 
     info "Merging selected config sections on remote..."
     if [[ "${OPT_DRY_RUN}" == true ]]; then
         info "[dry-run] Would merge config sections to ${REMOTE_BASE}/config.yaml"
         info "Selected sections:"
-        python3 -c "
-import yaml
-with open('${temp_local}') as f:
+        TEMP_LOCAL="${temp_local}" python3 -c '
+import yaml, os
+with open(os.environ["TEMP_LOCAL"]) as f:
     data = yaml.safe_load(f)
 for k in (data or {}):
-    print(f'  - {k}')
-"
+    print(f"  - {k}")
+'
         return
     fi
 
@@ -377,7 +378,7 @@ main() {
     resolve_config
 
     # Save config on first use or when flags override
-    if [[ ! -f "${CONFIG_FILE}" ]] || [[ -n "${OPT_USER}" ]] || [[ -n "${OPT_HOST}" ]]; then
+    if [[ "${OPT_DRY_RUN}" != true ]] && { [[ ! -f "${CONFIG_FILE}" ]] || [[ -n "${OPT_USER}" ]] || [[ -n "${OPT_HOST}" ]]; }; then
         save_config
     fi
 

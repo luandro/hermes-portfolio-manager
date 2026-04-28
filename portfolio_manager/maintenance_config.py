@@ -14,36 +14,25 @@ if TYPE_CHECKING:
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "skills": {
-        "untriaged_issue_digest": {
+        "health_check": {
             "enabled": True,
             "interval_hours": 24,
-            "min_age_hours": 24,
-            "max_findings": 20,
-            "create_issue_drafts": False,
         },
-        "stale_issue_digest": {
+        "dependency_audit": {
             "enabled": True,
             "interval_hours": 168,
-            "stale_after_days": 30,
-            "max_findings": 20,
-            "create_issue_drafts": False,
         },
-        "open_pr_health": {
-            "enabled": True,
-            "interval_hours": 12,
-            "stale_after_days": 7,
-            "include_review_pending": True,
-            "include_checks_failed": True,
-            "include_changes_requested": True,
-            "max_findings": 20,
-            "create_issue_drafts": False,
-        },
-        "repo_guidance_docs": {
+        "license_compliance": {
             "enabled": True,
             "interval_hours": 168,
-            "doc_paths": ["CONTRIBUTING.md", "DEVELOPMENT.md", "ARCHITECTURE.md", "DESIGN.md"],
-            "max_findings": 20,
-            "create_issue_drafts": False,
+        },
+        "security_advisory": {
+            "enabled": True,
+            "interval_hours": 24,
+        },
+        "stale_branches": {
+            "enabled": True,
+            "interval_hours": 168,
         },
     },
 }
@@ -65,8 +54,11 @@ def load_config(root: Path) -> dict[str, Any]:
     if cp.is_file():
         with open(cp) as f:
             data: dict[str, Any] = yaml.safe_load(f)
-        if data and isinstance(data, dict):
+        if data is None:
+            return copy.deepcopy(DEFAULT_CONFIG)
+        if isinstance(data, dict):
             return data
+        raise ValueError(f"maintenance.yaml must be a YAML mapping, got {type(data).__name__}")
     return copy.deepcopy(DEFAULT_CONFIG)
 
 
@@ -77,7 +69,7 @@ def _atomic_backup(root: Path) -> Path | None:
         return None
     bd = backup_dir(root)
     bd.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     dest = bd / f"maintenance-{ts}.yaml"
     shutil.copy2(cp, dest)
     return dest

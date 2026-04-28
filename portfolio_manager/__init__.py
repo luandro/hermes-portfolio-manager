@@ -165,6 +165,7 @@ _SKILL_DESCRIPTIONS: dict[str, str] = {
     "project-admin": "Administer portfolio projects — add, update, pause, resume, archive, remove, set priority, explain, manage auto-merge, create config backups.",
     "issue-brainstorm": "Brainstorm and refine an issue draft from a rough description.",
     "issue-create": "Create a GitHub issue from a refined draft (with confirmation).",
+    "portfolio-maintenance": "Run safe maintenance checks and generate reports.",
 }
 
 

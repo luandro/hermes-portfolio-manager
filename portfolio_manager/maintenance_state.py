@@ -95,7 +95,7 @@ def recover_stale_runs(
 ) -> list[str]:
     """Mark stale 'running' runs as 'failed'. Returns recovered run_ids."""
     cutoff_dt = datetime.now(UTC) - timedelta(hours=max_age_hours)
-    cutoff_str = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%S")
+    cutoff_str = cutoff_dt.isoformat()
     cur = conn.execute(
         "SELECT run_id FROM maintenance_runs WHERE status='running' AND started_at < ?",
         (cutoff_str,),

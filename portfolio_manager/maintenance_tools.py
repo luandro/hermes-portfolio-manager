@@ -35,6 +35,17 @@ def _parse_csv_filter(value: str | None) -> list[str] | None:
     return [s.strip() for s in value.split(",") if s.strip()] or None
 
 
+def _parse_bool(value: Any, default: bool = False) -> bool:
+    """Parse boolean-like CLI inputs."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "y", "on"}
+    return bool(value)
+
+
 def _ensure_dirs(root: Any) -> None:
     """Create state/, artifacts/ dirs if missing."""
     from pathlib import Path
@@ -142,7 +153,10 @@ def _handle_portfolio_maintenance_skill_enable(args: dict[str, Any], **kwargs: A
 
     interval_hours = args.get("interval_hours")
     if interval_hours is not None:
-        interval_hours = int(interval_hours)
+        try:
+            interval_hours = int(interval_hours)
+        except (TypeError, ValueError):
+            return _blocked(tool, "interval_hours must be an integer >= 1")
         if interval_hours < 1:
             return _blocked(tool, "interval_hours must be >= 1")
 
@@ -273,12 +287,10 @@ def _handle_portfolio_maintenance_run(args: dict[str, Any], **kwargs: Any) -> st
         config = load_config(root)
 
         # Apply runtime overrides
-        dry_run = args.get("dry_run", True)
-        if isinstance(dry_run, str):
-            dry_run = dry_run.strip().lower() in ("true", "1", "yes")
+        dry_run = _parse_bool(args.get("dry_run"), default=False)
 
-        config["refresh_github"] = args.get("refresh_github", False)
-        config["create_issue_drafts"] = args.get("create_issue_drafts", False)
+        config["refresh_github"] = _parse_bool(args.get("refresh_github"), default=False)
+        config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
 
         project_filter = _parse_csv_filter(args.get("project_filter"))
         skill_filter = _parse_csv_filter(args.get("skill_filter"))
@@ -361,11 +373,9 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
         project_id = resolution.project_id or ""
 
         config = load_config(root)
-        dry_run = args.get("dry_run", True)
-        if isinstance(dry_run, str):
-            dry_run = dry_run.strip().lower() in ("true", "1", "yes")
+        dry_run = _parse_bool(args.get("dry_run"), default=False)
 
-        config["create_issue_drafts"] = args.get("create_issue_drafts", False)
+        config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
 
         result = run_maintenance(
             root,

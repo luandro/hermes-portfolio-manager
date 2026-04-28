@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -94,5 +95,7 @@ def make_finding_fingerprint(
     key: str,
 ) -> str:
     """Produce a stable SHA-256 fingerprint for deduplication."""
-    raw = f"{skill_id}|{project_id}|{source_type}|{source_id or ''}|{key}"
+    raw = json.dumps(
+        [skill_id, project_id, source_type, source_id or "", key], separators=(",", ":"), ensure_ascii=False
+    )
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

@@ -212,9 +212,9 @@ class TestRealRunOrchestration:
 
         # Check artifact dir was created
         artifact_dir = root / "artifacts" / "maintenance"
-        if artifact_dir.exists():
-            report_files = list(artifact_dir.rglob("report.md"))
-            assert len(report_files) >= 1
+        assert artifact_dir.exists(), f"Expected artifact dir to exist at {artifact_dir}"
+        report_files = list(artifact_dir.rglob("report.md"))
+        assert len(report_files) >= 1
 
     def test_real_run_continues_after_one_skill_failure(
         self,

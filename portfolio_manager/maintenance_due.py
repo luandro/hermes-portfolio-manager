@@ -34,6 +34,8 @@ def compute_due_checks(
     if not include_archived:
         conditions.append("status != 'archived'")
     if project_filter is not None:
+        if not project_filter:
+            return []
         placeholders = ",".join("?" for _ in project_filter)
         conditions.append(f"id IN ({placeholders})")
         params.extend(project_filter)

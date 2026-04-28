@@ -29,7 +29,9 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
     findings: list[MaintenanceFinding] = []
 
     try:
-        cur = ctx.conn.execute("SELECT id, status FROM projects WHERE status NOT IN ('active', 'paused')")
+        cur = ctx.conn.execute(
+            "SELECT id, status FROM projects WHERE id=? AND status NOT IN ('active', 'paused')", (ctx.project.id,)
+        )
         rows = cur.fetchall()
     except Exception:
         rows = []

@@ -31,7 +31,7 @@ class TestLoadConfig:
     def test_returns_defaults_when_no_file(self, root: Path) -> None:
         cfg = load_config(root)
         assert "skills" in cfg
-        assert "untriaged_issue_digest" in cfg["skills"]
+        assert "health_check" in cfg["skills"]
 
     def test_loads_existing_file(self, root: Path) -> None:
         cp = config_path(root)
@@ -70,15 +70,15 @@ class TestSaveConfig:
 
 class TestGetSkillConfig:
     def test_returns_defaults_for_known_skill(self, root: Path) -> None:
-        cfg = get_skill_config(root, "untriaged_issue_digest")
+        cfg = get_skill_config(root, "health_check")
         assert cfg["enabled"] is True
         assert cfg["interval_hours"] == 24
 
     def test_merges_overrides(self, root: Path) -> None:
         # Save custom config with override
-        custom = {"skills": {"untriaged_issue_digest": {"interval_hours": 48}}}
+        custom = {"skills": {"health_check": {"interval_hours": 48}}}
         save_config(root, custom)
-        cfg = get_skill_config(root, "untriaged_issue_digest")
+        cfg = get_skill_config(root, "health_check")
         assert cfg["interval_hours"] == 48
         assert cfg["enabled"] is True  # from defaults
 
@@ -89,22 +89,22 @@ class TestGetSkillConfig:
 
 class TestEnableDisableSkill:
     def test_enable_skill(self, root: Path) -> None:
-        cfg = enable_skill(root, "untriaged_issue_digest")
-        assert cfg["skills"]["untriaged_issue_digest"]["enabled"] is True
+        cfg = enable_skill(root, "health_check")
+        assert cfg["skills"]["health_check"]["enabled"] is True
         # Verify persisted
         loaded = load_config(root)
-        assert loaded["skills"]["untriaged_issue_digest"]["enabled"] is True
+        assert loaded["skills"]["health_check"]["enabled"] is True
 
     def test_enable_skill_with_interval(self, root: Path) -> None:
-        cfg = enable_skill(root, "untriaged_issue_digest", interval_hours=48)
-        assert cfg["skills"]["untriaged_issue_digest"]["interval_hours"] == 48
+        cfg = enable_skill(root, "health_check", interval_hours=48)
+        assert cfg["skills"]["health_check"]["interval_hours"] == 48
 
     def test_disable_skill(self, root: Path) -> None:
-        cfg = disable_skill(root, "untriaged_issue_digest")
-        assert cfg["skills"]["untriaged_issue_digest"]["enabled"] is False
+        cfg = disable_skill(root, "health_check")
+        assert cfg["skills"]["health_check"]["enabled"] is False
         # Verify persisted
         loaded = load_config(root)
-        assert loaded["skills"]["untriaged_issue_digest"]["enabled"] is False
+        assert loaded["skills"]["health_check"]["enabled"] is False
 
     def test_enable_new_skill(self, root: Path) -> None:
         cfg = enable_skill(root, "custom_skill")

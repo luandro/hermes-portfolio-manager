@@ -32,9 +32,9 @@ def get_artifact_dir(root: Path, run_id: str) -> Path:
         raise ValueError("Invalid run_id: null byte detected")
     if not _RUN_ID_RE.match(run_id):
         raise ValueError(f"Invalid run_id: {run_id!r}")
-    result = (root / _ARTIFACT_BASE / run_id).resolve()
-    root_resolved = root.resolve()
-    if not result.is_relative_to(root_resolved):
+    artifact_base_resolved = (root / _ARTIFACT_BASE).resolve()
+    result = (artifact_base_resolved / run_id).resolve()
+    if not result.is_relative_to(artifact_base_resolved):
         raise ValueError(f"Path traversal detected for run_id: {run_id!r}")
     return result
 
@@ -65,11 +65,11 @@ def write_artifact(root: Path, run_id: str, filename: str, content: str) -> Path
     """
     d = ensure_artifact_dir(root, run_id)
     # Reject suspicious filenames
-    if "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
+    if not filename or "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
         raise ValueError(f"Invalid filename: {filename!r}")
     target = d / filename
     if not target.resolve().is_relative_to(d.resolve()):
         raise ValueError(f"Path traversal detected in filename: {filename!r}")
     safe_content = redact_secrets(content)
-    target.write_text(safe_content)
+    target.write_text(safe_content, encoding="utf-8")
     return target

@@ -45,7 +45,7 @@ MVP4_FILES = [
     "portfolio_manager/maintenance_registry.py",
     "portfolio_manager/maintenance_config.py",
     "portfolio_manager/maintenance_state.py",
-    "portfolio_manager/maintenance_builtin.py",
+    "portfolio_manager/skills/builtin/__init__.py",
 ]
 
 MAINTENANCE_TOOLS = [

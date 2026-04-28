@@ -44,7 +44,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
             project_id=ctx.project.id,
             source_type="dependency",
             source_id=f"{name}@{version}",
-            key=severity,
+            key=f"{name}@{version}",
         )
         findings.append(
             MaintenanceFinding(

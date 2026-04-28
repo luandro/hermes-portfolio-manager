@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -371,7 +372,7 @@ class TestMakeFindingFingerprint:
         assert fp_none != fp_real
 
     def test_matches_manual_sha256(self) -> None:
-        raw = "skill|proj|commit|abc|key"
+        raw = json.dumps(["skill", "proj", "commit", "abc", "key"], separators=(",", ":"), ensure_ascii=False)
         expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
         actual = make_finding_fingerprint("skill", "proj", "commit", "abc", "key")
         assert actual == expected
@@ -379,17 +380,14 @@ class TestMakeFindingFingerprint:
     def test_empty_strings(self) -> None:
         fp = make_finding_fingerprint("", "", "", "", "")
         assert len(fp) == 16
-        # Empty strings produce "||||" (4 delimiters between 5 empty segments)
-        raw = "||||"
+        # JSON encoding of empty strings
+        raw = '["","","","",""]'
         expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
         assert fp == expected
 
-    def test_pipe_in_value_is_delimiter_ambiguous(self) -> None:
-        """Values containing | are ambiguous with the pipe delimiter.
-
-        This is a known limitation of the simple delimiter-based approach.
-        """
+    def test_pipe_in_value_no_collision(self) -> None:
+        """Values containing | must not collide with different field splits."""
         fp1 = make_finding_fingerprint("a|b", "c", "d", "e", "f")
         fp2 = make_finding_fingerprint("a", "b|c", "d", "e", "f")
-        # These produce the same raw string, so same fingerprint
-        assert fp1 == fp2
+        # JSON encoding prevents collision
+        assert fp1 != fp2

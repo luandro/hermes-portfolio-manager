@@ -44,7 +44,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
             project_id=ctx.project.id,
             source_type="cve",
             source_id=cve_id,
-            key=severity,
+            key=cve_id,
         )
         findings.append(
             MaintenanceFinding(

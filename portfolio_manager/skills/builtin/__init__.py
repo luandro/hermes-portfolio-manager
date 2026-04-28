@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 
 def register_all() -> None:
     """Import all built-in skill modules so they self-register with REGISTRY."""
@@ -14,4 +16,5 @@ def register_all() -> None:
     )
 
 
-register_all()
+with contextlib.suppress(ValueError):
+    register_all()

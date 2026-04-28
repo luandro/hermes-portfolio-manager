@@ -138,6 +138,54 @@ CREATE TABLE IF NOT EXISTS issue_drafts (
 
 CREATE INDEX IF NOT EXISTS idx_issue_drafts_project_state ON issue_drafts(project_id, state);
 
+CREATE TABLE IF NOT EXISTS dependency_issues (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'medium',
+  summary TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dependency_issues_project ON dependency_issues(project_id);
+
+CREATE TABLE IF NOT EXISTS dependency_licenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  license TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dependency_licenses_project ON dependency_licenses(project_id);
+
+CREATE TABLE IF NOT EXISTS security_advisories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  cve_id TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'medium',
+  summary TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_security_advisories_project ON security_advisories(project_id);
+
+CREATE TABLE IF NOT EXISTS stale_branches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  branch_name TEXT NOT NULL,
+  last_activity TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stale_branches_project ON stale_branches(project_id);
+
 CREATE TABLE IF NOT EXISTS maintenance_runs (
   run_id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,

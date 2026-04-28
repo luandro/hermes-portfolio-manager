@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
-import tempfile
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING, Any
 
 from portfolio_manager.config import GithubRef, LocalPaths, ProjectConfig
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _build_project_config(conn: sqlite3.Connection, project_id: str) -> ProjectConfig | None:
+def _build_project_config(root: Path, conn: sqlite3.Connection, project_id: str) -> ProjectConfig | None:
     """Build a ProjectConfig from the projects table row."""
     cur = conn.execute(
         "SELECT id, name, repo_url, priority, status, default_branch FROM projects WHERE id=?", (project_id,)
@@ -52,11 +52,13 @@ def _build_project_config(conn: sqlite3.Connection, project_id: str) -> ProjectC
         priority=priority,
         status=status,
         default_branch=default_branch or "main",
-        local=LocalPaths(base_path=Path(tempfile.gettempdir()), issue_worktree_pattern=""),
+        local=LocalPaths(base_path=root / "worktrees" / pid, issue_worktree_pattern=""),
     )
 
 
-def _refresh_github_data(root: Path, conn: sqlite3.Connection, config: dict[str, Any]) -> None:
+def _refresh_github_data(
+    root: Path, conn: sqlite3.Connection, config: dict[str, Any], project_filter: list[str] | None = None
+) -> None:
     """Attempt GitHub sync using existing helpers. Raises on failure."""
     from portfolio_manager.github_client import check_gh_auth, check_gh_available, sync_project_github
     from portfolio_manager.state import upsert_issue, upsert_project, upsert_pull_request
@@ -65,11 +67,17 @@ def _refresh_github_data(root: Path, conn: sqlite3.Connection, config: dict[str,
         raise RuntimeError("GitHub CLI not available or not authenticated")
 
     # Sync all active projects
-    cur = conn.execute("SELECT id FROM projects WHERE status IN ('active', 'paused')")
+    if project_filter:
+        placeholders = ",".join("?" for _ in project_filter)
+        cur = conn.execute(
+            f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})", project_filter
+        )
+    else:
+        cur = conn.execute("SELECT id FROM projects WHERE status IN ('active', 'paused')")
     project_ids = [row[0] for row in cur.fetchall()]
 
     for pid in project_ids:
-        project = _build_project_config(conn, pid)
+        project = _build_project_config(root, conn, pid)
         if project is None:
             continue
         upsert_project(conn, project)
@@ -82,7 +90,7 @@ def _refresh_github_data(root: Path, conn: sqlite3.Connection, config: dict[str,
                     "number": issue.number,
                     "title": issue.title,
                     "state": "needs_triage",  # default for new rows; upsert_issue preserves existing state
-                    "labels_json": str(issue.labels),
+                    "labels_json": json.dumps(list(issue.labels), ensure_ascii=False),
                 },
             )
         for pr in result.prs:
@@ -131,7 +139,7 @@ def run_maintenance(
     refresh_github = config.get("refresh_github", False)
     if refresh_github:
         try:
-            _refresh_github_data(root, conn, config)
+            _refresh_github_data(root, conn, config, project_filter=project_filter)
         except Exception as exc:
             msg = f"GitHub refresh failed: {exc}"
             logger.warning(msg)
@@ -155,7 +163,7 @@ def run_maintenance(
         project_id = check["project_id"]
         skill_id = check["skill_id"]
 
-        project = _build_project_config(conn, project_id)
+        project = _build_project_config(root, conn, project_id)
         if project is None:
             errors.append(f"Project {project_id} not found in DB")
             continue

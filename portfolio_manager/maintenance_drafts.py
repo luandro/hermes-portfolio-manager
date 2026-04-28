@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
     from portfolio_manager.maintenance_models import MaintenanceFinding, MaintenanceSkillResult
 
-from portfolio_manager.maintenance_artifacts import ensure_artifact_dir
+from portfolio_manager.issue_drafts import create_issue_draft
+from portfolio_manager.maintenance_artifacts import redact_secrets, write_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def plan_maintenance_issue_drafts(
             # Check if finding already has an issue_draft_id in DB
             if conn is not None:
                 row = conn.execute(
-                    "SELECT issue_draft_id FROM maintenance_findings WHERE fingerprint=?",
+                    "SELECT issue_draft_id FROM maintenance_findings WHERE fingerprint=? AND issue_draft_id IS NOT NULL LIMIT 1",
                     (finding.fingerprint,),
                 ).fetchone()
                 if row and row[0]:
@@ -153,7 +154,7 @@ def _build_draft_body(plan: DraftPlan) -> str:
     parts.append("## Source Maintenance Run ID")
     parts.append(plan.run_id)
 
-    return "\n".join(parts)
+    return redact_secrets("\n".join(parts))
 
 
 def _clean_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -178,8 +179,6 @@ def create_maintenance_drafts(
 
     NEVER publishes to GitHub. Only creates local drafts via MVP 3 helpers.
     """
-    from portfolio_manager.issue_drafts import create_issue_draft
-
     results: list[dict[str, Any]] = []
 
     for plan in draft_plans:
@@ -227,7 +226,17 @@ def create_maintenance_drafts(
             )
             continue
 
-        draft_id = draft_result.get("draft_id", "")
+        draft_id = draft_result.get("draft_id")
+        if not draft_id:
+            results.append(
+                {
+                    "project_id": plan.project_id,
+                    "skill_id": plan.skill_id,
+                    "run_id": plan.run_id,
+                    "warning": "Draft creation failed: missing draft_id",
+                }
+            )
+            continue
 
         # Update findings in DB with issue_draft_id
         for finding in plan.findings:
@@ -238,7 +247,6 @@ def create_maintenance_drafts(
         conn.commit()
 
         # Write draft-created.json artifact
-        artifact_dir = ensure_artifact_dir(root, plan.run_id)
         first_fingerprint = plan.findings[0].fingerprint if plan.findings else ""
         draft_created_data = {
             "finding_fingerprint": first_fingerprint,
@@ -247,7 +255,7 @@ def create_maintenance_drafts(
             "draft_id": draft_id,
             "draft_artifact_path": draft_result.get("artifact_path", ""),
         }
-        (artifact_dir / "draft-created.json").write_text(json.dumps(draft_created_data, indent=2))
+        write_artifact(root, plan.run_id, "draft-created.json", json.dumps(draft_created_data, indent=2))
 
         results.append(
             {

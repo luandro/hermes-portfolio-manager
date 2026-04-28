@@ -53,7 +53,18 @@ def _register_test_skill() -> None:
             allowed_commands=[],
             config_schema={},
         )
-        registry.register(spec, lambda ctx: None)
+        from portfolio_manager.maintenance_models import MaintenanceSkillResult
+
+        def _execute(ctx):
+            return MaintenanceSkillResult(
+                skill_id="test_skill",
+                project_id=ctx.project.id,
+                status="success",
+                findings=[],
+                summary="Test skill ran successfully.",
+            )
+
+        registry.register(spec, _execute)
 
 
 # ---------------------------------------------------------------------------
