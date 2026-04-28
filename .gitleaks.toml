@@ -1,0 +1,5 @@
+[allowlist]
+  description = "Global allow list"
+  paths = [
+    '''tests/test_maintenance_artifacts\.py$''',
+  ]

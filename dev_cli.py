@@ -8,6 +8,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from portfolio_manager.maintenance_tools import (
+    _handle_portfolio_maintenance_due,
+    _handle_portfolio_maintenance_report,
+    _handle_portfolio_maintenance_run,
+    _handle_portfolio_maintenance_run_project,
+    _handle_portfolio_maintenance_skill_disable,
+    _handle_portfolio_maintenance_skill_enable,
+    _handle_portfolio_maintenance_skill_explain,
+    _handle_portfolio_maintenance_skill_list,
+)
 from portfolio_manager.tools import (
     _handle_portfolio_config_validate,
     _handle_portfolio_github_sync,
@@ -65,6 +75,15 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_issue_explain_draft": _handle_portfolio_issue_explain_draft,
     "portfolio_issue_list_drafts": _handle_portfolio_issue_list_drafts,
     "portfolio_issue_discard_draft": _handle_portfolio_issue_discard_draft,
+    # MVP 4 — maintenance
+    "maintenance-skill-list": _handle_portfolio_maintenance_skill_list,
+    "maintenance-skill-explain": _handle_portfolio_maintenance_skill_explain,
+    "maintenance-skill-enable": _handle_portfolio_maintenance_skill_enable,
+    "maintenance-skill-disable": _handle_portfolio_maintenance_skill_disable,
+    "maintenance-due": _handle_portfolio_maintenance_due,
+    "maintenance-run": _handle_portfolio_maintenance_run,
+    "maintenance-run-project": _handle_portfolio_maintenance_run_project,
+    "maintenance-report": _handle_portfolio_maintenance_report,
 }
 
 
@@ -105,6 +124,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--allow-open-questions", type=str, help="Allow open questions (true/false)")
     parser.add_argument("--allow-possible-duplicate", type=str, help="Allow possible duplicate (true/false)")
     parser.add_argument("--include-created", type=str, help="Include created drafts (true/false)")
+    parser.add_argument("--skill-id", help="Maintenance skill ID")
     parser.add_argument("--root", help="System root path override")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args(argv)
@@ -158,6 +178,8 @@ def main(argv: list[str] | None = None) -> None:
         handler_args["allow_possible_duplicate"] = _to_bool(args.allow_possible_duplicate)
     if args.include_created is not None:
         handler_args["include_created"] = _to_bool(args.include_created)
+    if args.skill_id is not None:
+        handler_args["skill_id"] = args.skill_id
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

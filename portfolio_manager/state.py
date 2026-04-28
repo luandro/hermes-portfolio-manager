@@ -137,6 +137,41 @@ CREATE TABLE IF NOT EXISTS issue_drafts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_issue_drafts_project_state ON issue_drafts(project_id, state);
+
+CREATE TABLE IF NOT EXISTS maintenance_runs (
+  run_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  summary TEXT,
+  reason TEXT,
+  FOREIGN KEY (project_id) REFERENCES projects(id)
+);
+
+CREATE TABLE IF NOT EXISTS maintenance_findings (
+  finding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'info',
+  title TEXT NOT NULL,
+  body TEXT,
+  source_type TEXT NOT NULL,
+  source_id TEXT,
+  source_url TEXT,
+  metadata_json TEXT DEFAULT '{}',
+  draftable INTEGER NOT NULL DEFAULT 1,
+  issue_draft_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (run_id) REFERENCES maintenance_runs(run_id),
+  FOREIGN KEY (issue_draft_id) REFERENCES issue_drafts(draft_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project ON maintenance_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_skill ON maintenance_runs(skill_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_run ON maintenance_findings(run_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_fingerprint ON maintenance_findings(fingerprint);
 """
 
 # ---------------------------------------------------------------------------
@@ -193,14 +228,7 @@ def open_state(root: Path) -> sqlite3.Connection:
 
 
 def init_state(conn: sqlite3.Connection) -> None:
-    """Execute the MVP schema. Idempotent (IF NOT EXISTS + version check)."""
-    # Guard: skip if already initialized
-    try:
-        row = conn.execute("SELECT value FROM _schema_meta WHERE key='schema_version'").fetchone()
-        if row:
-            return
-    except sqlite3.OperationalError:
-        pass
+    """Execute the MVP schema. Idempotent (IF NOT EXISTS)."""
     conn.executescript(SCHEMA_SQL)
     conn.execute("CREATE TABLE IF NOT EXISTS _schema_meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT OR IGNORE INTO _schema_meta (key, value) VALUES ('schema_version', '1')")

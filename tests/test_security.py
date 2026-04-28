@@ -458,3 +458,200 @@ class TestMvp3SubprocessArgumentArrays:
             cmd = call_args[0] if call_args else call_kwargs.get("args", [])
             assert isinstance(cmd, list), f"Expected list, got {type(cmd).__name__}: {cmd}"
             assert not call_kwargs.get("shell", False), f"shell=True found in call: {cmd}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 9 — MVP 4 maintenance security hardening
+# ---------------------------------------------------------------------------
+
+# Maintenance source files for security scanning
+MAINTENANCE_FILES = sorted(p for p in SRC_DIR.rglob("*.py") if p.name.startswith("maintenance"))
+
+
+class TestMaintenanceCommandAllowlist:
+    """Maintenance modules must only use safe, read-only commands."""
+
+    def test_no_shell_true_in_maintenance_code(self) -> None:
+        """No maintenance module uses shell=True in subprocess calls."""
+        for src_file in MAINTENANCE_FILES:
+            content = src_file.read_text()
+            assert "shell=True" not in content, f"shell=True found in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_only_allowed_gh_commands_in_maintenance_code(self) -> None:
+        """Only read-only gh commands are allowed in maintenance modules."""
+        allowed_prefixes = [
+            ["gh", "--version"],
+            ["gh", "auth", "status"],
+            ["gh", "issue", "list"],
+            ["gh", "pr", "list"],
+            ["gh", "api", "--method", "GET"],
+        ]
+        for src_file in MAINTENANCE_FILES:
+            content = src_file.read_text()
+            # Find any gh command references
+            for match in re.finditer(r"\"gh\b[^\"]*\"", content):
+                gh_cmd = match.group().strip('"')
+                parts = gh_cmd.split()
+                is_allowed = any(parts[: len(prefix)] == prefix for prefix in allowed_prefixes)
+                assert is_allowed, f"Disallowed gh command '{gh_cmd}' in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_no_gh_issue_create_in_maintenance_code(self) -> None:
+        """No gh issue create in maintenance modules."""
+        for src_file in MAINTENANCE_FILES:
+            content = src_file.read_text()
+            assert "gh issue create" not in content, (
+                f"'gh issue create' found in {src_file.relative_to(SRC_DIR.parent)}"
+            )
+
+    def test_no_gh_pr_mutation_in_maintenance_code(self) -> None:
+        """No gh pr create/merge/close in maintenance modules."""
+        banned_pr = ["gh pr create", "gh pr merge", "gh pr close", "gh pr ready"]
+        for src_file in MAINTENANCE_FILES:
+            content = src_file.read_text()
+            for banned in banned_pr:
+                assert banned not in content, f"'{banned}' found in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_no_gh_api_mutation_methods_in_maintenance_code(self) -> None:
+        """No POST/PUT/DELETE/PATCH in gh api calls in maintenance modules."""
+        mutation_methods = ["POST", "PUT", "DELETE", "PATCH"]
+        for src_file in MAINTENANCE_FILES:
+            content = src_file.read_text()
+            for method in mutation_methods:
+                patterns = [
+                    f"--method {method}",
+                    f'--method "{method}"',
+                    f"--method '{method}'",
+                ]
+                for pat in patterns:
+                    assert pat not in content, (
+                        f"gh api mutation method '{method}' found in {src_file.relative_to(SRC_DIR.parent)}"
+                    )
+
+
+class TestMaintenancePathContainment:
+    """Maintenance paths must stay under the project root."""
+
+    def test_maintenance_config_path_contained(self) -> None:
+        """Config paths from maintenance_config stay under root."""
+        from portfolio_manager.maintenance_config import config_path
+
+        root = Path("/tmp/test-root")
+        cp = config_path(root)
+        resolved_root = root.resolve()
+        assert cp.resolve().is_relative_to(resolved_root), f"Config path {cp} escapes root {resolved_root}"
+
+    def test_maintenance_artifact_path_contained(self) -> None:
+        """Artifact paths from maintenance_artifacts stay under root."""
+        from portfolio_manager.maintenance_artifacts import get_artifact_dir
+
+        root = Path("/tmp/test-root")
+        artifact_dir = get_artifact_dir(root, "run-abc-123")
+        resolved_root = root.resolve()
+        assert artifact_dir.is_relative_to(resolved_root), f"Artifact path {artifact_dir} escapes root {resolved_root}"
+
+    def test_guidance_doc_rejects_dotdot(self) -> None:
+        """Guidance doc paths with '..' are rejected."""
+        from portfolio_manager.maintenance_artifacts import get_artifact_dir
+
+        root = Path("/tmp/test-root")
+        with pytest.raises(ValueError, match="Invalid run_id"):
+            get_artifact_dir(root, "../escape")
+
+    def test_guidance_doc_rejects_absolute_path(self) -> None:
+        """Absolute paths in run_id are rejected."""
+        from portfolio_manager.maintenance_artifacts import get_artifact_dir
+
+        root = Path("/tmp/test-root")
+        with pytest.raises(ValueError, match="Invalid run_id"):
+            get_artifact_dir(root, "/etc/passwd")
+
+    def test_guidance_doc_rejects_url_scheme(self) -> None:
+        """URL schemes in run_id are rejected."""
+        from portfolio_manager.maintenance_artifacts import get_artifact_dir
+
+        root = Path("/tmp/test-root")
+        with pytest.raises(ValueError, match="Invalid run_id"):
+            get_artifact_dir(root, "file:///etc/passwd")
+
+    def test_guidance_doc_rejects_shell_metacharacters(self) -> None:
+        """Shell metacharacters in run_id are rejected."""
+        from portfolio_manager.maintenance_artifacts import get_artifact_dir
+
+        root = Path("/tmp/test-root")
+        for bad_id in ["run;rm -rf /", "run$(whoami)", "run`id`", "run|cat"]:
+            with pytest.raises(ValueError, match="Invalid run_id"):
+                get_artifact_dir(root, bad_id)
+
+
+class TestMaintenancePrivacyRedaction:
+    """Maintenance artifacts, reports, and drafts must not leak secrets."""
+
+    def test_error_artifact_redacts_tokens(self) -> None:
+        """Error artifacts have tokens redacted."""
+        from portfolio_manager.maintenance_artifacts import redact_secrets
+
+        text_with_token = "Error: ghp_ABC123DEF456 failed for repo"
+        redacted = redact_secrets(text_with_token)
+        assert "ghp_ABC123DEF456" not in redacted
+        assert "ghp_***" in redacted
+
+    def test_report_does_not_include_environment_variables(self) -> None:
+        """Reports do not include raw environment variable values."""
+        from portfolio_manager.maintenance_reports import write_maintenance_report
+
+        root = Path("/tmp/test-report-env-check")
+        run_id = "env-check-run"
+        findings = [
+            {
+                "title": "Test finding",
+                "severity": "info",
+                "source_type": "test",
+                "body": "Test body",
+            }
+        ]
+        metadata = {
+            "run_id": run_id,
+            "projects": ["proj-1"],
+        }
+
+        report_path = write_maintenance_report(root, run_id, findings, metadata)
+        content = report_path.read_text()
+
+        # Report should not contain common env var patterns
+        env_patterns = ["os.environ", "os.getenv", "HOME=", "PATH=", "USER="]
+        for pat in env_patterns:
+            assert pat not in content, f"Environment variable pattern '{pat}' found in report"
+
+    def test_maintenance_draft_excludes_private_metadata(self) -> None:
+        """Draft body excludes private metadata and chain-of-thought."""
+        from portfolio_manager.maintenance_drafts import (
+            _PRIVATE_META_KEYS,
+            DraftPlan,
+            _build_draft_body,
+        )
+        from portfolio_manager.maintenance_models import MaintenanceFinding
+
+        finding = MaintenanceFinding(
+            fingerprint="fp-test",
+            severity="medium",
+            title="Stale issue",
+            body="Issue has been open 45 days.\ninternal_notes: secret\nchain_of_thought: thinking...",
+            source_type="github_issue",
+            source_id="123",
+            source_url="https://github.com/test/repo/issues/123",
+            metadata={},
+        )
+
+        plan = DraftPlan(
+            project_id="test-project",
+            skill_id="stale_issue_digest",
+            run_id="run-test",
+            findings=[finding],
+            should_create=True,
+        )
+
+        body = _build_draft_body(plan)
+
+        # Private keys should not appear in the body
+        for key in _PRIVATE_META_KEYS:
+            assert key not in body, f"Private key '{key}' found in draft body"
