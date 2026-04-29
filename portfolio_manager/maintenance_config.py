@@ -175,7 +175,7 @@ def get_effective_config(
         if project_id not in valid_project_ids:
             raise ValueError(f"Unknown project_id: {project_id}")
 
-    merged = copy.deepcopy(_registry_defaults()["skills"][skill_id])
+    merged: dict[str, Any] = copy.deepcopy(_registry_defaults()["skills"][skill_id])
     defaults = raw.get("defaults", {})
     if isinstance(defaults, dict):
         merged = _deep_merge(merged, defaults)

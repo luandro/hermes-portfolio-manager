@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from portfolio_manager.maintenance_models import (
     MaintenanceContext,
@@ -89,7 +90,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
     for pr_number, title, review_stage, last_seen_at, updated_at in cur.fetchall():
         stage = review_stage or ""
         activity_at = _parse_timestamp(updated_at) or _parse_timestamp(last_seen_at)
-        severity: str | None = None
+        severity: Literal["low", "medium", "high"] | None = None
         if stage == "checks_failed" and include_checks_failed:
             severity = "high"
         elif stage == "changes_requested" and include_changes_requested:

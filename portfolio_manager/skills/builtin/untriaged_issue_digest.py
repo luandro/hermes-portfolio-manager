@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from portfolio_manager.maintenance_models import (
     MaintenanceContext,
@@ -81,7 +82,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
     findings: list[MaintenanceFinding] = []
     for seen_at, issue_number, title, state, last_seen_at, updated_at in candidates[:max_findings]:
         source_id = str(issue_number)
-        severity = "medium" if seen_at < medium_cutoff else "low"
+        severity: Literal["low", "medium"] = "medium" if seen_at < medium_cutoff else "low"
         finding_title = f"Untriaged issue #{issue_number}: {title}"
         findings.append(
             MaintenanceFinding(

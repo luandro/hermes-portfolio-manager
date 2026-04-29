@@ -309,7 +309,7 @@ for k in (data or {}):
     local temp_remote="/tmp/hermes-config-merge-$$.yaml"
     scp -q "${temp_local}" "${REMOTE_USER}@${REMOTE_HOST}:${temp_remote}"
 
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" python3 -s - "${REMOTE_BASE}" "${temp_remote}" <<'PYEOF'
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" python3 -s - "$(printf '%q' "${REMOTE_BASE}")" "$(printf '%q' "${temp_remote}")" <<'PYEOF'
 import yaml, os, sys
 
 remote_base = os.path.expanduser(sys.argv[1])

@@ -191,6 +191,26 @@ def upsert_maintenance_finding(conn: sqlite3.Connection, finding: dict[str, Any]
                 fingerprint,
             ),
         )
+    elif existing["status"] == "resolved":
+        conn.execute(
+            """UPDATE maintenance_findings
+               SET severity=?, status='open', title=?, body=?, source_type=?, source_id=?, source_url=?,
+                   metadata_json=?, last_seen_at=?, resolved_at=NULL, run_id=?, updated_at=?
+               WHERE fingerprint=?""",
+            (
+                finding["severity"],
+                finding["title"],
+                finding.get("body") or "",
+                finding.get("source_type"),
+                finding.get("source_id"),
+                finding.get("source_url"),
+                metadata_json,
+                finding.get("last_seen_at") or now,
+                finding.get("run_id"),
+                finding.get("updated_at") or now,
+                fingerprint,
+            ),
+        )
     conn.commit()
 
 
@@ -243,16 +263,16 @@ def mark_resolved_missing_findings(
     condition = ""
     if seen_fingerprints:
         placeholders = ",".join("?" for _ in seen_fingerprints)
-        condition = f" AND fingerprint NOT IN ({placeholders})"
+        condition = f" AND fingerprint NOT IN ({placeholders})"  # nosec B608
         params.extend(sorted(seen_fingerprints))
 
-    cur = conn.execute(
+    query = (  # nosec B608 - condition only adds ? placeholders; all values are parameterized
         """UPDATE maintenance_findings
            SET status='resolved', resolved_at=?, updated_at=?
-           WHERE project_id=? AND skill_id=? AND status IN ('open', 'draft_created')"""
-        + condition,
-        params,
+           WHERE project_id=? AND skill_id=? AND status IN ('open', 'draft_created')"""  # nosec B608
+        + condition
     )
+    cur = conn.execute(query, params)  # nosec B608
     conn.commit()
     return cur.rowcount
 

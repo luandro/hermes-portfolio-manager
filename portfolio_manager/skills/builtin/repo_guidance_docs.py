@@ -7,7 +7,7 @@ import json
 import re
 import subprocess
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from portfolio_manager.maintenance_models import (
     MaintenanceContext,
@@ -133,7 +133,7 @@ def _latest_commit_date(owner: str, repo: str, path: str) -> tuple[datetime | No
 
 def _finding(
     ctx: MaintenanceContext,
-    severity: str,
+    severity: Literal["info", "low", "medium", "high"],
     title: str,
     body: str,
     path: str,
@@ -176,7 +176,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
             if warning:
                 warnings.append(f"{path}: {warning}")
             if required:
-                severity = "medium" if path == "AGENTS.md" else "low"
+                severity: Literal["low", "medium"] = "medium" if path == "AGENTS.md" else "low"
                 findings.append(
                     _finding(
                         ctx,

@@ -110,8 +110,8 @@ def _refresh_github_data(
     if project_filter:
         placeholders = ",".join("?" for _ in project_filter)
         cur = conn.execute(
-            f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})",
-            project_filter,  # nosec B608 — placeholders is only comma-joined "?", values are parameterized
+            f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})",  # nosec B608
+            project_filter,
         )
     else:
         cur = conn.execute("SELECT id FROM projects WHERE status IN ('active', 'paused')")
@@ -266,7 +266,7 @@ def _run_maintenance_unlocked(
         lock_name = _project_skill_lock_name(project_id, skill_id)
         project_lock = acquire_lock(conn, lock_name, PROJECT_SKILL_LOCK_OWNER, PROJECT_SKILL_LOCK_TTL_SECONDS)
         if not project_lock.acquired:
-            run_id = start_maintenance_run(
+            _skip_run_id = start_maintenance_run(
                 conn,
                 {
                     "project_id": project_id,
@@ -279,14 +279,14 @@ def _run_maintenance_unlocked(
             )
             finish_maintenance_run(
                 conn,
-                run_id,
+                _skip_run_id,
                 "skipped",
                 summary="Skipped because maintenance lock is held",
                 error="lock_held",
             )
             runs.append(
                 {
-                    "run_id": run_id,
+                    "run_id": _skip_run_id,
                     "project_id": project_id,
                     "skill_id": skill_id,
                     "status": "skipped",
@@ -295,6 +295,7 @@ def _run_maintenance_unlocked(
             )
             continue
 
+        run_id = None
         try:
             skill_cfg = _effective_skill_config(config, project_id, skill_id)
 
@@ -334,7 +335,7 @@ def _run_maintenance_unlocked(
                         "source_type": finding.source_type,
                         "source_id": finding.source_id,
                         "source_url": finding.source_url,
-                        "metadata": finding.metadata,
+                        "metadata": {**finding.metadata, "draftable": finding.draftable},
                         "run_id": run_id,
                     },
                 )
@@ -400,7 +401,8 @@ def _run_maintenance_unlocked(
             logger.error(error_msg)
             errors.append(error_msg)
             with contextlib.suppress(Exception):
-                finish_maintenance_run(conn, run_id, "failed", summary=str(exc), error="execution_error")
+                if run_id is not None:
+                    finish_maintenance_run(conn, run_id, "failed", summary=str(exc), error="execution_error")
             runs.append(
                 {
                     "run_id": run_id,
@@ -454,7 +456,7 @@ def _run_maintenance_unlocked(
                             source_id=frow[5] or "",
                             source_url=frow[6] or "",
                             metadata=meta or {},
-                            draftable=True,
+                            draftable=meta.get("draftable", True),
                         )
                     )
                 if run_findings:
