@@ -10,7 +10,7 @@ import pytest
 from portfolio_manager.maintenance_config import save_config
 from portfolio_manager.maintenance_models import MaintenanceSkillSpec
 from portfolio_manager.maintenance_registry import get_registry
-from portfolio_manager.state import init_state, open_state
+from portfolio_manager.state import acquire_lock, init_state, open_state, release_lock
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -191,6 +191,42 @@ class TestSkillEnableDisable:
 
         cfg = load_config(root)
         assert cfg["skills"]["test_skill"]["enabled"] is False
+
+    def test_skill_enable_blocks_when_config_lock_held(self, root: Path, _register_test_skill: None) -> None:
+        from portfolio_manager.maintenance_tools import _handle_portfolio_maintenance_skill_enable
+
+        conn = open_state(root)
+        init_state(conn)
+        try:
+            lock = acquire_lock(conn, "maintenance:config", "other-owner", 60)
+            assert lock.acquired is True
+
+            result_str = _handle_portfolio_maintenance_skill_enable({"skill_id": "test_skill", "root": str(root)})
+            result = json.loads(result_str)
+
+            assert result["status"] == "blocked"
+            assert result["reason"] == "lock_held"
+        finally:
+            release_lock(conn, "maintenance:config", "other-owner")
+            conn.close()
+
+    def test_skill_disable_blocks_when_config_lock_held(self, root: Path, _register_test_skill: None) -> None:
+        from portfolio_manager.maintenance_tools import _handle_portfolio_maintenance_skill_disable
+
+        conn = open_state(root)
+        init_state(conn)
+        try:
+            lock = acquire_lock(conn, "maintenance:config", "other-owner", 60)
+            assert lock.acquired is True
+
+            result_str = _handle_portfolio_maintenance_skill_disable({"skill_id": "test_skill", "root": str(root)})
+            result = json.loads(result_str)
+
+            assert result["status"] == "blocked"
+            assert result["reason"] == "lock_held"
+        finally:
+            release_lock(conn, "maintenance:config", "other-owner")
+            conn.close()
 
 
 class TestMaintenanceDue:

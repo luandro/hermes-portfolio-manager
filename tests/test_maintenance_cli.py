@@ -10,9 +10,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import portfolio_manager.skills.builtin  # noqa: F401 — triggers self-registration
-from dev_cli import TOOL_HANDLERS
+from dev_cli import TOOL_HANDLERS, main
 
 MAINTENANCE_COMMANDS = [
+    "portfolio_maintenance_skill_list",
+    "portfolio_maintenance_skill_explain",
+    "portfolio_maintenance_skill_enable",
+    "portfolio_maintenance_skill_disable",
+    "portfolio_maintenance_due",
+    "portfolio_maintenance_run",
+    "portfolio_maintenance_run_project",
+    "portfolio_maintenance_report",
     "maintenance-skill-list",
     "maintenance-skill-explain",
     "maintenance-skill-enable",
@@ -53,6 +61,68 @@ def test_maintenance_handlers_are_callable() -> None:
         assert callable(handler), f"Handler for {cmd!r} is not callable"
 
 
+def test_maintenance_cli_wires_new_args(monkeypatch, capsys) -> None:
+    """Maintenance CLI args are parsed and forwarded to handlers."""
+
+    def fake_handler(args: dict[str, object]) -> str:
+        return json.dumps(args, sort_keys=True)
+
+    monkeypatch.setitem(TOOL_HANDLERS, "portfolio_maintenance_run", fake_handler)
+
+    main(
+        [
+            "portfolio_maintenance_run",
+            "--skill-id",
+            "stale_issue_digest",
+            "--interval-hours",
+            "168",
+            "--config-json",
+            '{"create_issue_drafts": true}',
+            "--include-disabled",
+            "true",
+            "--include-project-overrides",
+            "false",
+            "--include-paused",
+            "true",
+            "--include-archived",
+            "false",
+            "--include-not-due",
+            "true",
+            "--refresh-github",
+            "false",
+            "--create-issue-drafts",
+            "true",
+            "--max-projects",
+            "7",
+            "--run-id",
+            "run_001",
+            "--severity",
+            "high",
+            "--limit",
+            "3",
+            "--include-resolved",
+            "false",
+        ]
+    )
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["skill_id"] == "stale_issue_digest"
+    assert parsed["interval_hours"] == 168
+    assert parsed["config_json"] == '{"create_issue_drafts": true}'
+    assert parsed["include_disabled"] is True
+    assert parsed["include_project_overrides"] is False
+    assert parsed["include_paused"] is True
+    assert parsed["include_archived"] is False
+    assert parsed["include_not_due"] is True
+    assert parsed["refresh_github"] is False
+    assert parsed["create_issue_drafts"] is True
+    assert parsed["max_projects"] == 7
+    assert parsed["run_id"] == "run_001"
+    assert parsed["severity"] == "high"
+    assert parsed["limit"] == 3
+    assert parsed["include_resolved"] is False
+
+
 # ---------------------------------------------------------------------------
 # Handler callability tests — invoke each handler directly
 # ---------------------------------------------------------------------------
@@ -70,7 +140,7 @@ def test_maintenance_skill_list_callable(tmp_path: Path) -> None:
 def test_maintenance_skill_explain_callable(tmp_path: Path) -> None:
     root = _setup_root(tmp_path)
     handler = TOOL_HANDLERS["maintenance-skill-explain"]
-    result = handler({"root": str(root), "skill_id": "health_check"})
+    result = handler({"root": str(root), "skill_id": "untriaged_issue_digest"})
     data = json.loads(result)
     assert data["status"] == "success"
     assert data["tool"] == "portfolio_maintenance_skill_explain"
@@ -79,7 +149,7 @@ def test_maintenance_skill_explain_callable(tmp_path: Path) -> None:
 def test_maintenance_skill_enable_callable(tmp_path: Path) -> None:
     root = _setup_root(tmp_path)
     handler = TOOL_HANDLERS["maintenance-skill-enable"]
-    result = handler({"root": str(root), "skill_id": "health_check"})
+    result = handler({"root": str(root), "skill_id": "untriaged_issue_digest"})
     data = json.loads(result)
     assert data["status"] == "success"
     assert data["tool"] == "portfolio_maintenance_skill_enable"
@@ -88,9 +158,9 @@ def test_maintenance_skill_enable_callable(tmp_path: Path) -> None:
 def test_maintenance_skill_disable_callable(tmp_path: Path) -> None:
     root = _setup_root(tmp_path)
     # Enable first so disable has something to disable
-    TOOL_HANDLERS["maintenance-skill-enable"]({"root": str(root), "skill_id": "health_check"})
+    TOOL_HANDLERS["maintenance-skill-enable"]({"root": str(root), "skill_id": "untriaged_issue_digest"})
     handler = TOOL_HANDLERS["maintenance-skill-disable"]
-    result = handler({"root": str(root), "skill_id": "health_check"})
+    result = handler({"root": str(root), "skill_id": "untriaged_issue_digest"})
     data = json.loads(result)
     assert data["status"] == "success"
     assert data["tool"] == "portfolio_maintenance_skill_disable"

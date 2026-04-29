@@ -16,6 +16,7 @@ from portfolio_manager.config import resolve_root
 from portfolio_manager.maintenance_config import (
     disable_skill,
     enable_skill,
+    get_effective_config,
     get_skill_config,
     load_config,
 )
@@ -23,10 +24,13 @@ from portfolio_manager.maintenance_due import compute_due_checks
 from portfolio_manager.maintenance_orchestrator import run_maintenance
 from portfolio_manager.maintenance_registry import get_registry
 from portfolio_manager.maintenance_reports import load_latest_report, load_report
-from portfolio_manager.state import init_state, open_state
+from portfolio_manager.state import acquire_lock, init_state, open_state, release_lock
 from portfolio_manager.tools import _blocked, _failed, _result
 
 logger = logging.getLogger(__name__)
+CONFIG_LOCK_NAME = "maintenance:config"
+CONFIG_LOCK_OWNER = "maintenance-tool"
+CONFIG_LOCK_TTL_SECONDS = 60
 
 
 def _parse_csv_filter(value: str | None) -> list[str] | None:
@@ -115,7 +119,15 @@ def _handle_portfolio_maintenance_skill_explain(args: dict[str, Any], **kwargs: 
     if spec is None:
         return _blocked(tool, f"Unknown skill: {skill_id}", reason="skill_not_found")
 
-    effective_config = get_skill_config(root, skill_id)
+    project_id = args.get("project_id")
+    try:
+        effective_config = (
+            get_effective_config(root, skill_id, project_id=project_id)
+            if project_id
+            else get_skill_config(root, skill_id)
+        )
+    except ValueError as exc:
+        return _blocked(tool, str(exc))
 
     return _result(
         status="success",
@@ -160,8 +172,8 @@ def _handle_portfolio_maintenance_skill_enable(args: dict[str, Any], **kwargs: A
             interval_hours = int(interval_hours)
         except (TypeError, ValueError):
             return _blocked(tool, "interval_hours must be an integer >= 1")
-        if interval_hours < 1:
-            return _blocked(tool, "interval_hours must be >= 1")
+        if not 1 <= interval_hours <= 2160:
+            return _blocked(tool, "interval_hours must be between 1 and 2160")
 
     config_json_str = args.get("config_json")
     extra_config = {}
@@ -170,20 +182,34 @@ def _handle_portfolio_maintenance_skill_enable(args: dict[str, Any], **kwargs: A
             extra_config = json.loads(config_json_str)
         except (json.JSONDecodeError, TypeError) as exc:
             return _blocked(tool, f"Invalid config_json: {exc}")
+        if not isinstance(extra_config, dict):
+            return _blocked(tool, "config_json must decode to an object")
+    if "create_issue_drafts" in args:
+        extra_config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
 
+    conn = open_state(root)
+    init_state(conn)
     try:
-        updated = enable_skill(root, skill_id, interval_hours=interval_hours)
+        lock = acquire_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER, CONFIG_LOCK_TTL_SECONDS)
+        if not lock.acquired:
+            return _blocked(tool, "Config is locked by another operation", reason="lock_held")
 
-        # Merge extra config if provided
-        if extra_config:
-            from portfolio_manager.maintenance_config import save_config
-
-            skills = updated.setdefault("skills", {})
-            skill_cfg = skills.setdefault(skill_id, {})
-            skill_cfg.update(extra_config)
-            save_config(root, updated)
-
-        skill_cfg = updated.get("skills", {}).get(skill_id, {})
+        project_id = args.get("project_id")
+        try:
+            updated = enable_skill(
+                root,
+                skill_id,
+                interval_hours=interval_hours,
+                project_id=project_id,
+                config=extra_config,
+            )
+            skill_cfg = (
+                get_effective_config(root, skill_id, project_id=project_id)
+                if project_id
+                else updated["skills"][skill_id]
+            )
+        finally:
+            release_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER)
 
         return _result(
             status="success",
@@ -192,9 +218,13 @@ def _handle_portfolio_maintenance_skill_enable(args: dict[str, Any], **kwargs: A
             data={"skill_id": skill_id, "enabled": True, "config": skill_cfg},
             summary=f"Skill {skill_id} enabled.",
         )
+    except ValueError as exc:
+        return _blocked(tool, str(exc))
     except Exception as exc:
         logger.exception("Failed to enable skill %s", skill_id)
         return _failed(tool, str(exc))
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -213,9 +243,23 @@ def _handle_portfolio_maintenance_skill_disable(args: dict[str, Any], **kwargs: 
     if not re.match(r"^[a-z][a-z0-9_]{2,63}$", skill_id):
         return _blocked(tool, "invalid skill_id: must match ^[a-z][a-z0-9_]{2,63}$")
 
+    conn = open_state(root)
+    init_state(conn)
     try:
-        updated = disable_skill(root, skill_id)
-        skill_cfg = updated.get("skills", {}).get(skill_id, {})
+        lock = acquire_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER, CONFIG_LOCK_TTL_SECONDS)
+        if not lock.acquired:
+            return _blocked(tool, "Config is locked by another operation", reason="lock_held")
+
+        project_id = args.get("project_id")
+        try:
+            updated = disable_skill(root, skill_id, project_id=project_id)
+            skill_cfg = (
+                get_effective_config(root, skill_id, project_id=project_id)
+                if project_id
+                else updated["skills"][skill_id]
+            )
+        finally:
+            release_lock(conn, CONFIG_LOCK_NAME, CONFIG_LOCK_OWNER)
 
         return _result(
             status="success",
@@ -224,9 +268,13 @@ def _handle_portfolio_maintenance_skill_disable(args: dict[str, Any], **kwargs: 
             data={"skill_id": skill_id, "enabled": False, "config": skill_cfg},
             summary=f"Skill {skill_id} disabled.",
         )
+    except ValueError as exc:
+        return _blocked(tool, str(exc))
     except Exception as exc:
         logger.exception("Failed to disable skill %s", skill_id)
         return _failed(tool, str(exc))
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -294,8 +342,19 @@ def _handle_portfolio_maintenance_run(args: dict[str, Any], **kwargs: Any) -> st
         # Apply runtime overrides
         dry_run = _parse_bool(args.get("dry_run"), default=False)
 
-        config["refresh_github"] = _parse_bool(args.get("refresh_github"), default=False)
-        config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
+        defaults = config.get("defaults", {})
+        config["refresh_github"] = _parse_bool(
+            args.get("refresh_github"),
+            default=bool(defaults.get("refresh_github", config.get("refresh_github", False)))
+            if isinstance(defaults, dict)
+            else bool(config.get("refresh_github", False)),
+        )
+        config["create_issue_drafts"] = _parse_bool(
+            args.get("create_issue_drafts"),
+            default=bool(defaults.get("create_issue_drafts", config.get("create_issue_drafts", False)))
+            if isinstance(defaults, dict)
+            else bool(config.get("create_issue_drafts", False)),
+        )
 
         project_filter = _parse_csv_filter(args.get("project_filter"))
         skill_filter = _parse_csv_filter(args.get("skill_filter"))
@@ -308,6 +367,8 @@ def _handle_portfolio_maintenance_run(args: dict[str, Any], **kwargs: Any) -> st
             skill_filter=skill_filter,
             dry_run=bool(dry_run),
         )
+        if result.get("status") == "blocked":
+            return _blocked(tool, result.get("message", "Maintenance run is blocked"), reason=result.get("reason"))
 
         if dry_run:
             summary_data = result.get("summary", {})
@@ -380,8 +441,19 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
         config = load_config(root)
         dry_run = _parse_bool(args.get("dry_run"), default=False)
 
-        config["refresh_github"] = _parse_bool(args.get("refresh_github"), default=False)
-        config["create_issue_drafts"] = _parse_bool(args.get("create_issue_drafts"), default=False)
+        defaults = config.get("defaults", {})
+        config["refresh_github"] = _parse_bool(
+            args.get("refresh_github"),
+            default=bool(defaults.get("refresh_github", config.get("refresh_github", False)))
+            if isinstance(defaults, dict)
+            else bool(config.get("refresh_github", False)),
+        )
+        config["create_issue_drafts"] = _parse_bool(
+            args.get("create_issue_drafts"),
+            default=bool(defaults.get("create_issue_drafts", config.get("create_issue_drafts", False)))
+            if isinstance(defaults, dict)
+            else bool(config.get("create_issue_drafts", False)),
+        )
 
         result = run_maintenance(
             root,
@@ -390,6 +462,8 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
             project_filter=[project_id],
             dry_run=bool(dry_run),
         )
+        if result.get("status") == "blocked":
+            return _blocked(tool, result.get("message", "Maintenance run is blocked"), reason=result.get("reason"))
 
         if dry_run:
             summary_data = result.get("summary", {})

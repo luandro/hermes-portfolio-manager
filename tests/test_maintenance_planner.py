@@ -49,7 +49,7 @@ def root(tmp_path: Path) -> Path:
 def config() -> dict[str, Any]:
     return {
         "skills": {
-            "health_check": {"enabled": True, "interval_hours": 24},
+            "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
         },
     }
 
@@ -74,7 +74,7 @@ class TestPlanMaintenanceRun:
         assert "summary" in result
         planned = result["planned_checks"]
         assert len(planned) >= 1
-        assert any(p["project_id"] == "proj-1" and p["skill_id"] == "health_check" for p in planned)
+        assert any(p["project_id"] == "proj-1" and p["skill_id"] == "untriaged_issue_digest" for p in planned)
 
     def test_dry_run_does_not_insert_runs(
         self,
@@ -138,7 +138,7 @@ class TestPlanMaintenanceRun:
         _insert_project(conn, "proj-1")
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {
+                "untriaged_issue_digest": {
                     "enabled": True,
                     "interval_hours": 24,
                     "create_issue_drafts": True,

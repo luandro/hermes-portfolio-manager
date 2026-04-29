@@ -2,11 +2,40 @@
 
 from __future__ import annotations
 
+import copy
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import sqlite3
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _effective_skill_config(config: dict[str, Any], project_id: str, skill_id: str) -> dict[str, Any]:
+    skill_cfg: dict[str, Any] = {}
+    defaults = config.get("defaults", {})
+    if isinstance(defaults, dict):
+        skill_cfg = _deep_merge(skill_cfg, defaults)
+    skills_cfg = config.get("skills", {})
+    if isinstance(skills_cfg, dict) and isinstance(skills_cfg.get(skill_id), dict):
+        skill_cfg = _deep_merge(skill_cfg, skills_cfg[skill_id])
+    project_skill_cfg = (
+        config.get("projects", {}).get(project_id, {}).get("skills", {}).get(skill_id, {})
+        if isinstance(config.get("projects"), dict)
+        else {}
+    )
+    if isinstance(project_skill_cfg, dict):
+        skill_cfg = _deep_merge(skill_cfg, project_skill_cfg)
+    return skill_cfg
 
 
 def compute_due_checks(
@@ -54,7 +83,7 @@ def compute_due_checks(
 
     for project_id, _project_status in projects:
         for skill_id in skill_ids:
-            skill_cfg = skills_cfg[skill_id]
+            skill_cfg = _effective_skill_config(config, project_id, skill_id)
             enabled = skill_cfg.get("enabled", True)
 
             if not enabled:

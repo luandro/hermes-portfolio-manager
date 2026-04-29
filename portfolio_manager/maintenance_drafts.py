@@ -241,7 +241,8 @@ def create_maintenance_drafts(
         # Update findings in DB with issue_draft_id
         for finding in plan.findings:
             conn.execute(
-                "UPDATE maintenance_findings SET issue_draft_id=? WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
+                "UPDATE maintenance_findings SET issue_draft_id=?, status='draft_created', updated_at=datetime('now') "
+                "WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
                 (draft_id, finding.fingerprint),
             )
         conn.commit()
@@ -325,7 +326,8 @@ def repair_draft_references(root: Path, conn: sqlite3.Connection) -> int:
 
             # Only update rows that are still NULL
             conn.execute(
-                "UPDATE maintenance_findings SET issue_draft_id=? WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
+                "UPDATE maintenance_findings SET issue_draft_id=?, status='draft_created', updated_at=datetime('now') "
+                "WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
                 (draft_id, fingerprint),
             )
             conn.commit()

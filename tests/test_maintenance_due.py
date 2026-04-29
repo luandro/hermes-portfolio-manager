@@ -61,11 +61,11 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config)
-        due = [r for r in results if r["skill_id"] == "health_check" and r["project_id"] == "proj-1"]
+        due = [r for r in results if r["skill_id"] == "untriaged_issue_digest" and r["project_id"] == "proj-1"]
         assert len(due) == 1
         assert due[0]["is_due"] is True
         assert due[0]["reason"] == "never_run"
@@ -73,18 +73,18 @@ class TestComputeDueChecks:
     def test_recent_successful_run_is_not_due(self, conn: sqlite3.Connection) -> None:
         """A project+skill with a recent successful run is not due."""
         _insert_project(conn, "proj-1")
-        run_id = start_run(conn, "proj-1", "health_check")
+        run_id = start_run(conn, "proj-1", "untriaged_issue_digest")
         finish_run(conn, run_id, "success", summary="ok")
 
         from portfolio_manager.maintenance_due import compute_due_checks
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config)
-        due = [r for r in results if r["skill_id"] == "health_check" and r["project_id"] == "proj-1"]
+        due = [r for r in results if r["skill_id"] == "untriaged_issue_digest" and r["project_id"] == "proj-1"]
         assert len(due) == 1
         assert due[0]["is_due"] is False
         assert due[0]["reason"] == "not_due_yet"
@@ -95,9 +95,9 @@ class TestComputeDueChecks:
         old_time = datetime.now(UTC) - timedelta(hours=48)
         old_time_str = old_time.isoformat()
         # Start and finish with an old finished_at by direct insert
-        run_id = start_run(conn, "proj-1", "health_check", now=old_time)
+        run_id = start_run(conn, "proj-1", "untriaged_issue_digest", now=old_time)
         conn.execute(
-            "UPDATE maintenance_runs SET status='success', finished_at=?, summary='ok' WHERE run_id=?",
+            "UPDATE maintenance_runs SET status='success', finished_at=?, summary='ok' WHERE id=?",
             (old_time_str, run_id),
         )
         conn.commit()
@@ -106,11 +106,11 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config)
-        due = [r for r in results if r["skill_id"] == "health_check" and r["project_id"] == "proj-1"]
+        due = [r for r in results if r["skill_id"] == "untriaged_issue_digest" and r["project_id"] == "proj-1"]
         assert len(due) == 1
         assert due[0]["is_due"] is True
         assert due[0]["reason"] == "interval_elapsed"
@@ -123,11 +123,11 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": False, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": False, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config)
-        due = [r for r in results if r["skill_id"] == "health_check" and r["project_id"] == "proj-1"]
+        due = [r for r in results if r["skill_id"] == "untriaged_issue_digest" and r["project_id"] == "proj-1"]
         assert len(due) == 1
         assert due[0]["is_due"] is False
         assert due[0]["reason"] == "disabled"
@@ -142,7 +142,7 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config)
@@ -160,7 +160,7 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         # Include paused
@@ -183,7 +183,7 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
         results = compute_due_checks(conn, config=config, project_filter=["proj-1"])
@@ -198,10 +198,36 @@ class TestComputeDueChecks:
 
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
-                "dependency_audit": {"enabled": True, "interval_hours": 48},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
+                "stale_issue_digest": {"enabled": True, "interval_hours": 48},
             },
         }
-        results = compute_due_checks(conn, config=config, skill_filter=["health_check"])
+        results = compute_due_checks(conn, config=config, skill_filter=["untriaged_issue_digest"])
         skill_ids = {r["skill_id"] for r in results}
-        assert skill_ids == {"health_check"}
+        assert skill_ids == {"untriaged_issue_digest"}
+
+    def test_project_override_disable_makes_skill_not_due(self, conn: sqlite3.Connection) -> None:
+        """Project-scoped overrides are applied during due computation."""
+        _insert_project(conn, "proj-1")
+
+        from portfolio_manager.maintenance_due import compute_due_checks
+
+        config: dict[str, Any] = {
+            "skills": {
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
+            },
+            "projects": {
+                "proj-1": {
+                    "skills": {
+                        "untriaged_issue_digest": {"enabled": False},
+                    }
+                }
+            },
+        }
+
+        results = compute_due_checks(conn, config=config)
+
+        due = [r for r in results if r["skill_id"] == "untriaged_issue_digest" and r["project_id"] == "proj-1"]
+        assert len(due) == 1
+        assert due[0]["is_due"] is False
+        assert due[0]["reason"] == "disabled"

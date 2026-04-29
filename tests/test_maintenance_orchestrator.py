@@ -13,7 +13,7 @@ from portfolio_manager.maintenance_models import (
     MaintenanceFinding,
     MaintenanceSkillResult,
 )
-from portfolio_manager.state import init_state, open_state
+from portfolio_manager.state import acquire_lock, init_state, open_state, release_lock
 
 if TYPE_CHECKING:
     import sqlite3
@@ -41,8 +41,8 @@ def _insert_project(
 def _make_config(**overrides: Any) -> dict[str, Any]:
     cfg: dict[str, Any] = {
         "skills": {
-            "health_check": {"enabled": True, "interval_hours": 24},
-            "dependency_audit": {"enabled": True, "interval_hours": 48},
+            "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
+            "stale_issue_digest": {"enabled": True, "interval_hours": 48},
         },
     }
     cfg.update(overrides)
@@ -63,7 +63,7 @@ def root(tmp_path: Path) -> Path:
 
 
 def _mock_skill_result(
-    skill_id: str = "health_check",
+    skill_id: str = "untriaged_issue_digest",
     project_id: str = "proj-1",
     findings: list[MaintenanceFinding] | None = None,
     status: str = "success",
@@ -148,7 +148,7 @@ class TestRealRunOrchestration:
         # Use single-skill config to avoid double execution
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
         }
 
@@ -226,11 +226,11 @@ class TestRealRunOrchestration:
         config = _make_config()
 
         fail_result = _mock_skill_result(
-            skill_id="health_check",
+            skill_id="untriaged_issue_digest",
             status="failed",
         )
         success_result = _mock_skill_result(
-            skill_id="dependency_audit",
+            skill_id="stale_issue_digest",
         )
 
         from portfolio_manager.maintenance_orchestrator import run_maintenance
@@ -240,7 +240,7 @@ class TestRealRunOrchestration:
         def mock_execute(skill_id: str, ctx: MaintenanceContext) -> MaintenanceSkillResult:
             nonlocal call_count
             call_count += 1
-            if skill_id == "health_check":
+            if skill_id == "untriaged_issue_digest":
                 return fail_result
             return success_result
 
@@ -273,6 +273,62 @@ class TestRealRunOrchestration:
         assert "runs" in result
         assert "findings_count" in result
         assert "errors" in result
+
+    def test_run_blocks_when_global_lock_held(
+        self,
+        root: Path,
+        conn: sqlite3.Connection,
+    ) -> None:
+        """A held global maintenance lock blocks the whole real run."""
+        _insert_project(conn, "proj-1")
+        config = _make_config()
+
+        from portfolio_manager.maintenance_orchestrator import run_maintenance
+
+        lock = acquire_lock(conn, "maintenance:run", "other-owner", 1800)
+        assert lock.acquired is True
+        try:
+            result = run_maintenance(root, conn, config)
+        finally:
+            release_lock(conn, "maintenance:run", "other-owner")
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "lock_held"
+        assert result["runs"] == []
+
+    def test_project_skill_lock_skips_item_and_records_run(
+        self,
+        root: Path,
+        conn: sqlite3.Connection,
+    ) -> None:
+        """A held project/skill lock skips that item and stores a skipped run."""
+        _insert_project(conn, "proj-1")
+        config: dict[str, Any] = {
+            "skills": {
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
+            },
+        }
+
+        from portfolio_manager.maintenance_orchestrator import run_maintenance
+
+        lock = acquire_lock(
+            conn,
+            "maintenance:project:proj-1:skill:untriaged_issue_digest",
+            "other-owner",
+            600,
+        )
+        assert lock.acquired is True
+        try:
+            result = run_maintenance(root, conn, config)
+        finally:
+            release_lock(conn, "maintenance:project:proj-1:skill:untriaged_issue_digest", "other-owner")
+
+        assert result["runs"][0]["status"] == "skipped"
+        row = conn.execute(
+            "SELECT status, error FROM maintenance_runs WHERE project_id=? AND skill_id=?",
+            ("proj-1", "untriaged_issue_digest"),
+        ).fetchone()
+        assert row == ("skipped", "lock_held")
 
 
 class TestGitHubRefreshIntegration:

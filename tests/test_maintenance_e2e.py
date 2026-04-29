@@ -77,7 +77,7 @@ def _insert_pr(
 def _make_config(**overrides: Any) -> dict[str, Any]:
     cfg: dict[str, Any] = {
         "skills": {
-            "health_check": {"enabled": True, "interval_hours": 24},
+            "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
         },
         "refresh_github": False,
     }
@@ -86,7 +86,7 @@ def _make_config(**overrides: Any) -> dict[str, Any]:
 
 
 def _mock_skill_result(
-    skill_id: str = "health_check",
+    skill_id: str = "untriaged_issue_digest",
     project_id: str = "proj-1",
     findings: list[MaintenanceFinding] | None = None,
     status: str = "success",
@@ -216,7 +216,7 @@ class TestE2ERealRunStoresFindingsAndReport:
             result = run_maintenance(root, conn, config, dry_run=False)
 
         # 1. Run row created and finished
-        cur = conn.execute("SELECT run_id, status FROM maintenance_runs")
+        cur = conn.execute("SELECT id, status FROM maintenance_runs")
         rows = cur.fetchall()
         assert len(rows) >= 1
         run_id = rows[0][0]
@@ -255,7 +255,7 @@ class TestE2ERealRunStoresFindingsAndReport:
 
         metadata_json = json.loads((run_dir / "metadata.json").read_text())
         assert metadata_json["run_id"] == run_id
-        assert metadata_json["skill_id"] == "health_check"
+        assert metadata_json["skill_id"] == "untriaged_issue_digest"
 
         # 4. Result summary has expected keys
         assert "runs" in result
@@ -312,7 +312,7 @@ class TestE2ECreateIssueDraftsLocalOnly:
         )
 
         findings_map: dict[tuple[str, str, str], MaintenanceSkillResult] = {
-            ("proj-1", "health_check", run_id): mock_result,
+            ("proj-1", "untriaged_issue_digest", run_id): mock_result,
         }
         draft_plans = plan_maintenance_issue_drafts(
             findings_map,
@@ -389,7 +389,7 @@ class TestE2ERepeatedRunsAndResolution:
         _insert_project(conn)
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
             "refresh_github": False,
         }
@@ -435,15 +435,11 @@ class TestE2ERepeatedRunsAndResolution:
             mock_reg.list_specs.return_value = []
             run_maintenance(root, conn, config, dry_run=False)
 
-        # The fingerprint should still have exactly 1 row (or at most 2 from
-        # both runs — one per run_id). The key assertion: no unbounded duplication.
         cur = conn.execute(
             "SELECT count(*) FROM maintenance_findings WHERE fingerprint='fp-persist-001'",
         )
         count_after_second = cur.fetchone()[0]
-        # The second run inserts a new finding for its own run_id, so there
-        # should be exactly 2 rows (one per run).
-        assert count_after_second == 2
+        assert count_after_second == 1
 
         # Both runs should be recorded
         cur = conn.execute(
@@ -460,7 +456,7 @@ class TestE2ERepeatedRunsAndResolution:
         _insert_project(conn)
         config: dict[str, Any] = {
             "skills": {
-                "health_check": {"enabled": True, "interval_hours": 24},
+                "untriaged_issue_digest": {"enabled": True, "interval_hours": 24},
             },
             "refresh_github": False,
         }
@@ -516,13 +512,14 @@ class TestE2ERepeatedRunsAndResolution:
         assert cur.fetchone()[0] == 1
 
         # Run 2 should have no new findings with that fingerprint
-        cur = conn.execute("SELECT run_id FROM maintenance_runs ORDER BY started_at")
+        cur = conn.execute("SELECT id FROM maintenance_runs ORDER BY started_at")
         run_ids = [row[0] for row in cur.fetchall()]
         assert len(run_ids) >= 2
 
         latest_run_id = run_ids[-1]
         cur = conn.execute(
-            "SELECT count(*) FROM maintenance_findings WHERE run_id=? AND fingerprint='fp-disappears'",
-            (latest_run_id,),
+            "SELECT status, run_id FROM maintenance_findings WHERE fingerprint='fp-disappears'",
         )
-        assert cur.fetchone()[0] == 0, "Finding should not appear in the second run"
+        row = cur.fetchone()
+        assert row == ("resolved", run_ids[0])
+        assert latest_run_id != run_ids[0]

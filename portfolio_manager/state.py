@@ -187,39 +187,59 @@ CREATE TABLE IF NOT EXISTS stale_branches (
 CREATE INDEX IF NOT EXISTS idx_stale_branches_project ON stale_branches(project_id);
 
 CREATE TABLE IF NOT EXISTS maintenance_runs (
-  run_id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
+  id TEXT PRIMARY KEY,
   skill_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'running',
+  project_id TEXT,
+  status TEXT NOT NULL,
   started_at TEXT NOT NULL,
   finished_at TEXT,
+  due INTEGER NOT NULL DEFAULT 1,
+  dry_run INTEGER NOT NULL DEFAULT 0,
+  refresh_github INTEGER NOT NULL DEFAULT 1,
+  finding_count INTEGER NOT NULL DEFAULT 0,
+  draft_count INTEGER NOT NULL DEFAULT 0,
+  report_path TEXT,
   summary TEXT,
-  reason TEXT,
-  FOREIGN KEY (project_id) REFERENCES projects(id)
+  error TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS maintenance_findings (
-  finding_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  severity TEXT NOT NULL DEFAULT 'info',
+  fingerprint TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  status TEXT NOT NULL,
   title TEXT NOT NULL,
-  body TEXT,
-  source_type TEXT NOT NULL,
+  body TEXT NOT NULL,
+  source_type TEXT,
   source_id TEXT,
   source_url TEXT,
-  metadata_json TEXT DEFAULT '{}',
-  draftable INTEGER NOT NULL DEFAULT 1,
+  metadata_json TEXT,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  resolved_at TEXT,
+  run_id TEXT,
   issue_draft_id TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (run_id) REFERENCES maintenance_runs(run_id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id) REFERENCES maintenance_runs(id) ON DELETE SET NULL,
   FOREIGN KEY (issue_draft_id) REFERENCES issue_drafts(draft_id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project ON maintenance_runs(project_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_runs_skill ON maintenance_runs(skill_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_findings_run ON maintenance_findings(run_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_findings_fingerprint ON maintenance_findings(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project_skill
+ON maintenance_runs(project_id, skill_id, finished_at);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_status
+ON maintenance_runs(status, finished_at);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_project_skill
+ON maintenance_findings(project_id, skill_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_severity
+ON maintenance_findings(severity, status);
 """
 
 # ---------------------------------------------------------------------------
@@ -275,8 +295,72 @@ def open_state(root: Path) -> sqlite3.Connection:
     return conn
 
 
+def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}  # nosec B608
+
+
+def _rebuild_legacy_maintenance_schema(conn: sqlite3.Connection) -> None:
+    """Replace the pre-spec maintenance schema before running current DDL."""
+    run_cols = _table_columns(conn, "maintenance_runs")
+    finding_cols = _table_columns(conn, "maintenance_findings")
+    legacy_runs = bool(run_cols) and "id" not in run_cols and "run_id" in run_cols
+    legacy_findings = bool(finding_cols) and "project_id" not in finding_cols and "fingerprint" in finding_cols
+    if not legacy_runs and not legacy_findings:
+        return
+
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("DROP TABLE IF EXISTS maintenance_findings_legacy")
+        conn.execute("DROP TABLE IF EXISTS maintenance_runs_legacy")
+        if legacy_findings:
+            conn.execute("ALTER TABLE maintenance_findings RENAME TO maintenance_findings_legacy")
+        if legacy_runs:
+            conn.execute("ALTER TABLE maintenance_runs RENAME TO maintenance_runs_legacy")
+
+        conn.executescript(SCHEMA_SQL)
+
+        if legacy_runs:
+            conn.execute(
+                """INSERT OR IGNORE INTO maintenance_runs
+                   (id, project_id, skill_id, status, started_at, finished_at, due, dry_run,
+                    refresh_github, finding_count, draft_count, summary, error, created_at)
+                   SELECT run_id, project_id, skill_id,
+                          CASE status WHEN 'error' THEN 'failed' ELSE status END,
+                          started_at, finished_at, 1, 0, 1, 0, 0, summary, reason, started_at
+                   FROM maintenance_runs_legacy"""
+            )
+
+        if legacy_findings:
+            conn.execute(
+                """INSERT OR IGNORE INTO maintenance_findings
+                   (fingerprint, project_id, skill_id, severity, status, title, body, source_type,
+                    source_id, source_url, metadata_json, first_seen_at, last_seen_at, resolved_at,
+                    run_id, issue_draft_id, created_at, updated_at)
+                   SELECT f.fingerprint, r.project_id, r.skill_id, f.severity, 'open', f.title,
+                          COALESCE(f.body, ''), f.source_type, f.source_id, f.source_url,
+                          COALESCE(f.metadata_json, '{}'), f.created_at, f.created_at, NULL,
+                          f.run_id, f.issue_draft_id, f.created_at, f.created_at
+                   FROM maintenance_findings_legacy f
+                   JOIN maintenance_runs r ON r.id = f.run_id"""
+            )
+            conn.execute(
+                """UPDATE maintenance_runs
+                   SET finding_count = (
+                     SELECT count(*) FROM maintenance_findings
+                     WHERE maintenance_findings.run_id = maintenance_runs.id
+                   )"""
+            )
+
+        conn.execute("DROP TABLE IF EXISTS maintenance_findings_legacy")
+        conn.execute("DROP TABLE IF EXISTS maintenance_runs_legacy")
+        conn.commit()
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
 def init_state(conn: sqlite3.Connection) -> None:
     """Execute the MVP schema. Idempotent (IF NOT EXISTS)."""
+    _rebuild_legacy_maintenance_schema(conn)
     conn.executescript(SCHEMA_SQL)
     conn.execute("CREATE TABLE IF NOT EXISTS _schema_meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT OR IGNORE INTO _schema_meta (key, value) VALUES ('schema_version', '1')")
