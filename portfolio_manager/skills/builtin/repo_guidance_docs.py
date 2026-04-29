@@ -99,22 +99,24 @@ def _run_gh(owner: str, repo: str, endpoint: str) -> subprocess.CompletedProcess
     )
 
 
-def _gh_json(owner: str, repo: str, endpoint: str) -> tuple[bool, Any | None, str | None]:
+def _gh_json(owner: str, repo: str, endpoint: str) -> tuple[bool, Any | None, str | None, bool]:
     try:
         result = _run_gh(owner, repo, endpoint)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, None, str(exc)
+        return False, None, str(exc), False
     if result.returncode != 0:
-        return False, None, result.stderr.strip() or result.stdout.strip() or "gh api request failed"
+        err_output = result.stderr.strip() or result.stdout.strip() or ""
+        is_404 = "404" in err_output
+        return False, None, err_output or "gh api request failed", is_404
     try:
-        return True, json.loads(result.stdout or "null"), None
+        return True, json.loads(result.stdout or "null"), None, False
     except json.JSONDecodeError as exc:
-        return False, None, f"invalid gh api JSON: {exc}"
+        return False, None, f"invalid gh api JSON: {exc}", False
 
 
 def _latest_commit_date(owner: str, repo: str, path: str) -> tuple[datetime | None, str | None]:
     endpoint = f"repos/{owner}/{repo}/commits?path={path}&per_page=1"
-    ok, data, warning = _gh_json(owner, repo, endpoint)
+    ok, data, warning, _is_not_found = _gh_json(owner, repo, endpoint)
     if not ok:
         return None, warning
     if not isinstance(data, list) or not data:
@@ -171,33 +173,34 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
             continue
 
         contents_endpoint = f"repos/{owner}/{repo}/contents/{path}"
-        exists, _data, warning = _gh_json(owner, repo, contents_endpoint)
+        exists, _data, warning, is_not_found = _gh_json(owner, repo, contents_endpoint)
         if not exists:
             if warning:
                 warnings.append(f"{path}: {warning}")
-            if required:
-                severity: Literal["low", "medium"] = "medium" if path == "AGENTS.md" else "low"
-                findings.append(
-                    _finding(
-                        ctx,
-                        severity,
-                        f"Missing required guidance document: {path}",
-                        f"{path} is configured as a required repository guidance document but was not found.",
-                        path,
-                        "missing_required",
+            if is_not_found:
+                if required:
+                    severity: Literal["low", "medium"] = "medium" if path == "AGENTS.md" else "low"
+                    findings.append(
+                        _finding(
+                            ctx,
+                            severity,
+                            f"Missing required guidance document: {path}",
+                            f"{path} is configured as a required repository guidance document but was not found.",
+                            path,
+                            "missing_required",
+                        )
                     )
-                )
-            else:
-                findings.append(
-                    _finding(
-                        ctx,
-                        "info",
-                        f"Missing optional guidance document: {path}",
-                        f"{path} is configured as an optional repository guidance document but was not found.",
-                        path,
-                        "missing_optional",
+                else:
+                    findings.append(
+                        _finding(
+                            ctx,
+                            "info",
+                            f"Missing optional guidance document: {path}",
+                            f"{path} is configured as an optional repository guidance document but was not found.",
+                            path,
+                            "missing_optional",
+                        )
                     )
-                )
             continue
 
         commit_date, commit_warning = _latest_commit_date(owner, repo, path)

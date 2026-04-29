@@ -145,6 +145,8 @@ Read these before implementing:
 ## Verification
 
 After ALL tasks:
-1. Run: `.venv/bin/python -m pytest tests/test_maintenance_builtin.py tests/test_maintenance_registry.py -v --tb=short`
-2. Run: `.venv/bin/python -m pytest tests/ -q --tb=short` — must keep 500 existing tests green
-3. Report test counts
+1. Run: `uv run pytest tests/test_maintenance_builtin.py tests/test_maintenance_registry.py -v --tb=short`
+2. Run: `uv run pytest tests/ -q --tb=short` — must keep 500 existing tests green
+3. Run: `uv run ruff check .` and `uv run ruff format --check .`
+4. Run: `uv run bandit -c pyproject.toml -r .`
+5. Report test counts

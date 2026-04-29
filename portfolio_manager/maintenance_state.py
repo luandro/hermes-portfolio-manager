@@ -151,12 +151,13 @@ def upsert_maintenance_finding(conn: sqlite3.Connection, finding: dict[str, Any]
                (fingerprint, project_id, skill_id, severity, status, title, body, source_type,
                 source_id, source_url, metadata_json, first_seen_at, last_seen_at, resolved_at,
                 run_id, issue_draft_id, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)""",
             (
                 fingerprint,
                 finding["project_id"],
                 finding["skill_id"],
                 finding["severity"],
+                requested_status or "open",
                 finding["title"],
                 finding.get("body") or "",
                 finding.get("source_type"),

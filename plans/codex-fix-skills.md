@@ -3,7 +3,7 @@
 ## Context
 You are fixing portfolio-manager MVP 4 to match SPEC_4.md. DO NOT read SPEC_4.md — all requirements are below.
 
-Working directory: /home/luandro/Dev/hermes-multi-projects/portfolio-manager
+Working directory: portfolio-manager (repo root)
 Branch: feature/mvp4-maintenance-skills
 
 ## Task
@@ -110,8 +110,7 @@ Finding rule: required file missing OR required file has no recent commit within
 Severity: medium for missing AGENTS.md, low for missing README.md, low for stale docs, info for missing optional docs
 
 Allowed read-only GitHub commands:
-```
-gh api --method GET repos/OWNER/REPO/contents/PATH
+```bash
 gh api --method GET "repos/OWNER/REPO/commits?path=PATH&per_page=1"
 ```
 
@@ -139,10 +138,9 @@ Each skill file should:
 
 ## Verification
 ```bash
-cd /home/luandro/Dev/hermes-multi-projects/portfolio-manager
-/home/luandro/.local/bin/ruff check --fix --unsafe-fixes portfolio_manager/skills/ portfolio_manager/maintenance_config.py
-/home/luandro/.local/bin/ruff format portfolio_manager/skills/ portfolio_manager/maintenance_config.py
-uv run python -m pytest tests/ -x --tb=short -q
+uv run ruff check --fix --unsafe-fixes portfolio_manager/skills/ portfolio_manager/maintenance_config.py
+uv run ruff format portfolio_manager/skills/ portfolio_manager/maintenance_config.py
+uv run pytest tests/ -x --tb=short -q
 ```
 
 All tests must pass. Fix any test failures.

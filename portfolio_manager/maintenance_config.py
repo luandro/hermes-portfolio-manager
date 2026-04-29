@@ -259,6 +259,10 @@ def enable_skill(
     if interval_hours is not None:
         skill_cfg["interval_hours"] = interval_hours
     for key, value in (config or {}).items():
+        if key == "enabled":
+            continue
+        if key == "interval_hours" and interval_hours is not None:
+            continue
         skill_cfg[key] = copy.deepcopy(value)
     save_config(root, cfg)
     return load_config(root)

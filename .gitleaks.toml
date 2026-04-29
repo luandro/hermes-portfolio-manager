@@ -1,5 +1,15 @@
 [allowlist]
-  description = "Global allow list"
-  paths = [
-    '''tests/test_maintenance_artifacts\.py$''',
+  description = "Test fixture secrets in test_maintenance_artifacts.py"
+  regexes = [
+    '''ghp_abc123def456''',
+    '''ghp_ABC123XYZ''',
+    '''ghp_ABC123DEF456''',
+    '''github_pat_ABCDEFGH_1234''',
+    '''ghs_ABC123XYZtoken''',
+    '''gho_ABC123XYZ''',
+    '''eyJhbGciOiJIUzI1NiJ9''',
+    '''sk-pro\.\.\.f456''',
+    '''password=hunter2''',
+    '''password=supersecret''',
+    '''token=secret123''',
   ]

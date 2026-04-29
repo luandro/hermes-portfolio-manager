@@ -162,7 +162,7 @@ Remote connection details stored at `~/.config/hermes-deploy/config.json`:
 {
   "username": "user",
   "host": "myserver.com",
-  "remote_base": "$HOME/.hermes"
+  "remote_base": "~/.hermes"
 }
 ```
 

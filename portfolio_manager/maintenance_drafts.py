@@ -77,8 +77,8 @@ def plan_maintenance_issue_drafts(
             # Check if finding already has an issue_draft_id in DB
             if conn is not None:
                 row = conn.execute(
-                    "SELECT issue_draft_id FROM maintenance_findings WHERE fingerprint=? AND issue_draft_id IS NOT NULL LIMIT 1",
-                    (finding.fingerprint,),
+                    "SELECT issue_draft_id FROM maintenance_findings WHERE fingerprint=? AND project_id=? AND skill_id=? AND issue_draft_id IS NOT NULL LIMIT 1",
+                    (finding.fingerprint, project_id, skill_id),
                 ).fetchone()
                 if row and row[0]:
                     continue
@@ -137,6 +137,7 @@ def _build_draft_body(plan: DraftPlan) -> str:
                 # Redact full "key: value" pairs to prevent leaking values after key removal
                 safe_body = re.sub(rf"^.*\b{re.escape(key)}\b.*$", "", safe_body, flags=re.MULTILINE)
             safe_body = "\n".join(line for line in safe_body.split("\n") if line.strip())
+            safe_body = redact_secrets(safe_body)
             parts.append(safe_body)
         if f.source_url:
             parts.append(f"- **Source**: {f.source_url}")
@@ -242,8 +243,8 @@ def create_maintenance_drafts(
         for finding in plan.findings:
             conn.execute(
                 "UPDATE maintenance_findings SET issue_draft_id=?, status='draft_created', updated_at=datetime('now') "
-                "WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
-                (draft_id, finding.fingerprint),
+                "WHERE fingerprint=? AND project_id=? AND skill_id=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
+                (draft_id, finding.fingerprint, plan.project_id, plan.skill_id),
             )
         conn.commit()
 
@@ -318,8 +319,8 @@ def repair_draft_references(root: Path, conn: sqlite3.Connection) -> int:
         for fingerprint in fingerprints:
             # Check whether ANY row already has a draft reference
             existing = conn.execute(
-                "SELECT COUNT(*) FROM maintenance_findings WHERE fingerprint=? AND issue_draft_id IS NOT NULL",
-                (fingerprint,),
+                "SELECT COUNT(*) FROM maintenance_findings WHERE fingerprint=? AND project_id=? AND issue_draft_id IS NOT NULL",
+                (fingerprint, data.get("project_id")),
             ).fetchone()
             if existing and existing[0] > 0:
                 continue
@@ -327,8 +328,8 @@ def repair_draft_references(root: Path, conn: sqlite3.Connection) -> int:
             # Only update rows that are still NULL
             conn.execute(
                 "UPDATE maintenance_findings SET issue_draft_id=?, status='draft_created', updated_at=datetime('now') "
-                "WHERE fingerprint=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
-                (draft_id, fingerprint),
+                "WHERE fingerprint=? AND project_id=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
+                (draft_id, fingerprint, data.get("project_id")),
             )
             conn.commit()
             repairs += 1

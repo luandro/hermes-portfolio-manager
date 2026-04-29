@@ -221,6 +221,24 @@ class TestRequiredHelpers:
                 },
             )
 
+    def test_upsert_honors_requested_status_on_insert(self, conn: sqlite3.Connection) -> None:
+        """When a finding is inserted with requested_status='suppressed', the DB status is 'suppressed'."""
+        upsert_maintenance_finding(
+            conn,
+            {
+                "fingerprint": "fp-suppressed",
+                "project_id": "proj-1",
+                "skill_id": "skill-1",
+                "severity": "low",
+                "status": "ignored",
+                "title": "Suppressed finding",
+                "body": "",
+            },
+        )
+        finding = get_maintenance_finding(conn, "fp-suppressed")
+        assert finding is not None
+        assert finding["status"] == "ignored"
+
 
 class TestGetLatestSuccessfulRun:
     def test_returns_none_when_no_runs(self, conn: sqlite3.Connection) -> None:

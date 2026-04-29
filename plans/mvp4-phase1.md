@@ -285,6 +285,8 @@ Already covered by enable_skill/disable_skill above.
 ## Verification
 
 After ALL tasks:
-1. Run: `.venv/bin/python -m pytest tests/test_maintenance_runs.py tests/test_maintenance_config.py -v`
-2. Run: `.venv/bin/python -m pytest tests/ -q --tb=short` to confirm ALL 471 existing tests still pass
-3. Report the test counts
+1. Run: `uv run pytest tests/test_maintenance_runs.py tests/test_maintenance_config.py -v`
+2. Run: `uv run pytest tests/ -q --tb=short` to confirm all existing tests still pass
+3. Run: `uv run ruff check .` and `uv run ruff format --check .`
+4. Run: `uv run bandit -c pyproject.toml -r .`
+5. Report the test counts

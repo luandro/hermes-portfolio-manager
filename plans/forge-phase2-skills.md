@@ -48,5 +48,5 @@
 - Follow existing code style (dataclasses, type hints)
 
 ## After creating files
-Run: uv run python -m pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
+Run: uv run pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
 All existing tests must still pass.

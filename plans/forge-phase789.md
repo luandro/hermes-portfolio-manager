@@ -99,6 +99,6 @@ Implementation: ensure maintenance_reports.py and maintenance_drafts.py redact p
 
 ## Rules
 1. Write tests FIRST, confirm they fail, then implement
-2. Run: uv run python -m pytest tests/ -x --tb=short -q
+2. Run: uv run pytest tests/ -x --tb=short -q
 3. All 655 existing tests must stay passing
 4. Follow existing patterns in dev_cli.py, test_security.py, test_maintenance_skills.py

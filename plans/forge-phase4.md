@@ -88,7 +88,7 @@ Tests (add to test_maintenance_orchestrator.py):
 
 ## Rules
 1. Write tests FIRST, run them to confirm they FAIL, then implement
-2. Run: uv run python -m pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
+2. Run: uv run pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
 3. All 599 existing tests must stay passing
 4. Follow existing code patterns
 5. Use sqlite3 connections directly (same as maintenance_state.py)

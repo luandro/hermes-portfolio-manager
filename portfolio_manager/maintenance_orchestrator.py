@@ -6,6 +6,7 @@ import contextlib
 import copy
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING, Any
@@ -80,10 +81,16 @@ def _build_project_config(root: Path, conn: sqlite3.Connection, project_id: str)
     if row is None:
         return None
     pid, name, repo_url, priority, status, default_branch = row
-    # Parse owner/repo from repo_url
-    parts = repo_url.rstrip("/").split("/")
-    repo_name = parts[-1].replace(".git", "") if parts else pid
-    owner = parts[-2] if len(parts) >= 2 else "unknown"
+    # Parse owner/repo from repo_url (handles both HTTPS and SSH URLs)
+    cleaned = repo_url.rstrip("/")
+    m = re.search(r"(?:github\.com[:/])(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", cleaned)
+    if m:
+        owner = m.group("owner")
+        repo_name = m.group("repo")
+    else:
+        parts = cleaned.split("/")
+        repo_name = parts[-1].replace(".git", "") if parts else pid
+        owner = parts[-2] if len(parts) >= 2 else "unknown"
     return ProjectConfig(
         id=pid,
         name=name,
@@ -339,18 +346,18 @@ def _run_maintenance_unlocked(
                         "run_id": run_id,
                     },
                 )
-            mark_resolved_missing_findings(
-                conn,
-                project_id,
-                skill_id,
-                {finding.fingerprint for finding in result.findings},
-                datetime.now(UTC).isoformat(),
-            )
-
             total_findings += len(result.findings)
 
             # Finish run
             run_status = result.status if result.status in ("success", "skipped", "blocked", "failed") else "failed"
+            if run_status == "success":
+                mark_resolved_missing_findings(
+                    conn,
+                    project_id,
+                    skill_id,
+                    {finding.fingerprint for finding in result.findings},
+                    datetime.now(UTC).isoformat(),
+                )
             finish_maintenance_run(conn, run_id, run_status, summary=result.summary, error=result.reason)
 
             # Write report artifacts

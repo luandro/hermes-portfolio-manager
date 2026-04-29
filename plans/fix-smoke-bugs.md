@@ -6,7 +6,7 @@
 
 ## Bug 2: `no such table: maintenance_runs`
 **Root cause:** `maintenance_due.py` and `maintenance_orchestrator.py` use `open_state()` which opens the DB, but `init_state()` must be called first to create the tables.
-**Fix:** In `maintenance_tools.py`, every handler that uses `open_state()` should also call `init_state(root)` first. Check handlers: `_handle_portfolio_maintenance_due`, `_handle_portfolio_maintenance_run`, `_handle_portfolio_maintenance_run_project`, `_handle_portfolio_maintenance_report`, `_handle_portfolio_maintenance_skill_enable`, `_handle_portfolio_maintenance_skill_disable`. Add `init_state(root)` before `with open_state(root) as conn:` in each.
+**Fix:** In `maintenance_tools.py`, every handler that uses `open_state()` should also call `init_state()` first. The correct sequence is `init_state(root)` then `with open_state(root) as conn:`. Alternatively, since `init_state` takes a DB connection, use `with open_state(root) as conn: init_state(conn)`. Check handlers: `_handle_portfolio_maintenance_due`, `_handle_portfolio_maintenance_run`, `_handle_portfolio_maintenance_run_project`, `_handle_portfolio_maintenance_report`, `_handle_portfolio_maintenance_skill_enable`, `_handle_portfolio_maintenance_skill_disable`.
 
 ## Bug 3: CLI missing `--skill-id` argument
 **Root cause:** `dev_cli.py` has no `--skill-id` argparse argument. The maintenance tool handlers expect `skill_id` in args dict.

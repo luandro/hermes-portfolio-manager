@@ -22,13 +22,13 @@ published, or mutated without an explicit user request.
 | Tool | Description |
 |------|-------------|
 | `portfolio_maintenance_skill_list` | List all registered maintenance skills and their status |
-| `skill_explain` | Explain one maintenance skill in detail |
-| `skill_enable` | Enable a maintenance skill |
-| `skill_disable` | Disable a maintenance skill |
-| `maintenance_due` | Show which checks are due to run now |
-| `maintenance_run` | Execute or dry-run a full maintenance cycle |
-| `maintenance_run_project` | Run maintenance for a single project |
-| `maintenance_report` | Load and display the latest (or a specific) maintenance report |
+| `portfolio_maintenance_skill_explain` | Explain one maintenance skill in detail |
+| `portfolio_maintenance_skill_enable` | Enable a maintenance skill |
+| `portfolio_maintenance_skill_disable` | Disable a maintenance skill |
+| `portfolio_maintenance_due` | Show which checks are due to run now |
+| `portfolio_maintenance_run` | Execute or dry-run a full maintenance cycle |
+| `portfolio_maintenance_run_project` | Run maintenance for a single project |
+| `portfolio_maintenance_report` | Load and display the latest (or a specific) maintenance report |
 
 ## Guidance
 

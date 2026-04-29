@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -11,6 +10,7 @@ from portfolio_manager.maintenance_models import (
     MaintenanceFinding,
     MaintenanceSkillResult,
     MaintenanceSkillSpec,
+    make_finding_fingerprint,
 )
 from portfolio_manager.maintenance_registry import REGISTRY
 
@@ -49,11 +49,6 @@ def _normalized_title(title: str) -> str:
     return " ".join(title.lower().split())
 
 
-def _fingerprint(project_id: str, source_type: str, source_id: str, title: str) -> str:
-    raw = f"{project_id}{SPEC.id}{source_type}{source_id}{_normalized_title(title)}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-
 def _int_config(ctx: MaintenanceContext, key: str, default: int) -> int:
     try:
         value = int(ctx.skill_config.get(key, default))
@@ -89,7 +84,9 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
         finding_title = f"Stale issue #{issue_number}: {title}"
         findings.append(
             MaintenanceFinding(
-                fingerprint=_fingerprint(ctx.project.id, "issue", source_id, finding_title),
+                fingerprint=make_finding_fingerprint(
+                    SPEC.id, ctx.project.id, "issue", source_id, _normalized_title(finding_title)
+                ),
                 severity=severity,
                 title=finding_title,
                 body=f"Issue #{issue_number} is open and has not been updated since {updated_at or last_seen_at}.",

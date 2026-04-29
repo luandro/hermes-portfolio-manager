@@ -235,6 +235,9 @@ ON maintenance_runs(project_id, skill_id, finished_at);
 CREATE INDEX IF NOT EXISTS idx_maintenance_runs_status
 ON maintenance_runs(status, finished_at);
 
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project_skill_status_finished
+ON maintenance_runs(project_id, skill_id, status, finished_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_maintenance_findings_project_skill
 ON maintenance_findings(project_id, skill_id, status);
 

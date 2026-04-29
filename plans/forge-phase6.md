@@ -5,13 +5,13 @@
 
 ## Context
 - Branch: feature/mvp4-maintenance-skills
-- 635 tests passing, 2 structure tests failing (test_maintenance_tools_registered, test_maintenance_tool_schemas_exist)
+- all tests passing, 2 structure tests failing (test_maintenance_tools_registered, test_maintenance_tool_schemas_exist)
 - Phase 6 fixes those 2 failing tests
 
 ## CRITICAL: Structure test expectations
 
 The test `test_maintenance_tools_registered` expects these 8 tool names in `_TOOL_REGISTRY` in `portfolio_manager/__init__.py`:
-```
+```txt
 portfolio_maintenance_skill_list
 portfolio_maintenance_skill_explain
 portfolio_maintenance_skill_enable
@@ -23,7 +23,7 @@ portfolio_maintenance_report
 ```
 
 The test `test_maintenance_tool_schemas_exist` expects these attributes in `portfolio_manager/schemas.py`:
-```
+```txt
 PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA
 PORTFOLIO_MAINTENANCE_SKILL_EXPLAIN_SCHEMA
 PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA
@@ -121,7 +121,7 @@ Add tests to `tests/test_maintenance_tools.py`:
 
 ## Rules
 1. Write tests FIRST, confirm they fail, then implement
-2. Run: uv run python -m pytest tests/ -x --tb=short -q (all 637 tests must pass including the 2 structure tests)
+2. Run: uv run pytest tests/ -x --tb=short -q (all tests must pass including the 2 structure tests)
 3. Follow existing code patterns EXACTLY
 4. Keep handlers thin — delegate logic to existing modules
 5. Handlers must import from portfolio_manager modules, not from portfolio_manager.tools

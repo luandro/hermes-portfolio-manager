@@ -3,7 +3,7 @@
 You are analyzing a codebase for spec conformance. DO NOT modify any files. Produce a structured analysis and action recommendation only.
 
 ## Project
-- Repo: `/home/luandro/Dev/hermes-multi-projects/portfolio-manager`
+- Repo: `portfolio-manager` (repo root)
 - Branch: `feature/mvp4-maintenance-skills`
 - PR: #4 (https://github.com/luandro/hermes-portfolio-manager/pull/4)
 - 690 tests passing, 58 files changed, ~8k lines
@@ -88,7 +88,7 @@ Verify lock names and TTLs match.
 ## Output Format
 
 For each gap:
-```
+```text
 ### GAP N: <title>
 **Verified:** yes/no
 **Severity:** BLOCKER / IMPORTANT / MINOR / DEFER
@@ -99,7 +99,7 @@ For each gap:
 ```
 
 Final verdict:
-```
+```text
 MERGE DECISION: <block until X fixed, then merge> OR <merge now, fix Y in follow-up>
 PRIORITY ORDER: <ordered list of actions>
 ESTIMATED TOTAL EFFORT: <hours>

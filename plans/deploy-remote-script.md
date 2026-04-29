@@ -47,8 +47,8 @@ After plugin sync, ask the user:
   - Use python for yaml merge to avoid yq dependency issues
 
 ### 5. CLI flags
-```
-./deploy_remote.sh [OPTIONS]
+```bash
+bash scripts/deploy_remote.sh [OPTIONS]
 
 Options:
   -u, --user USER       Remote username (overrides stored config)

@@ -192,6 +192,12 @@ class TestRealRunOrchestration:
         cur = conn.execute("SELECT count(*) FROM maintenance_findings WHERE fingerprint='fp-old'")
         assert cur.fetchone()[0] == 1  # old finding still exists from first run
 
+        # The old finding should be resolved (not seen in second run)
+        row = conn.execute("SELECT status, resolved_at FROM maintenance_findings WHERE fingerprint='fp-old'").fetchone()
+        assert row is not None
+        assert row[0] == "resolved", f"Expected status='resolved', got '{row[0]}'"
+        assert row[1] is not None, "resolved_at should not be NULL for resolved finding"
+
     def test_real_run_writes_report_artifacts(
         self,
         root: Path,
@@ -409,3 +415,49 @@ class TestGitHubRefreshIntegration:
         assert len(result["runs"]) >= 1
         assert "warnings" in result
         assert any("gh unavailable" in w for w in result.get("warnings", []))
+
+
+class TestBuildProjectConfig:
+    """Tests for _build_project_config URL parsing."""
+
+    def test_ssh_url_parses_owner_and_repo(
+        self,
+        root: Path,
+        conn: sqlite3.Connection,
+    ) -> None:
+        """_build_project_config correctly parses SSH GitHub URLs."""
+        now = _now()
+        conn.execute(
+            "INSERT INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, 'medium', ?, ?, ?)",
+            ("proj-ssh", "SSH Project", "git@github.com:acme/my-repo.git", "active", now, now),
+        )
+        conn.commit()
+
+        from portfolio_manager.maintenance_orchestrator import _build_project_config
+
+        cfg = _build_project_config(root, conn, "proj-ssh")
+        assert cfg is not None
+        assert cfg.github.owner == "acme"
+        assert cfg.github.repo == "my-repo"
+
+    def test_https_url_parses_owner_and_repo(
+        self,
+        root: Path,
+        conn: sqlite3.Connection,
+    ) -> None:
+        """_build_project_config correctly parses HTTPS GitHub URLs."""
+        now = _now()
+        conn.execute(
+            "INSERT INTO projects (id, name, repo_url, priority, status, created_at, updated_at) "
+            "VALUES (?, ?, ?, 'medium', ?, ?, ?)",
+            ("proj-https", "HTTPS Project", "https://github.com/acme/my-repo", "active", now, now),
+        )
+        conn.commit()
+
+        from portfolio_manager.maintenance_orchestrator import _build_project_config
+
+        cfg = _build_project_config(root, conn, "proj-https")
+        assert cfg is not None
+        assert cfg.github.owner == "acme"
+        assert cfg.github.repo == "my-repo"

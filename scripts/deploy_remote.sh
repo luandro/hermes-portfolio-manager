@@ -44,6 +44,7 @@ OPT_SAVE_ONLY=false
 
 # --- Usage ---
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
@@ -59,23 +60,29 @@ Options:
   --save-only           Just save/update remote config without syncing
   --help                Show this help
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -u|--user)   OPT_USER="$2";   shift 2 ;;
-        -h|--host)   OPT_HOST="$2";   shift 2 ;;
-        -p|--path)   OPT_PATH="$2";   shift 2 ;;
+        -u|--user)
+            [[ $# -ge 2 ]] || { err "Missing value for $1"; usage 2; }
+            OPT_USER="$2"; shift 2 ;;
+        -h|--host)
+            [[ $# -ge 2 ]] || { err "Missing value for $1"; usage 2; }
+            OPT_HOST="$2"; shift 2 ;;
+        -p|--path)
+            [[ $# -ge 2 ]] || { err "Missing value for $1"; usage 2; }
+            OPT_PATH="$2"; shift 2 ;;
         --plugin-only) OPT_PLUGIN_ONLY=true; shift ;;
         --all)       OPT_ALL=true;    shift ;;
         --dry-run)   OPT_DRY_RUN=true; shift ;;
         --save-only) OPT_SAVE_ONLY=true; shift ;;
-        --help)      usage ;;
+        --help)      usage 0 ;;
         *)
             err "Unknown option: $1"
-            usage
+            usage 2
             ;;
     esac
 done
@@ -306,11 +313,13 @@ for k in (data or {}):
     fi
 
     # Upload temp file, merge on remote via python
-    local temp_remote="/tmp/hermes-config-merge-$$.yaml"
+    local temp_remote
+    temp_remote=$(ssh "${REMOTE_USER}@${REMOTE_HOST}" 'mktemp /tmp/hermes-config-merge-XXXXXX.yaml')
     scp -q "${temp_local}" "${REMOTE_USER}@${REMOTE_HOST}:${temp_remote}"
 
     ssh "${REMOTE_USER}@${REMOTE_HOST}" python3 -s - "$(printf '%q' "${REMOTE_BASE}")" "$(printf '%q' "${temp_remote}")" <<'PYEOF'
-import yaml, os, sys
+import yaml, os, sys, shutil
+from datetime import datetime
 
 remote_base = os.path.expanduser(sys.argv[1])
 remote_config = os.path.join(remote_base, "config.yaml")
@@ -318,6 +327,11 @@ temp_file = sys.argv[2]
 
 try:
     os.chmod(temp_file, 0o600)
+
+    # Backup existing remote config before merging
+    if os.path.isfile(remote_config):
+        backup_path = f"{remote_config}.{datetime.now().strftime('%Y%m%d_%H%M%S')}.bak"
+        shutil.copy2(remote_config, backup_path)
 
     # Load existing remote config
     existing = {}
@@ -380,11 +394,20 @@ print_summary() {
 # ============================
 # Main
 # ============================
+check_dependencies() {
+    if ! python3 -c 'import yaml' 2>/dev/null; then
+        err "PyYAML is required but not installed."
+        err "Install with: pip3 install pyyaml"
+        exit 1
+    fi
+}
+
 main() {
+    check_dependencies
     resolve_config
 
     # Save config on first use or when flags override
-    if [[ "${OPT_DRY_RUN}" != true ]] && { [[ ! -f "${CONFIG_FILE}" ]] || [[ -n "${OPT_USER}" ]] || [[ -n "${OPT_HOST}" ]]; }; then
+    if [[ "${OPT_DRY_RUN}" != true ]] && { [[ "${OPT_SAVE_ONLY}" == true ]] || [[ ! -f "${CONFIG_FILE}" ]] || [[ -n "${OPT_USER}" ]] || [[ -n "${OPT_HOST}" ]] || [[ -n "${OPT_PATH}" ]]; }; then
         save_config
     fi
 

@@ -62,7 +62,7 @@ Tests (add to test_maintenance_reports.py):
 
 ## Rules
 1. Write tests FIRST, run them to confirm they FAIL, then implement
-2. Run: uv run python -m pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
+2. Run: uv run pytest tests/ --ignore=tests/test_structure.py -x --tb=short -q
 3. All 563 existing tests must stay passing
 4. Use Path from pathlib, not os.path
 5. Follow existing code patterns (check existing modules)

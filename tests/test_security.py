@@ -465,7 +465,10 @@ class TestMvp3SubprocessArgumentArrays:
 # ---------------------------------------------------------------------------
 
 # Maintenance source files for security scanning
-MAINTENANCE_FILES = sorted(p for p in SRC_DIR.rglob("*.py") if p.name.startswith("maintenance"))
+BUILTIN_SKILLS_DIR = SRC_DIR / "skills" / "builtin"
+MAINTENANCE_FILES = sorted(
+    set(p for p in SRC_DIR.rglob("*.py") if p.name.startswith("maintenance")) | set(BUILTIN_SKILLS_DIR.rglob("*.py"))
+)
 
 
 class TestMaintenanceCommandAllowlist:
@@ -479,6 +482,8 @@ class TestMaintenanceCommandAllowlist:
 
     def test_only_allowed_gh_commands_in_maintenance_code(self) -> None:
         """Only read-only gh commands are allowed in maintenance modules."""
+        import ast
+
         allowed_prefixes = [
             ["gh", "--version"],
             ["gh", "auth", "status"],
@@ -486,14 +491,48 @@ class TestMaintenanceCommandAllowlist:
             ["gh", "pr", "list"],
             ["gh", "api", "--method", "GET"],
         ]
+
+        def _check_gh_cmd(parts: list[str], src_file: Path) -> None:
+            is_allowed = any(parts[: len(prefix)] == prefix for prefix in allowed_prefixes)
+            assert is_allowed, f"Disallowed gh command '{' '.join(parts)}' in {src_file.relative_to(SRC_DIR.parent)}"
+
         for src_file in MAINTENANCE_FILES:
             content = src_file.read_text()
-            # Find any gh command references
-            for match in re.finditer(r"\"gh\b[^\"]*\"", content):
+            # Check string-form gh calls: "gh <subcommand> ..."
+            # Exclude strings that look like error messages (contain "failed", "error", etc.)
+            _ERROR_MSG_RE = re.compile(r"\b(failed|error|invalid|unable|warning)\b", re.IGNORECASE)
+            for match in re.finditer(
+                r'"gh\s+(issue|pr|api|auth|repo|run|secret|gist|release|workflow)\b[^"]*"', content
+            ):
                 gh_cmd = match.group().strip('"')
+                if _ERROR_MSG_RE.search(gh_cmd):
+                    continue
                 parts = gh_cmd.split()
-                is_allowed = any(parts[: len(prefix)] == prefix for prefix in allowed_prefixes)
-                assert is_allowed, f"Disallowed gh command '{gh_cmd}' in {src_file.relative_to(SRC_DIR.parent)}"
+                _check_gh_cmd(parts, src_file)
+            # Check list-form gh calls via AST: ["gh", ...]
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.List):
+                    elts = node.elts
+                    if (
+                        elts
+                        and isinstance(elts[0], ast.Constant)
+                        and isinstance(elts[0].value, str)
+                        and elts[0].value == "gh"
+                    ):
+                        parts: list[str] = []
+                        all_const = True
+                        for elt in elts:
+                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                parts.append(elt.value)
+                            else:
+                                all_const = False
+                                break
+                        if all_const and parts:
+                            _check_gh_cmd(parts, src_file)
 
     def test_no_gh_issue_create_in_maintenance_code(self) -> None:
         """No gh issue create in maintenance modules."""
@@ -595,11 +634,11 @@ class TestMaintenancePrivacyRedaction:
         assert "ghp_ABC123DEF456" not in redacted
         assert "ghp_***" in redacted
 
-    def test_report_does_not_include_environment_variables(self) -> None:
+    def test_report_does_not_include_environment_variables(self, tmp_path: Path) -> None:
         """Reports do not include raw environment variable values."""
         from portfolio_manager.maintenance_reports import write_maintenance_report
 
-        root = Path("/tmp/test-report-env-check")
+        root = tmp_path / "test-report-env-check"
         run_id = "env-check-run"
         findings = [
             {
