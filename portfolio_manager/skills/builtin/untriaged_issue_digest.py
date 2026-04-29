@@ -81,9 +81,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
         finding_title = f"Untriaged issue #{issue_number}: {title}"
         findings.append(
             MaintenanceFinding(
-                fingerprint=make_finding_fingerprint(
-                    SPEC.id, ctx.project.id, "issue", source_id, _normalized_title(finding_title)
-                ),
+                fingerprint=make_finding_fingerprint(SPEC.id, ctx.project.id, "issue", source_id, source_id),
                 severity=severity,
                 title=finding_title,
                 body=(

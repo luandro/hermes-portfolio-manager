@@ -1012,6 +1012,14 @@ PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA = {
                 "type": "string",
                 "description": "Optional system root override.",
             },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional skill ID filter (comma-separated for multiple).",
+            },
+            "refresh_github": {
+                "type": "boolean",
+                "description": "If true, refresh GitHub data before running. Defaults to false.",
+            },
         },
         "required": ["project_ref"],
     },

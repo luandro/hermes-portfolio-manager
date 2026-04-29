@@ -12,7 +12,7 @@ published, or mutated without an explicit user request.
 > create commits, push branches, or publish GitHub issues.  The only write
 > actions are saving local reports and, when explicitly requested, creating
 > local issue drafts.
-
+>
 > **WARNING: No GitHub issue publishing from maintenance.** Maintenance tools
 > may create local issue drafts but will never call `gh issue create` or any
 > other GitHub mutation.

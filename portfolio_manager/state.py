@@ -357,6 +357,9 @@ def _rebuild_legacy_maintenance_schema(conn: sqlite3.Connection) -> None:
         conn.execute("DROP TABLE IF EXISTS maintenance_findings_legacy")
         conn.execute("DROP TABLE IF EXISTS maintenance_runs_legacy")
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.execute("PRAGMA foreign_keys=ON")
 

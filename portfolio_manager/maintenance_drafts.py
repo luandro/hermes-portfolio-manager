@@ -326,12 +326,13 @@ def repair_draft_references(root: Path, conn: sqlite3.Connection) -> int:
                 continue
 
             # Only update rows that are still NULL
-            conn.execute(
+            cursor = conn.execute(
                 "UPDATE maintenance_findings SET issue_draft_id=?, status='draft_created', updated_at=datetime('now') "
                 "WHERE fingerprint=? AND project_id=? AND (issue_draft_id IS NULL OR issue_draft_id = '')",
                 (draft_id, fingerprint, data.get("project_id")),
             )
-            conn.commit()
-            repairs += 1
+            if cursor.rowcount > 0:
+                conn.commit()
+                repairs += 1
 
     return repairs

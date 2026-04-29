@@ -301,6 +301,8 @@ def _handle_portfolio_maintenance_due(args: dict[str, Any], **kwargs: Any) -> st
             config=config,
             project_filter=project_filter,
             skill_filter=skill_filter,
+            include_paused=_parse_bool(args.get("include_paused"), default=False),
+            include_archived=_parse_bool(args.get("include_archived"), default=False),
         )
 
         due_count = sum(1 for c in checks if c["is_due"])
@@ -340,7 +342,7 @@ def _handle_portfolio_maintenance_run(args: dict[str, Any], **kwargs: Any) -> st
         config = load_config(root)
 
         # Apply runtime overrides
-        dry_run = _parse_bool(args.get("dry_run"), default=False)
+        dry_run = _parse_bool(args.get("dry_run"), default=True)
 
         defaults = config.get("defaults", {})
         config["refresh_github"] = _parse_bool(
@@ -439,7 +441,7 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
         project_id = resolution.project_id or ""
 
         config = load_config(root)
-        dry_run = _parse_bool(args.get("dry_run"), default=False)
+        dry_run = _parse_bool(args.get("dry_run"), default=True)
 
         defaults = config.get("defaults", {})
         config["refresh_github"] = _parse_bool(

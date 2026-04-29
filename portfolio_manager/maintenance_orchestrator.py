@@ -114,7 +114,9 @@ def _refresh_github_data(
         raise RuntimeError("GitHub CLI not available or not authenticated")
 
     # Sync all active projects
-    if project_filter:
+    if project_filter is not None:
+        if not project_filter:
+            return  # empty filter = no projects to refresh
         placeholders = ",".join("?" for _ in project_filter)
         cur = conn.execute(
             f"SELECT id FROM projects WHERE status IN ('active', 'paused') AND id IN ({placeholders})",  # nosec B608
@@ -434,6 +436,9 @@ def _run_maintenance_unlocked(
             findings_map: dict[tuple[str, str, str], Any] = {}
             for run_info in runs:
                 if run_info.get("status") != "success" or run_info.get("findings_count", 0) == 0:
+                    continue
+                skill_cfg = _effective_skill_config(config, run_info["project_id"], run_info["skill_id"])
+                if not skill_cfg.get("create_issue_drafts", config.get("create_issue_drafts", False)):
                     continue
                 # Fetch findings for this run
                 cur = conn.execute(
