@@ -293,8 +293,8 @@ def _handle_portfolio_maintenance_due(args: dict[str, Any], **kwargs: Any) -> st
 
     try:
         config = load_config(root)
-        project_filter = _parse_csv_filter(args.get("project_filter"))
-        skill_filter = _parse_csv_filter(args.get("skill_filter"))
+        project_filter = _parse_csv_filter(args.get("project_id") or args.get("project_filter"))
+        skill_filter = _parse_csv_filter(args.get("skill_id") or args.get("skill_filter"))
 
         checks = compute_due_checks(
             conn,
@@ -356,8 +356,8 @@ def _handle_portfolio_maintenance_run(args: dict[str, Any], **kwargs: Any) -> st
             else bool(config.get("create_issue_drafts", False)),
         )
 
-        project_filter = _parse_csv_filter(args.get("project_filter"))
-        skill_filter = _parse_csv_filter(args.get("skill_filter"))
+        project_filter = _parse_csv_filter(args.get("project_id") or args.get("project_filter"))
+        skill_filter = _parse_csv_filter(args.get("skill_id") or args.get("skill_filter"))
 
         result = run_maintenance(
             root,
@@ -455,11 +455,14 @@ def _handle_portfolio_maintenance_run_project(args: dict[str, Any], **kwargs: An
             else bool(config.get("create_issue_drafts", False)),
         )
 
+        skill_filter_arg = _parse_csv_filter(args.get("skill_id"))
+
         result = run_maintenance(
             root,
             conn,
             config,
             project_filter=[project_id],
+            skill_filter=skill_filter_arg,
             dry_run=bool(dry_run),
         )
         if result.get("status") == "blocked":
@@ -518,7 +521,7 @@ def _handle_portfolio_maintenance_report(args: dict[str, Any], **kwargs: Any) ->
             )
 
         # Apply optional filters to findings
-        severity_filter = args.get("severity_filter")
+        severity_filter = args.get("severity") or args.get("severity_filter")
         if severity_filter and "findings" in report:
             report["findings"] = [f for f in report["findings"] if f.get("severity") == severity_filter]
 

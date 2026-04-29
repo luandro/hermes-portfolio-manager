@@ -818,6 +818,14 @@ PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA = {
                 "type": "string",
                 "description": "Optional system root override.",
             },
+            "include_disabled": {
+                "type": "boolean",
+                "description": "If true, include disabled skills. Defaults to true.",
+            },
+            "include_project_overrides": {
+                "type": "boolean",
+                "description": "If true, include project-level override details. Defaults to false.",
+            },
         },
         "required": [],
     },
@@ -868,6 +876,10 @@ PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA = {
                 "type": "string",
                 "description": "Optional JSON string with additional config overrides.",
             },
+            "create_issue_drafts": {
+                "type": "boolean",
+                "description": "If true, create local issue drafts for draftable findings. Defaults to null (use config default).",
+            },
             "root": {
                 "type": "string",
                 "description": "Optional system root override.",
@@ -908,17 +920,29 @@ PORTFOLIO_MAINTENANCE_DUE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "project_filter": {
-                "type": "string",
-                "description": "Optional comma-separated project IDs to filter.",
-            },
-            "skill_filter": {
-                "type": "string",
-                "description": "Optional comma-separated skill IDs to filter.",
-            },
             "root": {
                 "type": "string",
                 "description": "Optional system root override.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID to filter.",
+            },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional skill ID to filter.",
+            },
+            "include_disabled": {
+                "type": "boolean",
+                "description": "If true, include disabled skills. Defaults to false.",
+            },
+            "include_paused": {
+                "type": "boolean",
+                "description": "If true, include paused projects. Defaults to false.",
+            },
+            "include_archived": {
+                "type": "boolean",
+                "description": "If true, include archived projects. Defaults to false.",
             },
         },
         "required": [],
