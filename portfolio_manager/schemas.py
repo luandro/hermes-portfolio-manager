@@ -962,11 +962,11 @@ PORTFOLIO_MAINTENANCE_RUN_SCHEMA = {
                 "type": "boolean",
                 "description": "If true, plan only — no side effects. Defaults to true.",
             },
-            "project_filter": {
+            "project_id": {
                 "type": "string",
                 "description": "Optional comma-separated project IDs to filter.",
             },
-            "skill_filter": {
+            "skill_id": {
                 "type": "string",
                 "description": "Optional comma-separated skill IDs to filter.",
             },
@@ -1035,15 +1035,15 @@ PORTFOLIO_MAINTENANCE_REPORT_SCHEMA = {
                 "type": "string",
                 "description": "Optional run ID. If omitted, returns the latest report.",
             },
-            "project_filter": {
+            "project_id": {
                 "type": "string",
                 "description": "Optional comma-separated project IDs to filter.",
             },
-            "skill_filter": {
+            "skill_id": {
                 "type": "string",
                 "description": "Optional comma-separated skill IDs to filter.",
             },
-            "severity_filter": {
+            "severity": {
                 "type": "string",
                 "description": "Optional severity filter: high, medium, low, info.",
             },

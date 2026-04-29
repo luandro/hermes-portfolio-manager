@@ -65,7 +65,14 @@ def write_artifact(root: Path, run_id: str, filename: str, content: str) -> Path
     """
     d = ensure_artifact_dir(root, run_id)
     # Reject suspicious filenames
-    if not filename or "/" in filename or "\\" in filename or ".." in filename or filename.startswith("."):
+    if (
+        not filename
+        or not filename.strip()
+        or "/" in filename
+        or "\\" in filename
+        or ".." in filename
+        or filename.startswith(".")
+    ):
         raise ValueError(f"Invalid filename: {filename!r}")
     target = d / filename
     if not target.resolve().is_relative_to(d.resolve()):

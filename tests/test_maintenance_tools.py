@@ -110,7 +110,7 @@ class TestSchemaDefaults:
         s = PORTFOLIO_MAINTENANCE_REPORT_SCHEMA
         assert s["parameters"]["required"] == []
         assert "run_id" in s["parameters"]["properties"]
-        assert "severity_filter" in s["parameters"]["properties"]
+        assert "severity" in s["parameters"]["properties"]
 
 
 # ---------------------------------------------------------------------------

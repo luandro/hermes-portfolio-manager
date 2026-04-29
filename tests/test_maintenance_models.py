@@ -332,9 +332,9 @@ class TestMaintenanceSkillResult:
 
 
 class TestMakeFindingFingerprint:
-    def test_returns_16_char_hex_string(self) -> None:
+    def test_returns_64_char_hex_string(self) -> None:
         fp = make_finding_fingerprint("skill", "proj", "commit", "abc", "key")
-        assert len(fp) == 16
+        assert len(fp) == 64
         assert all(c in "0123456789abcdef" for c in fp)
 
     def test_deterministic(self) -> None:
@@ -373,16 +373,16 @@ class TestMakeFindingFingerprint:
 
     def test_matches_manual_sha256(self) -> None:
         raw = json.dumps(["skill", "proj", "commit", "abc", "key"], separators=(",", ":"), ensure_ascii=False)
-        expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
+        expected = hashlib.sha256(raw.encode()).hexdigest()[:64]
         actual = make_finding_fingerprint("skill", "proj", "commit", "abc", "key")
         assert actual == expected
 
     def test_empty_strings(self) -> None:
         fp = make_finding_fingerprint("", "", "", "", "")
-        assert len(fp) == 16
+        assert len(fp) == 64
         # JSON encoding of empty strings
         raw = '["","","","",""]'
-        expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
+        expected = hashlib.sha256(raw.encode()).hexdigest()[:64]
         assert fp == expected
 
     def test_pipe_in_value_no_collision(self) -> None:

@@ -70,6 +70,9 @@ def _handle_portfolio_maintenance_skill_list(args: dict[str, Any], **kwargs: Any
     tool = "portfolio_maintenance_skill_list"
     root = resolve_root(args.get("root"))
 
+    include_disabled = _parse_bool(args.get("include_disabled"), default=True)
+    include_project_overrides = _parse_bool(args.get("include_project_overrides"), default=False)
+
     registry = get_registry()
     specs = registry.list_specs()
     config = load_config(root)
@@ -79,17 +82,32 @@ def _handle_portfolio_maintenance_skill_list(args: dict[str, Any], **kwargs: Any
     for spec in specs:
         skill_cfg = skills_cfg.get(spec.id, {})
         effective_enabled = skill_cfg.get("enabled", spec.default_enabled)
-        skills.append(
-            {
-                "id": spec.id,
-                "name": spec.name,
-                "description": spec.description,
-                "default_interval_hours": spec.default_interval_hours,
-                "default_enabled": spec.default_enabled,
-                "enabled": effective_enabled,
-                "interval_hours": skill_cfg.get("interval_hours", spec.default_interval_hours),
-            }
-        )
+
+        if not include_disabled and not effective_enabled:
+            continue
+
+        entry = {
+            "id": spec.id,
+            "name": spec.name,
+            "description": spec.description,
+            "default_interval_hours": spec.default_interval_hours,
+            "default_enabled": spec.default_enabled,
+            "enabled": effective_enabled,
+            "interval_hours": skill_cfg.get("interval_hours", spec.default_interval_hours),
+        }
+
+        if include_project_overrides:
+            projects_cfg = config.get("projects", {})
+            if isinstance(projects_cfg, dict):
+                project_overrides = []
+                for pid, pcfg in projects_cfg.items():
+                    if isinstance(pcfg, dict):
+                        pskill = pcfg.get("skills", {}).get(spec.id)
+                        if pskill is not None:
+                            project_overrides.append({"project_id": pid, **pskill})
+                entry["project_overrides"] = project_overrides
+
+        skills.append(entry)
 
     return _result(
         status="success",

@@ -98,4 +98,4 @@ def make_finding_fingerprint(
     raw = json.dumps(
         [skill_id, project_id, source_type, source_id or "", key], separators=(",", ":"), ensure_ascii=False
     )
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+    return hashlib.sha256(raw.encode()).hexdigest()[:64]
