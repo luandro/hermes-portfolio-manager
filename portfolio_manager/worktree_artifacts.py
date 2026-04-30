@@ -31,7 +31,10 @@ def _validate_issue_number(issue_number: int) -> None:
 
 
 def _safe_join(root: Path, *parts: str) -> Path:
-    base = (Path(root) / _ARTIFACT_BASE).resolve()
+    root = Path(root)
+    if not root.is_absolute():
+        raise ValueError(f"root must be an absolute path, got {root!r}")
+    base = (root / _ARTIFACT_BASE).resolve()
     target = (base.joinpath(*parts)).resolve()
     if not target.is_relative_to(base):
         raise ValueError(f"path escapes artifacts root: {target} not under {base}")

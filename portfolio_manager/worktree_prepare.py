@@ -69,8 +69,11 @@ def clone_base_repo(
         return outcome
 
     target_resolved.parent.mkdir(parents=True, exist_ok=True)
+    if not remote_url or remote_url.startswith("-"):
+        outcome.failures.append(f"invalid remote_url: {remote_url!r}")
+        return outcome
     res = run_git(
-        ["clone", remote_url, str(target_resolved)],
+        ["clone", "--", remote_url, str(target_resolved)],
         cwd=target_resolved.parent,
         timeout=DEFAULT_TIMEOUTS["clone"],
     )

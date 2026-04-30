@@ -148,6 +148,10 @@ def run_gh(args: list[str], *, cwd: Path, timeout: int) -> subprocess.CompletedP
         method = args[idx + 1] if idx + 1 < len(args) else ""
         if method.upper() != "GET":
             raise GitCommandError(f"gh --method {method!r} not allowed (GET only)")
+    # Also block --method=<non-GET> single-token form
+    for a in args:
+        if a.startswith("--method=") and a.split("=", 1)[1].upper() != "GET":
+            raise GitCommandError(f"gh {a!r} not allowed (GET only)")
     try:
         result = subprocess.run(
             ["gh", *args],

@@ -197,18 +197,19 @@ def build_plan(
             if wt_origin and not remotes_equal(wt_origin, remote_url):
                 blocked.append(f"existing issue worktree has wrong remote {normalize_remote_url(wt_origin)!r}")
                 would_create = False
-            wt_state = get_clean_state(issue_path)
-            if wt_state in ("merge_conflict", "rebase_conflict", "dirty_uncommitted", "dirty_untracked"):
-                blocked.append(f"existing issue worktree is {wt_state}")
-                would_create = False
             else:
-                # Branch must match too
-                if final_branch_name and not branch_exists(issue_path, final_branch_name, remote=False):
-                    blocked.append(f"existing issue worktree does not have branch {final_branch_name!r}")
+                wt_state = get_clean_state(issue_path)
+                if wt_state in ("merge_conflict", "rebase_conflict", "dirty_uncommitted", "dirty_untracked"):
+                    blocked.append(f"existing issue worktree is {wt_state}")
                     would_create = False
                 else:
-                    skipped_reason = "exact matching clean worktree already exists"
-                    would_create = False
+                    # Branch must match too
+                    if final_branch_name and not branch_exists(issue_path, final_branch_name, remote=False):
+                        blocked.append(f"existing issue worktree does not have branch {final_branch_name!r}")
+                        would_create = False
+                    else:
+                        skipped_reason = "exact matching clean worktree already exists"
+                        would_create = False
 
     # ---- If branch already exists in base repo without matching worktree → block ----
     if (

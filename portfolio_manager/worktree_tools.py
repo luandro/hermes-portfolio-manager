@@ -216,7 +216,7 @@ def _handle_portfolio_worktree_prepare_base(args: dict[str, Any], **kwargs: Any)
         refresh_base=_coerce_bool(args.get("refresh_base"), default=True),
         root=root,
     )
-    if plan.is_blocked and not (plan.would_clone_base or plan.would_refresh_base):
+    if plan.is_blocked:
         return _blocked(tool, "; ".join(plan.blocked_reasons), reason="blocked", data={"plan": plan_to_dict(plan)})
 
     artifact_dir = ensure_artifact_dir(base_artifact_dir(root, plan.project_id))

@@ -170,7 +170,7 @@ def worktree_reconcile(
     diffs: list[str] = []
     if row and not fs_exists:
         diffs.append("sqlite has row but filesystem path missing")
-    if fs_path and not is_git_repo(fs_path):
+    if fs_exists and fs_path and not is_git_repo(fs_path):
         diffs.append("filesystem path is not a git repo")
     branch = None
     state = "unknown"
