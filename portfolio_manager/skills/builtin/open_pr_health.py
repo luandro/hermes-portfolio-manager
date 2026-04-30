@@ -46,12 +46,8 @@ def _parse_timestamp(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def _normalized_title(title: str) -> str:
-    return " ".join(title.lower().split())
-
-
-def _fingerprint(project_id: str, source_type: str, source_id: str, title: str) -> str:
-    raw = f"{project_id}{SPEC.id}{source_type}{source_id}{_normalized_title(title)}"
+def _fingerprint(project_id: str, source_type: str, source_id: str) -> str:
+    raw = f"{project_id}{SPEC.id}{source_type}{source_id}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -110,7 +106,7 @@ def execute(ctx: MaintenanceContext) -> MaintenanceSkillResult:
         finding_title = f"Open PR #{pr_number} needs attention: {title}"
         findings.append(
             MaintenanceFinding(
-                fingerprint=_fingerprint(ctx.project.id, "pull_request", source_id, finding_title),
+                fingerprint=_fingerprint(ctx.project.id, "pull_request", source_id),
                 severity=severity,
                 title=finding_title,
                 body=f"PR #{pr_number} is open with review stage {stage}. Last updated at {updated_at or last_seen_at}.",

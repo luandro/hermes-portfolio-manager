@@ -173,13 +173,15 @@ def upsert_maintenance_finding(conn: sqlite3.Connection, finding: dict[str, Any]
             ),
         )
     elif existing["status"] in {"open", "draft_created"}:
+        new_status = requested_status if requested_status is not None else existing["status"]
         conn.execute(
             """UPDATE maintenance_findings
-               SET severity=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
+               SET severity=?, status=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
                    metadata_json=?, last_seen_at=?, run_id=?, updated_at=?
                WHERE fingerprint=?""",
             (
                 finding["severity"],
+                new_status,
                 finding["title"],
                 finding.get("body") or "",
                 finding.get("source_type"),
@@ -193,13 +195,16 @@ def upsert_maintenance_finding(conn: sqlite3.Connection, finding: dict[str, Any]
             ),
         )
     elif existing["status"] == "resolved":
+        new_status = requested_status if requested_status is not None else "open"
+        resolved_at_clause = "resolved_at=NULL" if new_status != "resolved" else "resolved_at=resolved_at"
         conn.execute(
-            """UPDATE maintenance_findings
-               SET severity=?, status='open', title=?, body=?, source_type=?, source_id=?, source_url=?,
-                   metadata_json=?, last_seen_at=?, resolved_at=NULL, run_id=?, updated_at=?
+            f"""UPDATE maintenance_findings
+               SET severity=?, status=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
+                   metadata_json=?, last_seen_at=?, {resolved_at_clause}, run_id=?, updated_at=?
                WHERE fingerprint=?""",
             (
                 finding["severity"],
+                new_status,
                 finding["title"],
                 finding.get("body") or "",
                 finding.get("source_type"),
