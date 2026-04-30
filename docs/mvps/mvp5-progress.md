@@ -1363,7 +1363,7 @@ state mutated beyond inspection rows.
 
 ## 15.1 Full pytest  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Run the full suite:
@@ -1383,7 +1383,7 @@ pytest exits 0 with no skipped MVP 5 tests.
 
 ## 15.2 Update handoff status  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None.

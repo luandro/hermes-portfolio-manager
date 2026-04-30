@@ -54,7 +54,7 @@ Do not assume implementation status from this document alone.
 | MVP 2 - Project administration | Baseline | Run full tests; verify project add/pause/resume/archive flow using test root |
 | MVP 3 - Issue creation and brainstorming | Baseline | Run full tests; verify draft, dry-run, duplicate detection, and create-from-draft using test repo or mocks |
 | MVP 4 - Maintenance skills | Merge boundary | Run full tests; verify maintenance tools and local draft behavior |
-| MVP 5 - Worktree preparation | Specified, not started | Must not start before MVPs 1-4 are green |
+| MVP 5 - Worktree preparation | Implemented (automated tests green; manual smoke deferred) | Run full tests; verify plan / prepare-base / create-issue tools dry-run + confirm flow against `/tmp/agent-system-test` with the local bare-repo fixture |
 | MVP 6-10 - Implementation, review, QA, operations, constrained autonomy | Roadmap specs only | Must not implement before previous MVPs are green |
 
 ## Verification Gate Before New Work
