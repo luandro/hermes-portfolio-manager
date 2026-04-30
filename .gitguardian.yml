@@ -3,4 +3,3 @@ version: 2
 secret:
   ignored_paths:
     - 'tests/test_maintenance_artifacts.py'
-    - 'tests/test_security.py'
