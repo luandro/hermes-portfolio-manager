@@ -803,6 +803,260 @@ PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA = {
 }
 
 # ---------------------------------------------------------------------------
+# MVP 4 — Maintenance tools
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA = {
+    "name": "portfolio_maintenance_skill_list",
+    "description": (
+        "List all registered maintenance skills with their enabled/disabled status from the maintenance config."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+            "include_disabled": {
+                "type": "boolean",
+                "description": "If true, include disabled skills. Defaults to true.",
+            },
+            "include_project_overrides": {
+                "type": "boolean",
+                "description": "If true, include project-level override details. Defaults to false.",
+            },
+        },
+        "required": [],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_SKILL_EXPLAIN_SCHEMA = {
+    "name": "portfolio_maintenance_skill_explain",
+    "description": ("Show the skill spec and effective config for a specific maintenance skill."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "skill_id": {
+                "type": "string",
+                "description": "Maintenance skill ID to explain.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID for project-specific config.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["skill_id"],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA = {
+    "name": "portfolio_maintenance_skill_enable",
+    "description": "Enable a maintenance skill in the config.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "skill_id": {
+                "type": "string",
+                "description": "Maintenance skill ID to enable.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID for project-scoped enable.",
+            },
+            "interval_hours": {
+                "type": "integer",
+                "description": "Optional check interval in hours.",
+            },
+            "config_json": {
+                "type": "string",
+                "description": "Optional JSON string with additional config overrides.",
+            },
+            "create_issue_drafts": {
+                "type": "boolean",
+                "description": "If true, create local issue drafts for draftable findings. Defaults to null (use config default).",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["skill_id"],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_SKILL_DISABLE_SCHEMA = {
+    "name": "portfolio_maintenance_skill_disable",
+    "description": "Disable a maintenance skill in the config.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "skill_id": {
+                "type": "string",
+                "description": "Maintenance skill ID to disable.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID for project-scoped disable.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": ["skill_id"],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_DUE_SCHEMA = {
+    "name": "portfolio_maintenance_due",
+    "description": (
+        "Check which maintenance skills are due to run across projects. Returns counts of due and not-due checks."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project ID to filter.",
+            },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional skill ID to filter.",
+            },
+            "include_disabled": {
+                "type": "boolean",
+                "description": "If true, include disabled skills. Defaults to false.",
+            },
+            "include_paused": {
+                "type": "boolean",
+                "description": "If true, include paused projects. Defaults to false.",
+            },
+            "include_archived": {
+                "type": "boolean",
+                "description": "If true, include archived projects. Defaults to false.",
+            },
+        },
+        "required": [],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_RUN_SCHEMA = {
+    "name": "portfolio_maintenance_run",
+    "description": (
+        "Execute or dry-run a maintenance cycle across projects. "
+        "In dry-run mode, returns planned checks without side effects."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, plan only — no side effects. Defaults to true.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional comma-separated project IDs to filter.",
+            },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional comma-separated skill IDs to filter.",
+            },
+            "create_issue_drafts": {
+                "type": "boolean",
+                "description": "If true, create local issue drafts for draftable findings. Defaults to false.",
+            },
+            "refresh_github": {
+                "type": "boolean",
+                "description": "If true, refresh GitHub data before running. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": [],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA = {
+    "name": "portfolio_maintenance_run_project",
+    "description": (
+        "Run maintenance for a single project. Resolves the project reference "
+        "then delegates to the maintenance orchestrator."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {
+                "type": "string",
+                "description": "Project reference: ID, name, or owner/repo string.",
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, plan only — no side effects. Defaults to true.",
+            },
+            "create_issue_drafts": {
+                "type": "boolean",
+                "description": "If true, create local issue drafts for draftable findings. Defaults to false.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional skill ID filter (comma-separated for multiple).",
+            },
+            "refresh_github": {
+                "type": "boolean",
+                "description": "If true, refresh GitHub data before running. Defaults to false.",
+            },
+        },
+        "required": ["project_ref"],
+    },
+}
+
+PORTFOLIO_MAINTENANCE_REPORT_SCHEMA = {
+    "name": "portfolio_maintenance_report",
+    "description": ("Load a maintenance report by run_id, or the latest report if no run_id given."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "run_id": {
+                "type": "string",
+                "description": "Optional run ID. If omitted, returns the latest report.",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional comma-separated project IDs to filter.",
+            },
+            "skill_id": {
+                "type": "string",
+                "description": "Optional comma-separated skill IDs to filter.",
+            },
+            "severity": {
+                "type": "string",
+                "description": "Optional severity filter: high, medium, low, info.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional system root override.",
+            },
+        },
+        "required": [],
+    },
+}
+
+# ---------------------------------------------------------------------------
 # All schemas in order
 # ---------------------------------------------------------------------------
 
@@ -836,4 +1090,13 @@ ALL_SCHEMAS = [
     PORTFOLIO_ISSUE_EXPLAIN_DRAFT_SCHEMA,
     PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA,
     PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA,
+    # MVP 4
+    PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_EXPLAIN_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_DISABLE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_DUE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_RUN_SCHEMA,
+    PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA,
+    PORTFOLIO_MAINTENANCE_REPORT_SCHEMA,
 ]

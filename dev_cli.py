@@ -8,6 +8,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from portfolio_manager.maintenance_tools import (
+    _handle_portfolio_maintenance_due,
+    _handle_portfolio_maintenance_report,
+    _handle_portfolio_maintenance_run,
+    _handle_portfolio_maintenance_run_project,
+    _handle_portfolio_maintenance_skill_disable,
+    _handle_portfolio_maintenance_skill_enable,
+    _handle_portfolio_maintenance_skill_explain,
+    _handle_portfolio_maintenance_skill_list,
+)
 from portfolio_manager.tools import (
     _handle_portfolio_config_validate,
     _handle_portfolio_github_sync,
@@ -65,6 +75,24 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_issue_explain_draft": _handle_portfolio_issue_explain_draft,
     "portfolio_issue_list_drafts": _handle_portfolio_issue_list_drafts,
     "portfolio_issue_discard_draft": _handle_portfolio_issue_discard_draft,
+    # MVP 4 — maintenance
+    "portfolio_maintenance_skill_list": _handle_portfolio_maintenance_skill_list,
+    "portfolio_maintenance_skill_explain": _handle_portfolio_maintenance_skill_explain,
+    "portfolio_maintenance_skill_enable": _handle_portfolio_maintenance_skill_enable,
+    "portfolio_maintenance_skill_disable": _handle_portfolio_maintenance_skill_disable,
+    "portfolio_maintenance_due": _handle_portfolio_maintenance_due,
+    "portfolio_maintenance_run": _handle_portfolio_maintenance_run,
+    "portfolio_maintenance_run_project": _handle_portfolio_maintenance_run_project,
+    "portfolio_maintenance_report": _handle_portfolio_maintenance_report,
+    # Short maintenance aliases
+    "maintenance-skill-list": _handle_portfolio_maintenance_skill_list,
+    "maintenance-skill-explain": _handle_portfolio_maintenance_skill_explain,
+    "maintenance-skill-enable": _handle_portfolio_maintenance_skill_enable,
+    "maintenance-skill-disable": _handle_portfolio_maintenance_skill_disable,
+    "maintenance-due": _handle_portfolio_maintenance_due,
+    "maintenance-run": _handle_portfolio_maintenance_run,
+    "maintenance-run-project": _handle_portfolio_maintenance_run_project,
+    "maintenance-report": _handle_portfolio_maintenance_report,
 }
 
 
@@ -105,6 +133,21 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--allow-open-questions", type=str, help="Allow open questions (true/false)")
     parser.add_argument("--allow-possible-duplicate", type=str, help="Allow possible duplicate (true/false)")
     parser.add_argument("--include-created", type=str, help="Include created drafts (true/false)")
+    parser.add_argument("--skill-id", help="Maintenance skill ID")
+    parser.add_argument("--interval-hours", type=int, help="Skill interval in hours (1-2160)")
+    parser.add_argument("--config-json", help="JSON object for skill config")
+    parser.add_argument("--include-disabled", type=str, help="Include disabled skills (true/false)")
+    parser.add_argument("--include-project-overrides", type=str, help="Include project overrides (true/false)")
+    parser.add_argument("--include-paused", type=str, help="Include paused projects (true/false)")
+    parser.add_argument("--include-archived", type=str, help="Include archived projects (true/false)")
+    parser.add_argument("--include-not-due", type=str, help="Include not-due checks (true/false)")
+    parser.add_argument("--refresh-github", type=str, help="Refresh GitHub state (true/false)")
+    parser.add_argument("--create-issue-drafts", type=str, help="Create local issue drafts (true/false)")
+    parser.add_argument("--max-projects", type=int, help="Max projects per run")
+    parser.add_argument("--run-id", help="Specific maintenance run ID")
+    parser.add_argument("--severity", help="Filter by severity (info/low/medium/high)")
+    parser.add_argument("--limit", type=int, help="Max results to return")
+    parser.add_argument("--include-resolved", type=str, help="Include resolved findings (true/false)")
     parser.add_argument("--root", help="System root path override")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args(argv)
@@ -158,6 +201,36 @@ def main(argv: list[str] | None = None) -> None:
         handler_args["allow_possible_duplicate"] = _to_bool(args.allow_possible_duplicate)
     if args.include_created is not None:
         handler_args["include_created"] = _to_bool(args.include_created)
+    if args.skill_id is not None:
+        handler_args["skill_id"] = args.skill_id
+    if args.include_disabled is not None:
+        handler_args["include_disabled"] = _to_bool(args.include_disabled)
+    if args.include_project_overrides is not None:
+        handler_args["include_project_overrides"] = _to_bool(args.include_project_overrides)
+    if args.include_paused is not None:
+        handler_args["include_paused"] = _to_bool(args.include_paused)
+    if args.include_archived is not None:
+        handler_args["include_archived"] = _to_bool(args.include_archived)
+    if args.include_not_due is not None:
+        handler_args["include_not_due"] = _to_bool(args.include_not_due)
+    if args.refresh_github is not None:
+        handler_args["refresh_github"] = _to_bool(args.refresh_github)
+    if args.create_issue_drafts is not None:
+        handler_args["create_issue_drafts"] = _to_bool(args.create_issue_drafts)
+    if args.include_resolved is not None:
+        handler_args["include_resolved"] = _to_bool(args.include_resolved)
+    if args.interval_hours is not None:
+        handler_args["interval_hours"] = args.interval_hours
+    if args.max_projects is not None:
+        handler_args["max_projects"] = args.max_projects
+    if args.limit is not None:
+        handler_args["limit"] = args.limit
+    if args.config_json is not None:
+        handler_args["config_json"] = args.config_json
+    if args.run_id is not None:
+        handler_args["run_id"] = args.run_id
+    if args.severity is not None:
+        handler_args["severity"] = args.severity
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "test fixtures for secret redaction testing"
+paths = [
+  '''tests/test_maintenance_artifacts\.py'''
+]

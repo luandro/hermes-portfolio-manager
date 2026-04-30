@@ -398,15 +398,15 @@ repo_guidance_docs fails safely and never treats malformed GitHub responses as s
 The dev agent should add these files to the repository before implementation or in the first documentation checkpoint:
 
 ```txt
-MVP4_SPEC.md
-MVP4_PROGRESS.md
+docs/mvps/mvp4-spec.md
+docs/mvps/mvp4-progress.md
 ```
 
 Rules:
 
 ```txt
 Do not leave the MVP 4 source of truth only in chat/canvas.
-Do not mark PROJECT_HANDOFF.md as MVP 4 complete until tests and smoke checks pass.
+Do not mark docs/product/project-handoff.md as MVP 4 complete until tests and smoke checks pass.
 ```
 
 ---
@@ -415,7 +415,7 @@ Do not mark PROJECT_HANDOFF.md as MVP 4 complete until tests and smoke checks pa
 
 ## 0.1 Confirm repository baseline
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -446,7 +446,7 @@ If tests fail, document and fix pre-existing regression before continuing.
 
 ## 0.2 Inspect actual package layout
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -484,7 +484,7 @@ No architecture change is made during discovery.
 
 ## 0.3 Add structure expectations as failing tests
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -523,7 +523,7 @@ The tests fail for expected MVP 4 missing functionality, not unrelated import er
 
 ## 1.1 Add SQLite schema for maintenance runs and findings
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -567,7 +567,7 @@ No migration breaks existing tables.
 
 ## 1.2 Add maintenance state helper functions
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -627,7 +627,7 @@ Invalid statuses raise controlled validation errors or return blocked through to
 
 ## 1.3 Add stale-running-run recovery
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -668,7 +668,7 @@ No artifacts are deleted.
 
 ## 1.4 Add maintenance config loader with defaults
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -716,7 +716,7 @@ Effective config resolution follows spec order.
 
 ## 1.5 Add maintenance config mutation helpers
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -769,7 +769,7 @@ Config mutation is atomic, backed up, locked, and preserves unknown allowed exte
 
 ## 2.1 Add maintenance data models
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -807,7 +807,7 @@ Invalid severity/status values are rejected.
 
 ## 2.2 Add maintenance registry
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -856,7 +856,7 @@ No arbitrary code loading exists.
 
 ## 2.3 Implement stable finding fingerprints
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -898,7 +898,7 @@ Different real findings remain distinct.
 
 ## 2.4 Implement `untriaged_issue_digest` pure logic
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -936,7 +936,7 @@ No GitHub command is used.
 
 ## 2.5 Implement `stale_issue_digest` pure logic
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -973,7 +973,7 @@ Thresholds are config-driven and tested.
 
 ## 2.6 Implement `open_pr_health` pure logic
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1012,7 +1012,7 @@ Config flags are honored.
 
 ## 2.7 Implement `repo_guidance_docs` with mocked GitHub GET only
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1061,7 +1061,7 @@ Only GET commands are possible.
 
 ## 3.1 Add maintenance artifact path helpers
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1103,7 +1103,7 @@ Secrets are redacted.
 
 ## 3.2 Write `report.md`, `findings.json`, and `metadata.json`
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1147,7 +1147,7 @@ JSON files are valid and deterministic enough for tests.
 
 ## 3.3 Add planned, refresh, draft, and error artifact writers
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1192,7 +1192,7 @@ Errors never expose secrets.
 
 ## 4.1 Implement due computation
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1239,7 +1239,7 @@ Due computation is deterministic and independent of Hermes.
 
 ## 4.2 Implement dry-run planning
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1277,7 +1277,7 @@ Dry-run has zero side effects and gives a useful preview.
 
 ## 4.3 Implement real run orchestration without drafts
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1338,7 +1338,7 @@ Failures are controlled and do not stop unrelated checks.
 
 ## 4.4 Integrate optional read-only GitHub refresh
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1384,7 +1384,7 @@ Maintenance uses current GitHub data when possible but fails safely when unavail
 
 ## 5.1 Add draft planning rules
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1426,7 +1426,7 @@ Draft creation rules are deterministic before side effects are added.
 
 ## 5.2 Create local issue drafts through MVP 3 helpers
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1474,7 +1474,7 @@ Failures do not lose findings.
 
 ## 5.3 Add repair behavior for partial draft creation
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1510,7 +1510,7 @@ Crash recovery can repair successful draft creation where SQLite update failed.
 
 ## 6.1 Add tool schemas
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1561,7 +1561,7 @@ Defaults match the spec.
 
 ## 6.2 Implement list and explain tools
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1604,7 +1604,7 @@ The user can see and understand available maintenance skills.
 
 ## 6.3 Implement enable and disable tools
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1651,7 +1651,7 @@ Config mutation is locked, atomic, and backed up.
 
 ## 6.4 Implement due tool
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1692,7 +1692,7 @@ The user can safely preview due maintenance work.
 
 ## 6.5 Implement run tools
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1739,7 +1739,7 @@ Project ambiguity blocks instead of guessing.
 
 ## 6.6 Implement report tool
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1783,7 +1783,7 @@ The user can review recent maintenance results from chat.
 
 ## 7.1 Add CLI parser entries for all maintenance tools
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1845,7 +1845,7 @@ All MVP 4 tools are callable outside Hermes.
 
 ## 7.2 Add CLI behavior tests with test root
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1893,7 +1893,7 @@ CLI commands return valid JSON shared result shapes.
 
 ## 8.1 Add `portfolio-maintenance` skill folder
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1942,7 +1942,7 @@ Hermes has clear instructions for safe maintenance workflows.
 
 ## 8.2 Add Hermes-style examples
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -1984,7 +1984,7 @@ A Hermes agent can choose the correct MVP 4 tools safely.
 
 ## 9.1 Add command allowlist tests
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2033,7 +2033,7 @@ Security tests prove MVP 4 cannot run forbidden GitHub or git commands.
 
 ## 9.2 Add path containment and traversal tests
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2076,7 +2076,7 @@ MVP 4 cannot escape runtime root or pass unsafe paths to gh api.
 
 ## 9.3 Add privacy and redaction tests
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2115,7 +2115,7 @@ Maintenance reports, artifacts, and drafts are public-safe except for local file
 
 ## 10.1 E2E: dry-run with seeded test root
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2155,7 +2155,7 @@ Dry-run creates no SQLite run rows, no artifacts, no drafts, and no GitHub comma
 
 ## 10.2 E2E: real run stores findings and report
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2187,7 +2187,7 @@ A real run creates one run row, expected findings, and report artifacts.
 
 ## 10.3 E2E: local draft creation only
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2221,7 +2221,7 @@ Findings reference the local draft ID.
 
 ## 10.4 E2E: repeated run dedupes and resolves findings
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2255,7 +2255,7 @@ Findings disappear cleanly when resolved.
 
 ## 10.5 Full regression suite
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 
@@ -2370,9 +2370,9 @@ No code test required, but final `pytest` must already pass.
 Update repository docs as appropriate:
 
 ```txt
-Add MVP4_SPEC.md if not already committed.
-Add MVP4_PROGRESS.md.
-Update PROJECT_HANDOFF.md status table only after implementation is verified.
+Add docs/mvps/mvp4-spec.md if not already committed.
+Add docs/mvps/mvp4-progress.md.
+Update docs/product/project-handoff.md status table only after implementation is verified.
 Mention MVP 4 completion criteria and smoke-test notes.
 ```
 
@@ -2414,7 +2414,7 @@ Resolved findings are marked resolved.
 Security tests prove no forbidden commands, no shell=True, safe paths, and redaction.
 Manual CLI smoke passes.
 Manual Hermes smoke passes.
-PROJECT_HANDOFF.md is updated only after verification.
+docs/product/project-handoff.md is updated only after verification.
 ```
 
 ---

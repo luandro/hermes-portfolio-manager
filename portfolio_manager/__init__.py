@@ -5,6 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from portfolio_manager.maintenance_tools import (
+    _handle_portfolio_maintenance_due,
+    _handle_portfolio_maintenance_report,
+    _handle_portfolio_maintenance_run,
+    _handle_portfolio_maintenance_run_project,
+    _handle_portfolio_maintenance_skill_disable,
+    _handle_portfolio_maintenance_skill_enable,
+    _handle_portfolio_maintenance_skill_explain,
+    _handle_portfolio_maintenance_skill_list,
+)
 from portfolio_manager.schemas import (
     PORTFOLIO_CONFIG_VALIDATE_SCHEMA,
     PORTFOLIO_GITHUB_SYNC_SCHEMA,
@@ -17,6 +27,15 @@ from portfolio_manager.schemas import (
     PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA,
     PORTFOLIO_ISSUE_QUESTIONS_SCHEMA,
     PORTFOLIO_ISSUE_UPDATE_DRAFT_SCHEMA,
+    # MVP 4 maintenance schemas
+    PORTFOLIO_MAINTENANCE_DUE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_REPORT_SCHEMA,
+    PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA,
+    PORTFOLIO_MAINTENANCE_RUN_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_DISABLE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_EXPLAIN_SCHEMA,
+    PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA,
     PORTFOLIO_PING_SCHEMA,
     PORTFOLIO_PROJECT_ADD_SCHEMA,
     PORTFOLIO_PROJECT_ARCHIVE_SCHEMA,
@@ -105,6 +124,35 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
     ("portfolio_issue_explain_draft", PORTFOLIO_ISSUE_EXPLAIN_DRAFT_SCHEMA, _handle_portfolio_issue_explain_draft),
     ("portfolio_issue_list_drafts", PORTFOLIO_ISSUE_LIST_DRAFTS_SCHEMA, _handle_portfolio_issue_list_drafts),
     ("portfolio_issue_discard_draft", PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA, _handle_portfolio_issue_discard_draft),
+    # MVP 4 tools
+    (
+        "portfolio_maintenance_skill_list",
+        PORTFOLIO_MAINTENANCE_SKILL_LIST_SCHEMA,
+        _handle_portfolio_maintenance_skill_list,
+    ),
+    (
+        "portfolio_maintenance_skill_explain",
+        PORTFOLIO_MAINTENANCE_SKILL_EXPLAIN_SCHEMA,
+        _handle_portfolio_maintenance_skill_explain,
+    ),
+    (
+        "portfolio_maintenance_skill_enable",
+        PORTFOLIO_MAINTENANCE_SKILL_ENABLE_SCHEMA,
+        _handle_portfolio_maintenance_skill_enable,
+    ),
+    (
+        "portfolio_maintenance_skill_disable",
+        PORTFOLIO_MAINTENANCE_SKILL_DISABLE_SCHEMA,
+        _handle_portfolio_maintenance_skill_disable,
+    ),
+    ("portfolio_maintenance_due", PORTFOLIO_MAINTENANCE_DUE_SCHEMA, _handle_portfolio_maintenance_due),
+    ("portfolio_maintenance_run", PORTFOLIO_MAINTENANCE_RUN_SCHEMA, _handle_portfolio_maintenance_run),
+    (
+        "portfolio_maintenance_run_project",
+        PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA,
+        _handle_portfolio_maintenance_run_project,
+    ),
+    ("portfolio_maintenance_report", PORTFOLIO_MAINTENANCE_REPORT_SCHEMA, _handle_portfolio_maintenance_report),
 ]
 
 # Skills directory: check repo-root skills/ first, fall back to plugin-local
@@ -117,6 +165,7 @@ _SKILL_DESCRIPTIONS: dict[str, str] = {
     "project-admin": "Administer portfolio projects — add, update, pause, resume, archive, remove, set priority, explain, manage auto-merge, create config backups.",
     "issue-brainstorm": "Brainstorm and refine an issue draft from a rough description.",
     "issue-create": "Create a GitHub issue from a refined draft (with confirmation).",
+    "portfolio-maintenance": "Run safe maintenance checks and generate reports.",
 }
 
 

@@ -37,7 +37,7 @@ When in doubt, treat as hard.
 Do these directly (not through forge):
 - Reading files, understanding the codebase
 - Running linters, tests (discover commands via `search_files` if needed)
-- Editing HERMES.md, AGENTS.md, SPEC.md, plans/
+- Editing HERMES.md, AGENTS.md, docs/mvps/, plans/
 - Git operations (add, commit, push, branch, PR)
 - Post-commit: `forge update && forge workspace sync`
 
