@@ -21,16 +21,22 @@ from portfolio_manager.state import init_state, open_state, upsert_project
 from portfolio_manager.worktree_artifacts import (
     base_artifact_dir,
     ensure_artifact_dir,
+    issue_artifact_dir,
     write_commands,
     write_error,
     write_plan,
     write_preflight,
     write_result,
 )
-from portfolio_manager.worktree_locks import WorktreeLockBusy, with_project_lock
+from portfolio_manager.worktree_create import create_issue_worktree
+from portfolio_manager.worktree_locks import (
+    WorktreeLockBusy,
+    with_project_and_issue_locks,
+    with_project_lock,
+)
 from portfolio_manager.worktree_planner import build_plan, plan_to_dict
 from portfolio_manager.worktree_prepare import clone_base_repo, refresh_base_branch
-from portfolio_manager.worktree_state import upsert_base_worktree
+from portfolio_manager.worktree_state import upsert_base_worktree, upsert_issue_worktree
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -311,6 +317,166 @@ def _execute_prepare_base(tool: str, plan: Any, config: Any, root: Path, artifac
                 message=f"Base repo ready for {plan.project_id}",
                 data={"outcome": result_payload, "artifact_dir": str(artifact_dir)},
                 summary=f"prepared base for {plan.project_id}",
+            )
+    except WorktreeLockBusy as exc:
+        return _blocked(tool, str(exc), reason="lock_busy")
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# 8.4 portfolio_worktree_create_issue handler
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_worktree_create_issue(args: dict[str, Any], **kwargs: Any) -> str:
+    """Create an issue worktree (idempotent on exact-match clean state)."""
+    tool = "portfolio_worktree_create_issue"
+    project_ref = args.get("project_ref", "")
+    if not project_ref:
+        return _blocked(tool, "project_ref is required", reason="invalid_input")
+
+    issue_number, err = _validate_issue_number(args)
+    if err is not None:
+        return _blocked(tool, err, reason="invalid_input")
+    assert issue_number is not None
+
+    dry_run = _coerce_bool(args.get("dry_run"), default=True)
+    confirm = _coerce_bool(args.get("confirm"), default=False)
+    if not dry_run and not confirm:
+        return _blocked(tool, "confirm=true required when dry_run=false", reason="confirm_required")
+
+    root = resolve_root(args.get("root"))
+    _ensure_dirs(root)
+    try:
+        config = load_projects_config(root)
+    except ConfigError as exc:
+        return _blocked(tool, str(exc), reason="config_error")
+
+    plan = build_plan(
+        config,
+        project_ref=project_ref,
+        issue_number=issue_number,
+        base_branch=args.get("base_branch"),
+        branch_name=args.get("branch_name"),
+        refresh_base=_coerce_bool(args.get("refresh_base"), default=True),
+        root=root,
+    )
+    if plan.is_blocked:
+        return _blocked(tool, "; ".join(plan.blocked_reasons), reason="blocked", data={"plan": plan_to_dict(plan)})
+
+    artifact_dir = ensure_artifact_dir(issue_artifact_dir(root, plan.project_id, issue_number))
+    write_plan(artifact_dir, plan_to_dict(plan))
+    write_commands(artifact_dir, plan.commands)
+
+    if dry_run:
+        write_preflight(artifact_dir, {"dry_run": True, "skipped": plan.is_skipped})
+        message = f"[dry-run] {plan.project_id}#{issue_number}: would_create={plan.would_create_worktree}"
+        return _result(
+            status="success" if not plan.is_skipped else "skipped",
+            tool=tool,
+            message=message,
+            data={"plan": plan_to_dict(plan), "artifact_dir": str(artifact_dir)},
+            summary=f"dry-run plan written to {artifact_dir}",
+        )
+    return _execute_create_issue(tool, plan, config, root, artifact_dir, issue_number)
+
+
+def _execute_create_issue(
+    tool: str,
+    plan: Any,
+    config: Any,
+    root: Path,
+    artifact_dir: Path,
+    issue_number: int,
+) -> str:
+    conn = open_state(root)
+    init_state(conn)
+    try:
+        _ensure_project_row(conn, config, plan.project_id)
+        with with_project_and_issue_locks(conn, plan.project_id, issue_number):
+            # Auto-prepare the base if needed (clone/refresh) — same gates apply.
+            if plan.would_clone_base:
+                outcome = clone_base_repo(remote_url=plan.remote_url_raw, target_path=plan.base_path, root=root)
+                if outcome.is_blocked or outcome.is_failed:
+                    payload = {
+                        "stage": "auto_clone",
+                        "blocked_reasons": outcome.blocked_reasons,
+                        "failures": outcome.failures,
+                    }
+                    write_error(artifact_dir, payload)
+                    return _blocked(
+                        tool,
+                        "; ".join(outcome.blocked_reasons or outcome.failures),
+                        reason="failed" if outcome.is_failed else "blocked",
+                        data={"outcome": payload},
+                    )
+            if plan.would_refresh_base:
+                outcome = refresh_base_branch(
+                    base_path=plan.base_path,
+                    base_branch=plan.base_branch,
+                    remote_url=plan.remote_url_raw,
+                )
+                if outcome.is_blocked or outcome.is_failed:
+                    payload = {
+                        "stage": "auto_refresh",
+                        "blocked_reasons": outcome.blocked_reasons,
+                        "failures": outcome.failures,
+                    }
+                    write_error(artifact_dir, payload)
+                    return _blocked(
+                        tool,
+                        "; ".join(outcome.blocked_reasons or outcome.failures),
+                        reason="failed" if outcome.is_failed else "blocked",
+                        data={"outcome": payload},
+                    )
+            # Now create the issue worktree.
+            create_outcome = create_issue_worktree(
+                base_path=plan.base_path,
+                issue_path=plan.issue_worktree_path,
+                branch_name=plan.branch_name,
+                base_branch=plan.base_branch,
+                remote_url=plan.remote_url_raw,
+                root=root,
+            )
+            if create_outcome.is_blocked or create_outcome.is_failed:
+                payload = {
+                    "stage": "worktree_add",
+                    "blocked_reasons": create_outcome.blocked_reasons,
+                    "failures": create_outcome.failures,
+                }
+                write_error(artifact_dir, payload)
+                return _blocked(
+                    tool,
+                    "; ".join(create_outcome.blocked_reasons or create_outcome.failures),
+                    reason="failed" if create_outcome.is_failed else "blocked",
+                    data={"outcome": payload},
+                )
+            upsert_issue_worktree(
+                conn,
+                project_id=plan.project_id,
+                issue_number=issue_number,
+                path=str(plan.issue_worktree_path),
+                state="clean",
+                branch_name=plan.branch_name,
+                base_branch=plan.base_branch,
+                remote_url=plan.remote_url,
+            )
+            result_payload = {
+                "status": "success",
+                "created": create_outcome.created,
+                "skipped": create_outcome.skipped,
+            }
+            write_result(artifact_dir, result_payload)
+            return _result(
+                status="skipped" if create_outcome.skipped else "success",
+                tool=tool,
+                message=(
+                    f"Issue worktree {'matched' if create_outcome.skipped else 'created'} "
+                    f"for {plan.project_id}#{issue_number}"
+                ),
+                data={"outcome": result_payload, "artifact_dir": str(artifact_dir)},
+                summary=f"{plan.project_id}#{issue_number} → {plan.branch_name}",
             )
     except WorktreeLockBusy as exc:
         return _blocked(tool, str(exc), reason="lock_busy")

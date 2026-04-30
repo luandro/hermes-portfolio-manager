@@ -872,7 +872,7 @@ Lock always released. Artifacts written for real runs only.
 
 ## 8.1 Create-issue input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -893,7 +893,7 @@ Defaults match spec.
 
 ## 8.2 Idempotency check (the hard part)  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_create.py`:
@@ -927,7 +927,7 @@ Tests cover every outcome path. No mutation in this function.
 
 ## 8.3 Create worktree command  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_create.py` (continued):
@@ -955,7 +955,7 @@ Single allowlisted command runs. No fallback strategy attaches an existing branc
 
 ## 8.4 Create-issue handler with both locks + artifacts  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:

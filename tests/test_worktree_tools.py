@@ -192,3 +192,81 @@ def test_prepare_base_blocks_dirty_repo(agent_root: Path, projects_yaml_pointing
     out = _handle_portfolio_worktree_prepare_base(args)
     res = json.loads(out)
     assert res["status"] == "blocked"
+
+
+# ---------------------------------------------------------------------------
+# 8.4 Create-issue handler
+# ---------------------------------------------------------------------------
+
+from portfolio_manager.worktree_tools import _handle_portfolio_worktree_create_issue  # noqa: E402
+
+
+def test_create_issue_dry_run_blocks_no_mutation(agent_root: Path, projects_yaml_pointing_to_bare_remote: Path) -> None:
+    out = _handle_portfolio_worktree_create_issue(
+        {"project_ref": "testproj", "issue_number": 5, "dry_run": True, "root": str(agent_root)}
+    )
+    res = json.loads(out)
+    assert res["status"] in ("success", "skipped")
+    assert not (agent_root / "worktrees" / "testproj-issue-5").exists()
+
+
+def test_create_issue_requires_confirm_when_dry_run_false(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    out = _handle_portfolio_worktree_create_issue(
+        {"project_ref": "testproj", "issue_number": 5, "dry_run": False, "root": str(agent_root)}
+    )
+    res = json.loads(out)
+    assert res["status"] == "blocked" and res["reason"] == "confirm_required"
+
+
+def test_create_issue_executes_and_records_state(agent_root: Path, projects_yaml_pointing_to_bare_remote: Path) -> None:
+    out = _handle_portfolio_worktree_create_issue(
+        {
+            "project_ref": "testproj",
+            "issue_number": 11,
+            "dry_run": False,
+            "confirm": True,
+            "root": str(agent_root),
+        }
+    )
+    res = json.loads(out)
+    assert res["status"] == "success", res
+    issue_path = agent_root / "worktrees" / "testproj-issue-11"
+    assert issue_path.is_dir() and (issue_path / ".git").exists()
+    assert (agent_root / "artifacts" / "worktrees" / "testproj" / "issue-11" / "result.json").exists()
+
+
+def test_create_issue_idempotent_second_call_skipped(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    args = {
+        "project_ref": "testproj",
+        "issue_number": 12,
+        "dry_run": False,
+        "confirm": True,
+        "root": str(agent_root),
+    }
+    _handle_portfolio_worktree_create_issue(args)
+    out = _handle_portfolio_worktree_create_issue(args)
+    res = json.loads(out)
+    assert res["status"] == "skipped"
+
+
+def test_create_issue_blocks_when_branch_exists_in_base_only(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path, bare_remote: Path
+) -> None:
+    base = agent_root / "worktrees" / "testproj"
+    _git("clone", str(bare_remote), str(base), cwd=agent_root)
+    _git("branch", "agent/testproj/issue-13", "main", cwd=base)
+    out = _handle_portfolio_worktree_create_issue(
+        {
+            "project_ref": "testproj",
+            "issue_number": 13,
+            "dry_run": False,
+            "confirm": True,
+            "root": str(agent_root),
+        }
+    )
+    res = json.loads(out)
+    assert res["status"] == "blocked"
