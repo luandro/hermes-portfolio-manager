@@ -52,6 +52,7 @@ from portfolio_manager.schemas import (
     PORTFOLIO_STATUS_SCHEMA,
     PORTFOLIO_WORKTREE_INSPECT_SCHEMA,
     PORTFOLIO_WORKTREE_PLAN_SCHEMA,
+    PORTFOLIO_WORKTREE_PREPARE_BASE_SCHEMA,
 )
 from portfolio_manager.tools import (
     _handle_portfolio_config_validate,
@@ -83,6 +84,7 @@ from portfolio_manager.tools import (
 )
 from portfolio_manager.worktree_tools import (
     _handle_portfolio_worktree_plan,
+    _handle_portfolio_worktree_prepare_base,
 )
 
 # Tool name -> (schema, handler) mapping
@@ -159,8 +161,11 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
     ("portfolio_maintenance_report", PORTFOLIO_MAINTENANCE_REPORT_SCHEMA, _handle_portfolio_maintenance_report),
     # MVP 5 — worktree preparation
     ("portfolio_worktree_plan", PORTFOLIO_WORKTREE_PLAN_SCHEMA, _handle_portfolio_worktree_plan),
-    # The remaining MVP 5 tools (prepare_base, create_issue, list, explain) are
-    # registered as the corresponding handlers land in worktree_tools.py.
+    (
+        "portfolio_worktree_prepare_base",
+        PORTFOLIO_WORKTREE_PREPARE_BASE_SCHEMA,
+        _handle_portfolio_worktree_prepare_base,
+    ),
 ]
 
 # Skills directory: check repo-root skills/ first, fall back to plugin-local

@@ -41,7 +41,8 @@ class WorktreePlan:
     issue_worktree_path: Path
     base_branch: str
     branch_name: str
-    remote_url: str
+    remote_url: str  # canonical normalized form (for comparison + display)
+    remote_url_raw: str  # original from project config (for actual clone/fetch)
     would_clone_base: bool
     would_refresh_base: bool
     would_create_worktree: bool
@@ -106,6 +107,7 @@ def build_plan(
             base_branch="",
             branch_name="",
             remote_url="",
+            remote_url_raw="",
             would_clone_base=False,
             would_refresh_base=False,
             would_create_worktree=False,
@@ -154,6 +156,7 @@ def build_plan(
             base_branch=final_base_branch,
             branch_name=final_branch_name,
             remote_url=norm_remote,
+            remote_url_raw=remote_url,
             would_clone_base=False,
             would_refresh_base=False,
             would_create_worktree=False,
@@ -251,6 +254,7 @@ def build_plan(
         base_branch=final_base_branch,
         branch_name=final_branch_name,
         remote_url=norm_remote,
+        remote_url_raw=remote_url,
         would_clone_base=would_clone,
         would_refresh_base=would_refresh and not blocked,
         would_create_worktree=would_create and not blocked,

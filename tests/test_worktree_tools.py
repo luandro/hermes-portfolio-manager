@@ -127,3 +127,68 @@ def test_plan_tool_blocks_missing_issue_number(agent_root: Path, projects_yaml_p
     out = _handle_portfolio_worktree_plan({"project_ref": "testproj", "root": str(agent_root)})
     res = json.loads(out)
     assert res["status"] == "blocked"
+
+
+# ---------------------------------------------------------------------------
+# 7.4 Prepare-base handler
+# ---------------------------------------------------------------------------
+
+from portfolio_manager.worktree_tools import _handle_portfolio_worktree_prepare_base  # noqa: E402
+
+
+def test_prepare_base_dry_run_writes_plan_artifacts_no_clone(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    out = _handle_portfolio_worktree_prepare_base({"project_ref": "testproj", "dry_run": True, "root": str(agent_root)})
+    res = json.loads(out)
+    assert res["status"] == "success"
+    assert "[dry-run]" in res["message"]
+    base_dir = agent_root / "worktrees" / "testproj"
+    assert not base_dir.exists()
+    artifact_dir = agent_root / "artifacts" / "worktrees" / "testproj" / "base"
+    assert (artifact_dir / "plan.json").exists()
+    assert (artifact_dir / "commands.json").exists()
+
+
+def test_prepare_base_requires_confirm_when_dry_run_false(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    out = _handle_portfolio_worktree_prepare_base(
+        {"project_ref": "testproj", "dry_run": False, "root": str(agent_root)}
+    )
+    res = json.loads(out)
+    assert res["status"] == "blocked"
+    assert res["reason"] == "confirm_required"
+
+
+def test_prepare_base_executes_clone_and_records_state(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    out = _handle_portfolio_worktree_prepare_base(
+        {"project_ref": "testproj", "dry_run": False, "confirm": True, "root": str(agent_root)}
+    )
+    res = json.loads(out)
+    assert res["status"] == "success", res
+    assert (agent_root / "worktrees" / "testproj" / ".git").exists()
+    artifact_dir = agent_root / "artifacts" / "worktrees" / "testproj" / "base"
+    assert (artifact_dir / "result.json").exists()
+
+
+def test_prepare_base_idempotent_second_call_refreshes(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    args = {"project_ref": "testproj", "dry_run": False, "confirm": True, "root": str(agent_root)}
+    _handle_portfolio_worktree_prepare_base(args)
+    out = _handle_portfolio_worktree_prepare_base(args)
+    res = json.loads(out)
+    assert res["status"] == "success"
+
+
+def test_prepare_base_blocks_dirty_repo(agent_root: Path, projects_yaml_pointing_to_bare_remote: Path) -> None:
+    args = {"project_ref": "testproj", "dry_run": False, "confirm": True, "root": str(agent_root)}
+    _handle_portfolio_worktree_prepare_base(args)
+    base = agent_root / "worktrees" / "testproj"
+    (base / "README.md").write_text("dirty\n", encoding="utf-8")
+    out = _handle_portfolio_worktree_prepare_base(args)
+    res = json.loads(out)
+    assert res["status"] == "blocked"

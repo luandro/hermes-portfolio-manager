@@ -48,6 +48,7 @@ from portfolio_manager.tools import (
 )
 from portfolio_manager.worktree_tools import (
     _handle_portfolio_worktree_plan,
+    _handle_portfolio_worktree_prepare_base,
 )
 
 TOOL_HANDLERS: dict[str, Callable[..., str]] = {
@@ -99,6 +100,8 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     # MVP 5 — worktree preparation
     "portfolio_worktree_plan": _handle_portfolio_worktree_plan,
     "worktree-plan": _handle_portfolio_worktree_plan,
+    "portfolio_worktree_prepare_base": _handle_portfolio_worktree_prepare_base,
+    "worktree-prepare-base": _handle_portfolio_worktree_prepare_base,
 }
 
 

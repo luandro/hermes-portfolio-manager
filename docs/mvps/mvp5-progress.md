@@ -744,7 +744,7 @@ Handler is < 40 lines. Logic lives in the planner.
 
 ## 7.1 Prepare-base input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -774,7 +774,7 @@ Defaults match spec.
 
 ## 7.2 Clone-if-missing logic  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_prepare.py`:
@@ -799,7 +799,7 @@ Clone never runs without confirm=true. Bad post-clone remote triggers blocked + 
 
 ## 7.3 Safe base-branch refresh logic  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_prepare.py` (continued):
@@ -829,7 +829,7 @@ No path escapes ff-only semantics. Divergence → blocked, never auto-resolved.
 
 ## 7.4 Prepare-base handler with locks + artifacts  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
