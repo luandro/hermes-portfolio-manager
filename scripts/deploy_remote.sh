@@ -204,17 +204,7 @@ sync_plugin() {
     rsync_cmd "${PROJECT_DIR}/" "${remote_target}"
     ok "Plugin synced."
 
-    # Restart gateway (best-effort)
-    info "Restarting hermes gateway on remote (best-effort)..."
-    if [[ "${OPT_DRY_RUN}" == true ]]; then
-        info "[dry-run] Would run: ssh ${REMOTE_USER}@${REMOTE_HOST} 'hermes gateway restart'"
-    else
-        if ssh "${REMOTE_USER}@${REMOTE_HOST}" 'hermes gateway restart' 2>/dev/null; then
-            ok "Gateway restarted."
-        else
-            warn "Gateway restart skipped (not running or not installed)."
-        fi
-    fi
+    # Gateway restart happens after all syncs are complete (see end of main)
 }
 
 # --- Skills sync ---
@@ -369,6 +359,20 @@ ask_yes_no() {
     [[ "${response}" =~ ^[Yy]$ ]]
 }
 
+# --- Gateway restart ---
+restart_gateway() {
+    info "Restarting hermes gateway on remote (best-effort)..."
+    if [[ "${OPT_DRY_RUN}" == true ]]; then
+        info "[dry-run] Would run: ssh ${REMOTE_USER}@${REMOTE_HOST} 'hermes gateway restart'"
+        return
+    fi
+    if ssh "${REMOTE_USER}@${REMOTE_HOST}" 'hermes gateway restart' 2>/dev/null; then
+        ok "Gateway restarted."
+    else
+        warn "Gateway restart skipped (not running or not installed)."
+    fi
+}
+
 # --- Summary ---
 print_summary() {
     echo ""
@@ -420,6 +424,7 @@ main() {
     sync_plugin
 
     if [[ "${OPT_PLUGIN_ONLY}" == true ]]; then
+        restart_gateway
         print_summary
         exit 0
     fi
@@ -438,6 +443,7 @@ main() {
         else
             warn "Local config.yaml not found. Skipping."
         fi
+        restart_gateway
         print_summary
         exit 0
     fi
@@ -453,6 +459,7 @@ main() {
         sync_config_selective; SYNCED_CONFIG=true
     fi
 
+    restart_gateway
     print_summary
 }
 
