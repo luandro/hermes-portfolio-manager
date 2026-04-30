@@ -176,7 +176,7 @@ If equivalents already exist (e.g. a generic redaction helper), reuse them — d
 
 ## 0.1 Confirm baseline green  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Run the existing suite:
@@ -196,7 +196,7 @@ pytest exits 0, OR the user has explicitly accepted the baseline.
 
 ## 0.2 Inspect existing worktree + lock + artifact contracts  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None.
@@ -223,7 +223,7 @@ No code changed.
 
 ## 0.3 Add structure tests for MVP 5 modules  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Add `tests/test_structure.py` cases (extend the existing file):

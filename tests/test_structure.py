@@ -87,3 +87,96 @@ def test_maintenance_tool_schemas_exist() -> None:
         # Convert tool_name to SCREAMING_SNAKE: portfolio_maintenance_skill_list -> PORTFOLIO_MAINTENANCE_SKILL_LIST
         attr_name = tool_name.upper() + "_SCHEMA"
         assert hasattr(schemas, attr_name), f"Missing schema: schemas.{attr_name}"
+
+
+# ---------------------------------------------------------------------------
+# MVP 5 — Worktree Preparation
+# ---------------------------------------------------------------------------
+
+MVP5_MODULES = [
+    "portfolio_manager.worktree_paths",
+    "portfolio_manager.worktree_git",
+    "portfolio_manager.worktree_state",
+    "portfolio_manager.worktree_artifacts",
+    "portfolio_manager.worktree_locks",
+    "portfolio_manager.worktree_planner",
+    "portfolio_manager.worktree_prepare",
+    "portfolio_manager.worktree_create",
+    "portfolio_manager.worktree_reconcile",
+    "portfolio_manager.worktree_tools",
+]
+
+MVP5_TOOLS = [
+    "portfolio_worktree_plan",
+    "portfolio_worktree_prepare_base",
+    "portfolio_worktree_create_issue",
+    "portfolio_worktree_list",
+    "portfolio_worktree_inspect",
+    "portfolio_worktree_explain",
+]
+
+MVP5_CLI_COMMANDS = [
+    "worktree-plan",
+    "worktree-prepare-base",
+    "worktree-create-issue",
+    "worktree-list",
+    "worktree-inspect",
+    "worktree-explain",
+]
+
+
+def test_worktree_modules_exist() -> None:
+    """All ten new MVP 5 worktree_* modules must be importable."""
+    import importlib
+
+    missing: list[str] = []
+    for mod in MVP5_MODULES:
+        try:
+            importlib.import_module(mod)
+        except ImportError:
+            missing.append(mod)
+    assert not missing, f"Missing MVP 5 modules: {missing}"
+
+
+def test_worktree_prepare_skill_folder_exists() -> None:
+    skill_md = ROOT / "skills" / "worktree-prepare" / "SKILL.md"
+    assert skill_md.is_file(), f"Missing skill: {skill_md}"
+
+
+def test_worktree_tools_registered() -> None:
+    """All MVP 5 worktree tools must appear in the __init__ tool registry."""
+    from portfolio_manager import _TOOL_REGISTRY
+
+    registered = {name for name, _, _ in _TOOL_REGISTRY}
+    missing = [t for t in MVP5_TOOLS if t not in registered]
+    assert not missing, f"Missing tool registrations: {missing}"
+
+
+def test_dev_cli_worktree_commands_registered() -> None:
+    """All MVP 5 CLI subcommands must be registered in dev_cli."""
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("dev_cli", ROOT / "dev_cli.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["dev_cli"] = module
+    spec.loader.exec_module(module)
+    missing = [c for c in MVP5_CLI_COMMANDS if c not in module.TOOL_HANDLERS]
+    assert not missing, f"Missing CLI commands: {missing}"
+
+
+def test_no_duplicate_tool_names() -> None:
+    """No tool name may appear twice in the registry."""
+    from portfolio_manager import _TOOL_REGISTRY
+
+    names = [name for name, _, _ in _TOOL_REGISTRY]
+    duplicates = {n for n in names if names.count(n) > 1}
+    assert not duplicates, f"Duplicate tool names: {duplicates}"
+
+
+def test_existing_portfolio_worktree_inspect_still_callable() -> None:
+    """MVP 1 inspect handler must remain importable and callable (back-compat)."""
+    from portfolio_manager.tools import _handle_portfolio_worktree_inspect
+
+    assert callable(_handle_portfolio_worktree_inspect)
