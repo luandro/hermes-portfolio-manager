@@ -838,6 +838,8 @@ class TestMvp5CommandAllowlist:
                     raise AssertionError(
                         f"Forbidden runner '{name}' referenced in {src_file.relative_to(SRC_DIR.parent)}"
                     )
+
+
 class TestMvp5SecretRedaction:
     """Phase 13.4 — secrets never appear in artifacts or error JSON."""
 
