@@ -367,7 +367,7 @@ appear verbatim in artifact-bound output.
 
 ## 2.1 Allowlisted subprocess wrapper  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_git.py`:
@@ -403,7 +403,7 @@ Forbidden subcommands raise before subprocess starts. Timeouts respect spec defa
 
 ## 2.2 Read-only git probes  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_git.py` (use a local bare repo fixture, see Task 14.1):
