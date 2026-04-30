@@ -444,7 +444,7 @@ Probes are pure read-only. They never write to the repo.
 
 ## 3.1 Worktree id keys + (optional) additive columns  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_state.py`:
@@ -480,7 +480,7 @@ Existing MVP 1–4 state tests still pass. ALTERs run at most once.
 
 ## 3.2 Worktree state upsert + read helpers  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_state.py` (continued):
