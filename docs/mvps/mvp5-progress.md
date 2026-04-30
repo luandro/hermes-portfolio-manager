@@ -1069,7 +1069,7 @@ Always read-only at filesystem level. Optional SQLite inspection update is allow
 
 ## 10.1 worktree_reconcile helper  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_reconcile.py`:

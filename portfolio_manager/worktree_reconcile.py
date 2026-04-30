@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from portfolio_manager.worktree_git import (
@@ -19,8 +20,6 @@ from portfolio_manager.worktree_git import (
 from portfolio_manager.worktree_paths import normalize_remote_url, remotes_equal
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from portfolio_manager.config import ProjectConfig
 
 
@@ -138,9 +137,76 @@ def suggest_next_action(state: str, kind: str) -> str:
     return "State unknown. Re-run inspect to refresh."
 
 
+def _row_state(row: dict[str, object]) -> str:
+    return str(row.get("state") or "unknown")
+
+
+def worktree_reconcile(
+    conn: object,
+    project_id: str,
+    issue_number: int | None,
+    root: Path,
+) -> dict[str, object]:
+    """Compare SQLite row, filesystem and git probes; return verdict + diffs.
+
+    Never mutates the repo and never auto-resolves drift. Callers may decide
+    to update SQLite to filesystem truth based on the returned ``safe_to_sync``
+    flag.
+    """
+    from portfolio_manager.worktree_state import (
+        base_worktree_id,
+        get_worktree,
+        issue_worktree_id,
+    )
+
+    worktree_id = (
+        issue_worktree_id(project_id, issue_number) if issue_number is not None else base_worktree_id(project_id)
+    )
+    row = get_worktree(conn, worktree_id) or {}  # type: ignore[arg-type]
+    fs_path = Path(str(row.get("path") or "")) if row.get("path") else None
+
+    # Path-derived expected location (not resolved against config here)
+    fs_exists = bool(fs_path and fs_path.exists())
+    diffs: list[str] = []
+    if row and not fs_exists:
+        diffs.append("sqlite has row but filesystem path missing")
+    if fs_path and not is_git_repo(fs_path):
+        diffs.append("filesystem path is not a git repo")
+    branch = None
+    state = "unknown"
+    remote_url: str | None = None
+    if fs_exists and fs_path is not None and is_git_repo(fs_path):
+        from portfolio_manager.worktree_git import DEFAULT_TIMEOUTS, run_git
+
+        b = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=fs_path, timeout=DEFAULT_TIMEOUTS["rev-parse"])
+        branch = b.stdout.strip() if b.returncode == 0 else None
+        state = get_clean_state(fs_path)
+        origin = get_origin_url(fs_path)
+        remote_url = normalize_remote_url(origin) if origin else None
+        sql_branch = row.get("branch_name")
+        sql_remote = row.get("remote_url")
+        if branch and sql_branch and branch != sql_branch:
+            diffs.append(f"branch drift: sqlite={sql_branch!r} fs={branch!r}")
+        if remote_url and sql_remote and remote_url != sql_remote:
+            diffs.append(f"remote drift: sqlite={sql_remote!r} fs={remote_url!r}")
+
+    safe_to_sync = not diffs and (fs_exists or not row)
+    return {
+        "worktree_id": worktree_id,
+        "sqlite_row": row,
+        "fs_exists": fs_exists,
+        "branch": branch,
+        "state": state,
+        "remote_url": remote_url,
+        "diffs": diffs,
+        "safe_to_sync": safe_to_sync,
+    }
+
+
 __all__ = [
     "DiscoveredWorktree",
     "discover_worktrees",
     "discovered_to_dict",
     "suggest_next_action",
+    "worktree_reconcile",
 ]
