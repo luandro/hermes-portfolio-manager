@@ -1266,7 +1266,7 @@ E2E tests must use **local temporary Git repos**, never real GitHub. Create a si
 
 ## 14.1 Local bare-repo fixture  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None (this task is the fixture itself).
@@ -1295,7 +1295,7 @@ Fixtures usable by all E2E tests below. No network access needed.
 
 ## 14.2 E2E: prepare base end-to-end  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
@@ -1318,7 +1318,7 @@ Real clone + ff happen exactly once with confirm; blocked paths report dirty/con
 
 ## 14.3 E2E: create issue worktree + idempotency  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
@@ -1339,7 +1339,7 @@ Repeat call is a no-op. Mismatched branch state always blocks.
 
 ## 14.4 E2E: dirty / conflict / divergence block paths  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
