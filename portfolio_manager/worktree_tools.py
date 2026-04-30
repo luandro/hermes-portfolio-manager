@@ -15,6 +15,7 @@ from portfolio_manager.config import (
     ConfigError,
     load_projects_config,
     resolve_root,
+    select_projects,
 )
 from portfolio_manager.errors import redact_secrets
 from portfolio_manager.state import init_state, open_state, upsert_project
@@ -36,7 +37,15 @@ from portfolio_manager.worktree_locks import (
 )
 from portfolio_manager.worktree_planner import build_plan, plan_to_dict
 from portfolio_manager.worktree_prepare import clone_base_repo, refresh_base_branch
-from portfolio_manager.worktree_state import upsert_base_worktree, upsert_issue_worktree
+from portfolio_manager.worktree_reconcile import (
+    discover_worktrees,
+    discovered_to_dict,
+    suggest_next_action,
+)
+from portfolio_manager.worktree_state import (
+    upsert_base_worktree,
+    upsert_issue_worktree,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -482,3 +491,126 @@ def _execute_create_issue(
         return _blocked(tool, str(exc), reason="lock_busy")
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# 9.1 portfolio_worktree_list handler (read-only by default)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_worktree_list(args: dict[str, Any], **kwargs: Any) -> str:
+    """List discovered worktrees. Optionally inspect each (which writes SQLite)."""
+    tool = "portfolio_worktree_list"
+    root = resolve_root(args.get("root"))
+    _ensure_dirs(root)
+    try:
+        config = load_projects_config(root)
+    except ConfigError as exc:
+        return _blocked(tool, str(exc), reason="config_error")
+
+    project_ref = args.get("project_ref")
+    include_archived = _coerce_bool(args.get("include_archived"), default=False)
+    include_paused = _coerce_bool(args.get("include_paused"), default=False)
+    inspect = _coerce_bool(args.get("inspect"), default=False)
+
+    if project_ref:
+        projects = [p for p in config.projects if p.id == project_ref]
+        if not projects:
+            return _blocked(tool, f"project not found: {project_ref!r}", reason="not_found")
+    else:
+        projects = select_projects(config, include_archived=include_archived, include_paused=include_paused)
+
+    discovered = discover_worktrees(root, projects, inspect=inspect)
+
+    if inspect:
+        conn = open_state(root)
+        init_state(conn)
+        try:
+            for project in projects:
+                _ensure_project_row(conn, config, project.id)
+            for wt in discovered:
+                if not wt.project_id:
+                    continue
+                if wt.kind == "issue" and wt.issue_number is not None:
+                    upsert_issue_worktree(
+                        conn,
+                        project_id=wt.project_id,
+                        issue_number=wt.issue_number,
+                        path=wt.path,
+                        state=wt.state if wt.state != "unknown" else "missing",
+                        branch_name=wt.branch_name,
+                        remote_url=wt.remote_url,
+                    )
+                elif wt.kind == "base":
+                    upsert_base_worktree(
+                        conn,
+                        project_id=wt.project_id,
+                        path=wt.path,
+                        state=wt.state if wt.state != "unknown" else "missing",
+                        branch_name=wt.branch_name,
+                        remote_url=wt.remote_url,
+                    )
+        finally:
+            conn.close()
+
+    payload = [discovered_to_dict(w) for w in discovered]
+    return _result(
+        status="success",
+        tool=tool,
+        message=f"Found {len(payload)} worktrees ({'inspected' if inspect else 'not inspected'})",
+        data={"worktrees": payload, "count": len(payload), "inspected": inspect},
+        summary=f"{len(payload)} worktrees" + (" (inspected)" if inspect else ""),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 9.3 portfolio_worktree_explain handler (read-only)
+# ---------------------------------------------------------------------------
+
+
+def _handle_portfolio_worktree_explain(args: dict[str, Any], **kwargs: Any) -> str:
+    """Explain a worktree state and suggest the next safe action."""
+    tool = "portfolio_worktree_explain"
+    project_ref = args.get("project_ref", "")
+    if not project_ref:
+        return _blocked(tool, "project_ref is required", reason="invalid_input")
+
+    root = resolve_root(args.get("root"))
+    _ensure_dirs(root)
+    try:
+        config = load_projects_config(root)
+    except ConfigError as exc:
+        return _blocked(tool, str(exc), reason="config_error")
+
+    projects = [p for p in config.projects if p.id == project_ref]
+    if not projects:
+        return _blocked(tool, f"project not found: {project_ref!r}", reason="not_found")
+
+    discovered = discover_worktrees(root, projects, inspect=True)
+    issue_number = args.get("issue_number")
+    if issue_number is not None:
+        try:
+            n = int(issue_number)
+        except (TypeError, ValueError):
+            return _blocked(tool, f"issue_number must be int, got {issue_number!r}", reason="invalid_input")
+        target = next((w for w in discovered if w.kind == "issue" and w.issue_number == n), None)
+    else:
+        target = next((w for w in discovered if w.kind == "base"), None)
+
+    if target is None:
+        return _result(
+            status="success",
+            tool=tool,
+            message="No matching worktree found on disk.",
+            data={"target": None, "suggestion": "Run portfolio_worktree_prepare_base / create_issue first."},
+            summary="not found",
+        )
+
+    suggestion = suggest_next_action(target.state, target.kind)
+    return _result(
+        status="success",
+        tool=tool,
+        message=f"{target.kind} worktree for {target.project_id} is {target.state}",
+        data={"target": discovered_to_dict(target), "suggestion": suggestion},
+        summary=suggestion,
+    )

@@ -993,7 +993,7 @@ No forbidden command can be reached from this code path (verified by Phase 13 te
 
 ## 9.1 Extend portfolio_worktree_inspect (back-compat)  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -1018,7 +1018,7 @@ MVP 1 inspect tests still pass unchanged. New parameters work as specified.
 
 ## 9.2 portfolio_worktree_list  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -1043,7 +1043,7 @@ Side effect (SQLite) only when inspect=true.
 
 ## 9.3 portfolio_worktree_explain  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:

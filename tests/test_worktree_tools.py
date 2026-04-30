@@ -270,3 +270,78 @@ def test_create_issue_blocks_when_branch_exists_in_base_only(
     )
     res = json.loads(out)
     assert res["status"] == "blocked"
+
+
+# ---------------------------------------------------------------------------
+# 9.1 List handler / 9.3 Explain handler
+# ---------------------------------------------------------------------------
+
+from portfolio_manager.worktree_tools import (  # noqa: E402
+    _handle_portfolio_worktree_explain,
+    _handle_portfolio_worktree_list,
+)
+
+
+def test_list_empty_when_no_worktrees(agent_root: Path, projects_yaml_pointing_to_bare_remote: Path) -> None:
+    out = _handle_portfolio_worktree_list({"root": str(agent_root)})
+    res = json.loads(out)
+    assert res["status"] == "success"
+    assert res["data"]["count"] == 0
+    assert res["data"]["inspected"] is False
+
+
+def test_list_finds_base_and_issue(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path, bare_remote: Path
+) -> None:
+    base = agent_root / "worktrees" / "testproj"
+    _git("clone", str(bare_remote), str(base), cwd=agent_root)
+    issue_path = agent_root / "worktrees" / "testproj-issue-3"
+    _git("worktree", "add", str(issue_path), "-b", "agent/testproj/issue-3", "main", cwd=base)
+    out = _handle_portfolio_worktree_list({"root": str(agent_root), "inspect": True})
+    res = json.loads(out)
+    assert res["status"] == "success"
+    kinds = {w["kind"] for w in res["data"]["worktrees"]}
+    assert {"base", "issue"} <= kinds
+    issue_entry = next(w for w in res["data"]["worktrees"] if w["kind"] == "issue")
+    assert issue_entry["state"] == "clean"
+    assert issue_entry["issue_number"] == 3
+
+
+def test_list_inspect_persists_state(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path, bare_remote: Path
+) -> None:
+    base = agent_root / "worktrees" / "testproj"
+    _git("clone", str(bare_remote), str(base), cwd=agent_root)
+    out = _handle_portfolio_worktree_list({"root": str(agent_root), "inspect": True})
+    assert json.loads(out)["status"] == "success"
+    state_db = agent_root / "state" / "state.sqlite"
+    assert state_db.exists()
+
+
+def test_explain_missing_worktree_returns_helpful_message(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path
+) -> None:
+    out = _handle_portfolio_worktree_explain({"root": str(agent_root), "project_ref": "testproj"})
+    res = json.loads(out)
+    assert res["status"] == "success"
+    assert "not found" in res["summary"].lower() or res["data"]["target"] is None
+
+
+def test_explain_clean_state(agent_root: Path, projects_yaml_pointing_to_bare_remote: Path, bare_remote: Path) -> None:
+    base = agent_root / "worktrees" / "testproj"
+    _git("clone", str(bare_remote), str(base), cwd=agent_root)
+    out = _handle_portfolio_worktree_explain({"root": str(agent_root), "project_ref": "testproj"})
+    res = json.loads(out)
+    assert res["status"] == "success"
+    assert "clean" in res["summary"].lower()
+
+
+def test_explain_dirty_uncommitted_state(
+    agent_root: Path, projects_yaml_pointing_to_bare_remote: Path, bare_remote: Path
+) -> None:
+    base = agent_root / "worktrees" / "testproj"
+    _git("clone", str(bare_remote), str(base), cwd=agent_root)
+    (base / "README.md").write_text("dirty\n", encoding="utf-8")
+    out = _handle_portfolio_worktree_explain({"root": str(agent_root), "project_ref": "testproj"})
+    res = json.loads(out)
+    assert "uncommitted" in res["summary"].lower() or "dirty" in res["summary"].lower()

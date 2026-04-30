@@ -48,6 +48,8 @@ from portfolio_manager.tools import (
 )
 from portfolio_manager.worktree_tools import (
     _handle_portfolio_worktree_create_issue,
+    _handle_portfolio_worktree_explain,
+    _handle_portfolio_worktree_list,
     _handle_portfolio_worktree_plan,
     _handle_portfolio_worktree_prepare_base,
 )
@@ -105,6 +107,11 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "worktree-prepare-base": _handle_portfolio_worktree_prepare_base,
     "portfolio_worktree_create_issue": _handle_portfolio_worktree_create_issue,
     "worktree-create-issue": _handle_portfolio_worktree_create_issue,
+    "portfolio_worktree_list": _handle_portfolio_worktree_list,
+    "worktree-list": _handle_portfolio_worktree_list,
+    "portfolio_worktree_explain": _handle_portfolio_worktree_explain,
+    "worktree-explain": _handle_portfolio_worktree_explain,
+    "worktree-inspect": _handle_portfolio_worktree_inspect,
 }
 
 

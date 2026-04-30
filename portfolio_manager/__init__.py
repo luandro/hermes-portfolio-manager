@@ -51,7 +51,9 @@ from portfolio_manager.schemas import (
     PORTFOLIO_PROJECT_UPDATE_SCHEMA,
     PORTFOLIO_STATUS_SCHEMA,
     PORTFOLIO_WORKTREE_CREATE_ISSUE_SCHEMA,
+    PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA,
     PORTFOLIO_WORKTREE_INSPECT_SCHEMA,
+    PORTFOLIO_WORKTREE_LIST_SCHEMA,
     PORTFOLIO_WORKTREE_PLAN_SCHEMA,
     PORTFOLIO_WORKTREE_PREPARE_BASE_SCHEMA,
 )
@@ -85,6 +87,8 @@ from portfolio_manager.tools import (
 )
 from portfolio_manager.worktree_tools import (
     _handle_portfolio_worktree_create_issue,
+    _handle_portfolio_worktree_explain,
+    _handle_portfolio_worktree_list,
     _handle_portfolio_worktree_plan,
     _handle_portfolio_worktree_prepare_base,
 )
@@ -173,6 +177,8 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
         PORTFOLIO_WORKTREE_CREATE_ISSUE_SCHEMA,
         _handle_portfolio_worktree_create_issue,
     ),
+    ("portfolio_worktree_list", PORTFOLIO_WORKTREE_LIST_SCHEMA, _handle_portfolio_worktree_list),
+    ("portfolio_worktree_explain", PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA, _handle_portfolio_worktree_explain),
 ]
 
 # Skills directory: check repo-root skills/ first, fall back to plugin-local
