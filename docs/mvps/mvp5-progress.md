@@ -1101,7 +1101,7 @@ Reconcile is safe to call before any mutation tool to recover from prior crashes
 
 ## 11.1 Add CLI parser entries  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_dev_cli.py`:
@@ -1126,7 +1126,7 @@ All commands print valid JSON shared result objects when invoked with --json.
 
 ## 11.2 CLI behavior tests with test root  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_dev_cli.py`:
@@ -1150,7 +1150,7 @@ JSON exit code and shape match shared result format.
 
 ## 12.1 Add `worktree-prepare` skill folder  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_skill.py` (new file) or extend `test_skills.py`:

@@ -375,6 +375,17 @@ def _handle_portfolio_worktree_inspect(args: dict[str, Any], **kwargs: Any) -> s
     tool = "portfolio_worktree_inspect"
     root = resolve_root(args.get("root"))
 
+    explicit_path = args.get("path")
+    if explicit_path is not None:
+        from pathlib import Path
+
+        from portfolio_manager.worktree_paths import assert_under_worktrees_root
+
+        try:
+            assert_under_worktrees_root(Path(str(explicit_path)), Path(root))
+        except ValueError as exc:
+            return _blocked(tool, f"Inspect path outside worktrees root: {exc}")
+
     try:
         config = load_projects_config(root)
     except ConfigError as exc:
