@@ -88,7 +88,10 @@ def render_issue_worktree_path(
         raise ValueError(f"issue_number must be positive, got {issue_number}")
     if "/" in project_id or "\\" in project_id or ".." in project_id or project_id.startswith("."):
         raise ValueError(f"project_id contains illegal chars: {project_id!r}")
-    rendered = pattern.format(project_id=project_id, issue_number=issue_number)
+    try:
+        rendered = pattern.format(project_id=project_id, issue_number=issue_number)
+    except (KeyError, IndexError) as exc:
+        raise ValueError(f"invalid issue worktree pattern: {pattern!r}") from exc
     return assert_under_worktrees_root(Path(rendered), root)
 
 

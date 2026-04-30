@@ -178,7 +178,9 @@ def build_plan(
             blocked.append(f"base path exists but is not a git repo: {base_path}")
         else:
             origin = get_origin_url(base_path)
-            if origin and not remotes_equal(origin, remote_url):
+            if not origin:
+                blocked.append("base repo has no origin remote")
+            elif not remotes_equal(origin, remote_url):
                 blocked.append(
                     f"base remote {normalize_remote_url(origin)!r} does not match config "
                     f"{normalize_remote_url(remote_url)!r}"
@@ -193,14 +195,17 @@ def build_plan(
 
     # ---- Inspect existing issue worktree (idempotency / conflict detection) ----
     skipped_reason: str | None = None
-    would_create = True
+    would_create = issue_number is not None
     if issue_number is not None and issue_path.exists():
         if not is_git_repo(issue_path):
             blocked.append(f"issue path exists but is not a git repo: {issue_path}")
             would_create = False
         else:
             wt_origin = get_origin_url(issue_path)
-            if wt_origin and not remotes_equal(wt_origin, remote_url):
+            if not wt_origin:
+                blocked.append("existing issue worktree has no origin remote")
+                would_create = False
+            elif not remotes_equal(wt_origin, remote_url):
                 blocked.append(f"existing issue worktree has wrong remote {normalize_remote_url(wt_origin)!r}")
                 would_create = False
             else:

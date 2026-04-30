@@ -201,7 +201,6 @@ def _handle_portfolio_worktree_prepare_base(args: dict[str, Any], **kwargs: Any)
         return _blocked(tool, "confirm=true required when dry_run=false", reason="confirm_required")
 
     root = resolve_root(args.get("root"))
-    _ensure_dirs(root)
     try:
         config = load_projects_config(root)
     except ConfigError as exc:
@@ -229,6 +228,7 @@ def _handle_portfolio_worktree_prepare_base(args: dict[str, Any], **kwargs: Any)
             summary="dry-run only; no artifacts written",
         )
 
+    _ensure_dirs(root)
     artifact_dir = ensure_artifact_dir(base_artifact_dir(root, plan.project_id))
     write_plan(artifact_dir, plan_to_dict(plan))
     write_commands(artifact_dir, plan.commands)
@@ -357,7 +357,6 @@ def _handle_portfolio_worktree_create_issue(args: dict[str, Any], **kwargs: Any)
         return _blocked(tool, "confirm=true required when dry_run=false", reason="confirm_required")
 
     root = resolve_root(args.get("root"))
-    _ensure_dirs(root)
     try:
         config = load_projects_config(root)
     except ConfigError as exc:
@@ -385,6 +384,7 @@ def _handle_portfolio_worktree_create_issue(args: dict[str, Any], **kwargs: Any)
             summary="dry-run only; no artifacts written",
         )
 
+    _ensure_dirs(root)
     artifact_dir = ensure_artifact_dir(issue_artifact_dir(root, plan.project_id, issue_number))
     write_plan(artifact_dir, plan_to_dict(plan))
     write_commands(artifact_dir, plan.commands)
@@ -502,7 +502,6 @@ def _handle_portfolio_worktree_list(args: dict[str, Any], **kwargs: Any) -> str:
     """List discovered worktrees. Optionally inspect each (which writes SQLite)."""
     tool = "portfolio_worktree_list"
     root = resolve_root(args.get("root"))
-    _ensure_dirs(root)
     try:
         config = load_projects_config(root)
     except ConfigError as exc:
@@ -523,6 +522,7 @@ def _handle_portfolio_worktree_list(args: dict[str, Any], **kwargs: Any) -> str:
     discovered = discover_worktrees(root, projects, inspect=inspect)
 
     if inspect:
+        _ensure_dirs(root)
         conn = open_state(root)
         init_state(conn)
         try:
@@ -576,7 +576,6 @@ def _handle_portfolio_worktree_explain(args: dict[str, Any], **kwargs: Any) -> s
         return _blocked(tool, "project_ref is required", reason="invalid_input")
 
     root = resolve_root(args.get("root"))
-    _ensure_dirs(root)
     try:
         config = load_projects_config(root)
     except ConfigError as exc:
