@@ -589,7 +589,7 @@ No artifact ever contains a credential, token, or env var value.
 
 ## 5.1 Worktree lock context managers  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_locks.py`:
