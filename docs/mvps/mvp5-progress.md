@@ -519,7 +519,7 @@ Upserts are idempotent on the worktree id key. Invalid state values rejected.
 
 ## 4.1 Artifact path helpers  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_artifacts.py`:
@@ -549,7 +549,7 @@ Paths always contained under root/artifacts/worktrees.
 
 ## 4.2 Artifact writers + redaction  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_artifacts.py` (continued):
