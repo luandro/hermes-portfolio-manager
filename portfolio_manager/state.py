@@ -298,8 +298,81 @@ def open_state(root: Path) -> sqlite3.Connection:
     return conn
 
 
+_MAINTENANCE_DDL = """\
+CREATE TABLE IF NOT EXISTS maintenance_runs (
+  id TEXT PRIMARY KEY,
+  skill_id TEXT NOT NULL,
+  project_id TEXT,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  due INTEGER NOT NULL DEFAULT 1,
+  dry_run INTEGER NOT NULL DEFAULT 0,
+  refresh_github INTEGER NOT NULL DEFAULT 1,
+  finding_count INTEGER NOT NULL DEFAULT 0,
+  draft_count INTEGER NOT NULL DEFAULT 0,
+  report_path TEXT,
+  summary TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS maintenance_findings (
+  fingerprint TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  status TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  source_type TEXT,
+  source_id TEXT,
+  source_url TEXT,
+  metadata_json TEXT,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  resolved_at TEXT,
+  run_id TEXT,
+  issue_draft_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (run_id) REFERENCES maintenance_runs(id) ON DELETE SET NULL,
+  FOREIGN KEY (issue_draft_id) REFERENCES issue_drafts(draft_id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project_skill
+ON maintenance_runs(project_id, skill_id, finished_at);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_status
+ON maintenance_runs(status, finished_at);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_runs_project_skill_status_finished
+ON maintenance_runs(project_id, skill_id, status, finished_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_project_skill
+ON maintenance_findings(project_id, skill_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_maintenance_findings_severity
+ON maintenance_findings(severity, status);
+"""
+
+
 def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}  # nosec B608
+
+
+def _exec_ddl(conn: sqlite3.Connection, ddl: str) -> None:
+    """Execute multiple semicolon-separated DDL statements within the current transaction.
+
+    Unlike ``conn.executescript()``, this does **not** commit the current transaction,
+    keeping DDL and subsequent DML in the same atomic unit.
+    """
+    for stmt in ddl.split(";"):
+        stripped = stmt.strip()
+        if stripped:
+            conn.execute(stripped)
 
 
 def _rebuild_legacy_maintenance_schema(conn: sqlite3.Connection) -> None:
@@ -320,7 +393,7 @@ def _rebuild_legacy_maintenance_schema(conn: sqlite3.Connection) -> None:
         if legacy_runs:
             conn.execute("ALTER TABLE maintenance_runs RENAME TO maintenance_runs_legacy")
 
-        conn.executescript(SCHEMA_SQL)
+        _exec_ddl(conn, _MAINTENANCE_DDL)
 
         if legacy_runs:
             conn.execute(
