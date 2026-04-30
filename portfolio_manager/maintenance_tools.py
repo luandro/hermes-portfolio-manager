@@ -323,6 +323,10 @@ def _handle_portfolio_maintenance_due(args: dict[str, Any], **kwargs: Any) -> st
             include_archived=_parse_bool(args.get("include_archived"), default=False),
         )
 
+        include_disabled = _parse_bool(args.get("include_disabled"), default=False)
+        if not include_disabled:
+            checks = [c for c in checks if c.get("reason") != "disabled"]
+
         due_count = sum(1 for c in checks if c["is_due"])
         not_due_count = len(checks) - due_count
 
