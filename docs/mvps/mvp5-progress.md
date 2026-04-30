@@ -253,7 +253,7 @@ These are pure functions with no I/O. They are the security boundary. Get them r
 
 ## 1.1 Branch name validator  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py`:
@@ -294,7 +294,7 @@ No filesystem or subprocess calls.
 
 ## 1.2 Path containment + symlink escape guard  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py` (continued):
@@ -329,7 +329,7 @@ Symlink escapes are caught. Pattern substitution accepts only validated int issu
 
 ## 1.3 Remote URL normalizer  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py` (continued):
