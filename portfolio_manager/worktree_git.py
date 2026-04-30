@@ -81,6 +81,18 @@ def _check_git_args(args: list[str]) -> None:
     # Extra restrictions on fetch: never --force.
     if leader == "fetch" and any(a in {"--force", "-f"} for a in args):
         raise GitCommandError("git fetch --force is forbidden")
+    # branch: only read-only flags allowed
+    if leader == "branch":
+        _BRANCH_ALLOWED_FLAGS = {"--show-current", "--list", "-a", "-r", "--all", "--remotes"}
+        for a in args[1:]:
+            if a.startswith("-") and a not in _BRANCH_ALLOWED_FLAGS:
+                raise GitCommandError(f"git branch flag {a!r} not allowed")
+    # remote: only get-url allowed
+    if leader == "remote" and (len(args) < 2 or args[1] != "get-url"):
+        raise GitCommandError("git remote only allows get-url subcommand")
+    # worktree: only list and add allowed
+    if leader == "worktree" and (len(args) < 2 or args[1] not in {"list", "add"}):
+        raise GitCommandError("git worktree only allows list/add subcommands")
 
 
 def _redact(text: str) -> str:
