@@ -196,27 +196,48 @@ def upsert_maintenance_finding(conn: sqlite3.Connection, finding: dict[str, Any]
         )
     elif existing["status"] == "resolved":
         new_status = requested_status if requested_status is not None else "open"
-        resolved_at_clause = "resolved_at=NULL" if new_status != "resolved" else "resolved_at=resolved_at"
-        conn.execute(
-            f"""UPDATE maintenance_findings
-               SET severity=?, status=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
-                   metadata_json=?, last_seen_at=?, {resolved_at_clause}, run_id=?, updated_at=?
-               WHERE fingerprint=?""",
-            (
-                finding["severity"],
-                new_status,
-                finding["title"],
-                finding.get("body") or "",
-                finding.get("source_type"),
-                finding.get("source_id"),
-                finding.get("source_url"),
-                metadata_json,
-                finding.get("last_seen_at") or now,
-                finding.get("run_id"),
-                finding.get("updated_at") or now,
-                fingerprint,
-            ),
-        )
+        if new_status != "resolved":
+            conn.execute(
+                """UPDATE maintenance_findings
+                   SET severity=?, status=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
+                       metadata_json=?, last_seen_at=?, resolved_at=NULL, run_id=?, updated_at=?
+                   WHERE fingerprint=?""",
+                (
+                    finding["severity"],
+                    new_status,
+                    finding["title"],
+                    finding.get("body") or "",
+                    finding.get("source_type"),
+                    finding.get("source_id"),
+                    finding.get("source_url"),
+                    metadata_json,
+                    finding.get("last_seen_at") or now,
+                    finding.get("run_id"),
+                    finding.get("updated_at") or now,
+                    fingerprint,
+                ),
+            )
+        else:
+            conn.execute(
+                """UPDATE maintenance_findings
+                   SET severity=?, status=?, title=?, body=?, source_type=?, source_id=?, source_url=?,
+                       metadata_json=?, last_seen_at=?, resolved_at=resolved_at, run_id=?, updated_at=?
+                   WHERE fingerprint=?""",
+                (
+                    finding["severity"],
+                    new_status,
+                    finding["title"],
+                    finding.get("body") or "",
+                    finding.get("source_type"),
+                    finding.get("source_id"),
+                    finding.get("source_url"),
+                    metadata_json,
+                    finding.get("last_seen_at") or now,
+                    finding.get("run_id"),
+                    finding.get("updated_at") or now,
+                    fingerprint,
+                ),
+            )
     conn.commit()
 
 

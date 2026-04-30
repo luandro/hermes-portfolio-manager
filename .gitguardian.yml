@@ -1,0 +1,4 @@
+secret:
+  scanning:
+    ignore:
+      - tests/test_maintenance_artifacts.py
