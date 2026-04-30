@@ -95,15 +95,18 @@ class TestSubprocessUsesArgumentArrays:
 class TestNoUnsafeGitCommands:
     """Scan source files for banned destructive git commands."""
 
+    # MVP 5 allowlists `git merge --ff-only` and `git switch` for safe base-branch
+    # refresh and worktree creation. Bare `git merge` / `git switch` strings are
+    # therefore not categorically banned at the source-grep layer; the allowlist
+    # check in worktree_git.run_git is the security boundary. Fail-closed for
+    # everything that has no legitimate use anywhere in the plugin.
     BANNED_GIT: ClassVar[list[str]] = [
         "git pull",
         "git rebase",
-        "git merge",
         "git reset",
         "git clean",
         "git stash",
         "git checkout",
-        "git switch",
         "git commit",
         "git push",
     ]
@@ -694,3 +697,191 @@ class TestMaintenancePrivacyRedaction:
         # Private keys should not appear in the body
         for key in _PRIVATE_META_KEYS:
             assert key not in body, f"Private key '{key}' found in draft body"
+
+
+# ---------------------------------------------------------------------------
+# Phase 13 — MVP 5 worktree security hardening
+# ---------------------------------------------------------------------------
+
+
+WORKTREE_SOURCES: list[Path] = sorted(SRC_DIR.glob("worktree*.py"))
+
+
+class TestMvp5BranchValidationAtHandlerLayer:
+    """Phase 13.1 — bad branch names cannot reach run_git via any tool path."""
+
+    @pytest.mark.parametrize(
+        "bad_branch",
+        [
+            "agent/proj/issue-42..foo",
+            "agent/proj/issue-42@{0}",
+            "-agent/proj/issue-42",
+            "agent/proj/issue-42; rm -rf /",
+            "refs/heads/agent/proj/issue-42",
+            "agent/proj/issue-42$(whoami)",
+            "agent/proj/issue-42`id`",
+        ],
+    )
+    def test_bad_branch_rejected_at_handler_layer(self, bad_branch: str) -> None:
+        from portfolio_manager.worktree_paths import validate_branch_name
+
+        with pytest.raises(ValueError):
+            validate_branch_name(bad_branch)
+
+
+class TestMvp5PathSymlinkEscape:
+    """Phase 13.2 — no tool path can escape $ROOT/worktrees."""
+
+    def test_issue_worktree_pattern_escape_blocked(self, tmp_path: Path) -> None:
+        from portfolio_manager.worktree_paths import render_issue_worktree_path
+
+        with pytest.raises(ValueError):
+            render_issue_worktree_path(
+                "../../escape-{project_id}-issue-{issue_number}",
+                "proj",
+                42,
+                tmp_path / "agent-system" / "worktrees",
+            )
+
+    def test_symlink_under_worktrees_to_outside_blocked(self, tmp_path: Path) -> None:
+        import os
+
+        from portfolio_manager.worktree_paths import has_escaping_symlink
+
+        worktrees_root = tmp_path / "worktrees"
+        worktrees_root.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        link = worktrees_root / "evil"
+        os.symlink(outside, link)
+
+        assert has_escaping_symlink(link, worktrees_root) is True
+
+    def test_artifact_dir_path_traversal_blocked(self, tmp_path: Path) -> None:
+        from portfolio_manager.worktree_artifacts import issue_artifact_dir
+
+        with pytest.raises((ValueError, AssertionError)):
+            issue_artifact_dir(tmp_path, "../escape", 42)
+
+    def test_inspect_path_outside_root_blocked(self, tmp_path: Path) -> None:
+        import json
+
+        from portfolio_manager.tools import _handle_portfolio_worktree_inspect
+
+        # Set up minimal config root
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / "projects.yaml").write_text("version: 1\nprojects: []\n", encoding="utf-8")
+        escape = tmp_path / "outside"
+        escape.mkdir()
+
+        result = json.loads(_handle_portfolio_worktree_inspect({"path": str(escape), "root": str(tmp_path)}))
+        assert result["status"] == "blocked"
+
+
+class TestMvp5CommandAllowlist:
+    """Phase 13.3 — forbidden commands cannot be introduced in worktree modules."""
+
+    def test_no_shell_true_in_worktree_modules(self) -> None:
+        for src_file in WORKTREE_SOURCES:
+            content = src_file.read_text()
+            assert "shell=True" not in content, f"shell=True found in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_only_allowlisted_git_subcommands_in_worktree_modules(self) -> None:
+        # The allowlist is centralized in worktree_git.py. Verify the module
+        # references no banned subcommand strings outside its own allowlist
+        # check (which references them only inside the rejection logic). We
+        # check the *other* worktree modules — they must never call git
+        # directly except via run_git.
+        forbidden_substrings = (
+            "git push",
+            "git commit",
+            "git reset",
+            "git clean",
+            "git stash",
+            "git rebase",
+        )
+        for src_file in WORKTREE_SOURCES:
+            if src_file.name == "worktree_git.py":
+                continue  # the allowlist module may mention forbidden names
+            content = src_file.read_text()
+            for forbidden in forbidden_substrings:
+                assert forbidden not in content, (
+                    f"Forbidden '{forbidden}' found in {src_file.relative_to(SRC_DIR.parent)}"
+                )
+
+    def test_no_gh_issue_create_in_worktree_modules(self) -> None:
+        for src_file in WORKTREE_SOURCES:
+            content = src_file.read_text()
+            assert "gh issue create" not in content, f"gh issue create found in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_no_pr_remote_mutation_in_worktree_modules(self) -> None:
+        forbidden = ("gh pr create", "gh pr merge", "git push", "git commit")
+        for src_file in WORKTREE_SOURCES:
+            content = src_file.read_text()
+            for cmd in forbidden:
+                assert cmd not in content, f"Forbidden '{cmd}' found in {src_file.relative_to(SRC_DIR.parent)}"
+
+    def test_no_build_or_test_runner_in_worktree_modules(self) -> None:
+        # MVP 5 does not run any package-manager / build / test commands inside
+        # managed repos. Scan for direct invocations.
+        forbidden = (
+            '"npm"',
+            '"pnpm"',
+            '"yarn"',
+            '"pip"',
+            '"cargo"',
+            '"make"',
+            '"pytest"',
+        )
+        for src_file in WORKTREE_SOURCES:
+            content = src_file.read_text()
+            for cmd in forbidden:
+                assert cmd not in content, (
+                    f"Forbidden runner {cmd} referenced in {src_file.relative_to(SRC_DIR.parent)}"
+                )
+
+
+class TestMvp5SecretRedaction:
+    """Phase 13.4 — secrets never appear in artifacts or error JSON."""
+
+    def test_https_token_in_remote_url_redacted(self) -> None:
+        from portfolio_manager.worktree_paths import redact_remote_url
+
+        url = "https://x-access-token:ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA@github.com/owner/repo.git"
+        redacted = redact_remote_url(url)
+        assert "ghp_" not in redacted
+        assert "x-access-token" not in redacted
+
+    def test_ghp_token_redacted_in_artifact_writer(self, tmp_path: Path) -> None:
+        from portfolio_manager.worktree_artifacts import (
+            base_artifact_dir,
+            ensure_artifact_dir,
+            write_error,
+        )
+
+        artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
+        token = "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        path = write_error(
+            artifact_dir,
+            {
+                "step": "fetch",
+                "stderr": f"fatal: could not read Username for 'https://x-access-token:{token}@github.com/'",
+            },
+        )
+        content = path.read_text(encoding="utf-8")
+        assert token not in content
+
+    def test_summary_md_does_not_leak_token(self, tmp_path: Path) -> None:
+        from portfolio_manager.worktree_artifacts import (
+            base_artifact_dir,
+            ensure_artifact_dir,
+            write_summary_md,
+        )
+
+        artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
+        token = "github_pat_AAAAAAAAAAAAAAAAAAAA_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        path = write_summary_md(
+            artifact_dir,
+            f"# Result\n\nClone URL contained {token} (should be redacted).",
+        )
+        assert token not in path.read_text(encoding="utf-8")

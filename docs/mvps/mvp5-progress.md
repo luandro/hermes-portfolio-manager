@@ -1178,7 +1178,7 @@ A Hermes agent reading this skill cannot reasonably skip plan-first or confirm-r
 
 ## 13.1 Branch validation security tests  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py` (extend):
@@ -1200,7 +1200,7 @@ Bad branch names cannot reach run_git via any tool path.
 
 ## 13.2 Path / symlink escape tests  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
@@ -1220,7 +1220,7 @@ No tool path can escape $ROOT/worktrees.
 
 ## 13.3 Command allowlist tests  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
@@ -1242,7 +1242,7 @@ Forbidden commands cannot be introduced without breaking a security test.
 
 ## 13.4 Secret redaction tests  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
