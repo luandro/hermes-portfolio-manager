@@ -46,6 +46,9 @@ from portfolio_manager.tools import (
     _handle_portfolio_status,
     _handle_portfolio_worktree_inspect,
 )
+from portfolio_manager.worktree_tools import (
+    _handle_portfolio_worktree_plan,
+)
 
 TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_ping": _handle_portfolio_ping,
@@ -93,6 +96,9 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "maintenance-run": _handle_portfolio_maintenance_run,
     "maintenance-run-project": _handle_portfolio_maintenance_run_project,
     "maintenance-report": _handle_portfolio_maintenance_report,
+    # MVP 5 — worktree preparation
+    "portfolio_worktree_plan": _handle_portfolio_worktree_plan,
+    "worktree-plan": _handle_portfolio_worktree_plan,
 }
 
 
@@ -148,6 +154,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--severity", help="Filter by severity (info/low/medium/high)")
     parser.add_argument("--limit", type=int, help="Max results to return")
     parser.add_argument("--include-resolved", type=str, help="Include resolved findings (true/false)")
+    # MVP 5 worktree args
+    parser.add_argument("--issue-number", type=int, help="GitHub issue number")
+    parser.add_argument("--branch-name", help="Override branch name")
+    parser.add_argument("--base-branch", help="Override base branch")
+    parser.add_argument("--refresh-base", type=str, help="Refresh base branch (true/false)")
+    parser.add_argument("--inspect", type=str, help="Run inspection probes (true/false)")
+    parser.add_argument("--path", help="Explicit worktree path for inspect/explain")
     parser.add_argument("--root", help="System root path override")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args(argv)
@@ -231,6 +244,18 @@ def main(argv: list[str] | None = None) -> None:
         handler_args["run_id"] = args.run_id
     if args.severity is not None:
         handler_args["severity"] = args.severity
+    if args.issue_number is not None:
+        handler_args["issue_number"] = args.issue_number
+    if args.branch_name is not None:
+        handler_args["branch_name"] = args.branch_name
+    if args.base_branch is not None:
+        handler_args["base_branch"] = args.base_branch
+    if args.refresh_base is not None:
+        handler_args["refresh_base"] = _to_bool(args.refresh_base)
+    if args.inspect is not None:
+        handler_args["inspect"] = _to_bool(args.inspect)
+    if args.path is not None:
+        handler_args["path"] = args.path
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

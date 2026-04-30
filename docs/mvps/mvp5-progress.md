@@ -624,7 +624,7 @@ Locks always released in finally. Stable acquisition order. Contention → block
 
 ## 6.1 Plan input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -658,7 +658,7 @@ Schema validates per spec § Tool Specifications.
 
 ## 6.2 Plan logic (pure)  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_planner.py`:
@@ -714,7 +714,7 @@ Plan never writes anywhere.
 
 ## 6.3 Plan tool handler  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py` (continued):
