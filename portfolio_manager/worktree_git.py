@@ -152,6 +152,17 @@ def run_gh(args: list[str], *, cwd: Path, timeout: int) -> subprocess.CompletedP
     for a in args:
         if a.startswith("--method=") and a.split("=", 1)[1].upper() != "GET":
             raise GitCommandError(f"gh {a!r} not allowed (GET only)")
+    # Block -X shorthand for --method
+    if "-X" in args:
+        idx = args.index("-X")
+        method = args[idx + 1] if idx + 1 < len(args) else ""
+        if method.upper() != "GET":
+            raise GitCommandError(f"gh -X {method!r} not allowed (GET only)")
+    # Block payload flags that implicitly trigger POST
+    _POST_FLAGS = {"-f", "-F", "--field", "--raw-field", "--input"}
+    for a in args:
+        if a in _POST_FLAGS or a.split("=", 1)[0] in _POST_FLAGS:
+            raise GitCommandError(f"gh {a!r} not allowed (implies POST)")
     try:
         result = subprocess.run(
             ["gh", *args],

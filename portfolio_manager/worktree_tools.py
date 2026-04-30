@@ -26,7 +26,6 @@ from portfolio_manager.worktree_artifacts import (
     write_commands,
     write_error,
     write_plan,
-    write_preflight,
     write_result,
 )
 from portfolio_manager.worktree_create import create_issue_worktree
@@ -102,6 +101,8 @@ def _validate_issue_number(args: dict[str, Any]) -> tuple[int | None, str | None
     raw = args.get("issue_number")
     if raw is None:
         return None, "issue_number is required"
+    if isinstance(raw, bool):
+        return None, f"issue_number must be int, got {raw!r}"
     try:
         n = int(raw)
     except (TypeError, ValueError):
@@ -219,18 +220,18 @@ def _handle_portfolio_worktree_prepare_base(args: dict[str, Any], **kwargs: Any)
     if plan.is_blocked:
         return _blocked(tool, "; ".join(plan.blocked_reasons), reason="blocked", data={"plan": plan_to_dict(plan)})
 
-    artifact_dir = ensure_artifact_dir(base_artifact_dir(root, plan.project_id))
-    write_plan(artifact_dir, plan_to_dict(plan))
-    write_commands(artifact_dir, plan.commands)
     if dry_run:
-        write_preflight(artifact_dir, {"dry_run": True})
         return _result(
             status="success",
             tool=tool,
             message=f"[dry-run] {plan.project_id}: would clone={plan.would_clone_base} refresh={plan.would_refresh_base}",
-            data={"plan": plan_to_dict(plan), "artifact_dir": str(artifact_dir)},
-            summary=f"dry-run plan written to {artifact_dir}",
+            data={"plan": plan_to_dict(plan)},
+            summary="dry-run only; no artifacts written",
         )
+
+    artifact_dir = ensure_artifact_dir(base_artifact_dir(root, plan.project_id))
+    write_plan(artifact_dir, plan_to_dict(plan))
+    write_commands(artifact_dir, plan.commands)
     return _execute_prepare_base(tool, plan, config, root, artifact_dir)
 
 
@@ -374,20 +375,19 @@ def _handle_portfolio_worktree_create_issue(args: dict[str, Any], **kwargs: Any)
     if plan.is_blocked:
         return _blocked(tool, "; ".join(plan.blocked_reasons), reason="blocked", data={"plan": plan_to_dict(plan)})
 
-    artifact_dir = ensure_artifact_dir(issue_artifact_dir(root, plan.project_id, issue_number))
-    write_plan(artifact_dir, plan_to_dict(plan))
-    write_commands(artifact_dir, plan.commands)
-
     if dry_run:
-        write_preflight(artifact_dir, {"dry_run": True, "skipped": plan.is_skipped})
         message = f"[dry-run] {plan.project_id}#{issue_number}: would_create={plan.would_create_worktree}"
         return _result(
             status="success" if not plan.is_skipped else "skipped",
             tool=tool,
             message=message,
-            data={"plan": plan_to_dict(plan), "artifact_dir": str(artifact_dir)},
-            summary=f"dry-run plan written to {artifact_dir}",
+            data={"plan": plan_to_dict(plan)},
+            summary="dry-run only; no artifacts written",
         )
+
+    artifact_dir = ensure_artifact_dir(issue_artifact_dir(root, plan.project_id, issue_number))
+    write_plan(artifact_dir, plan_to_dict(plan))
+    write_commands(artifact_dir, plan.commands)
     return _execute_create_issue(tool, plan, config, root, artifact_dir, issue_number)
 
 

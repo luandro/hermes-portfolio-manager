@@ -58,16 +58,21 @@ def base_worktree_id(project_id: str) -> str:
 
 def issue_worktree_id(project_id: str, issue_number: int) -> str:
     """Return the canonical ID for an issue worktree row."""
+    if not isinstance(issue_number, int) or isinstance(issue_number, bool) or issue_number < 1:
+        raise ValueError(f"issue_number must be positive int, got {issue_number!r}")
     return f"issue:{project_id}:{issue_number}"
 
 
 def init_worktree_schema(conn: sqlite3.Connection) -> None:
     """Add MVP 5 worktree columns idempotently. Safe on every startup."""
     existing = {row[1] for row in conn.execute("PRAGMA table_info(worktrees)").fetchall()}
+    changed = False
     for col, sqltype in _MVP5_COLUMNS.items():
         if col not in existing:
             conn.execute(f"ALTER TABLE worktrees ADD COLUMN {col} {sqltype}")
-    conn.commit()
+            changed = True
+    if changed:
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------

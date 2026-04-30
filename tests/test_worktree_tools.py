@@ -145,9 +145,10 @@ def test_prepare_base_dry_run_writes_plan_artifacts_no_clone(
     assert "[dry-run]" in res["message"]
     base_dir = agent_root / "worktrees" / "testproj"
     assert not base_dir.exists()
+    # dry_run should not write artifacts
     artifact_dir = agent_root / "artifacts" / "worktrees" / "testproj" / "base"
-    assert (artifact_dir / "plan.json").exists()
-    assert (artifact_dir / "commands.json").exists()
+    assert not (artifact_dir / "plan.json").exists()
+    assert not (artifact_dir / "commands.json").exists()
 
 
 def test_prepare_base_requires_confirm_when_dry_run_false(

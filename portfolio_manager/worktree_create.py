@@ -110,6 +110,14 @@ def create_issue_worktree(
         if not branch_exists(issue_resolved, branch_name, remote=False):
             outcome.blocked_reasons.append(f"existing issue worktree does not have branch {branch_name!r}")
             return outcome
+        # Verify HEAD is actually on the expected branch
+        head = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=issue_resolved, timeout=DEFAULT_TIMEOUTS["rev-parse"])
+        current = head.stdout.strip() if head.returncode == 0 else ""
+        if current != branch_name:
+            outcome.blocked_reasons.append(
+                f"existing issue worktree is on branch {current!r}, expected {branch_name!r}"
+            )
+            return outcome
         outcome.skipped = True
         outcome.final_state = "clean"
         return outcome

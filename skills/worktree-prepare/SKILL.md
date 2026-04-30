@@ -34,19 +34,19 @@ Use this skill whenever the user asks to prepare, plan, create, refresh, list, i
 ## Example Interaction
 
 User:
-```
+```text
 Prepare a worktree for issue 42 in comapeo-cloud-app.
 ```
 
 Skill (after `portfolio_worktree_plan`):
-```
+```text
 Plan: clone/refresh base repo at $ROOT/worktrees/comapeo-cloud-app, then create branch
 agent/comapeo-cloud-app/issue-42 at $ROOT/worktrees/comapeo-cloud-app-issue-42 from origin/main.
 Confirm to run it.
 ```
 
 User:
-```
+```text
 Create it now.
 ```
 

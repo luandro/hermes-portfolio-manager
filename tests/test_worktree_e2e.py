@@ -69,7 +69,14 @@ def test_e2e_prepare_base_dry_run_no_side_effects(agent_root: Path) -> None:
     base_path = agent_root / "worktrees" / "testproj"
     assert not base_path.exists()
     state_db = agent_root / "state" / "state.sqlite"
-    assert not state_db.exists() or state_db.stat().st_size <= 4096
+    if state_db.exists():
+        import sqlite3
+
+        with sqlite3.connect(state_db) as c:
+            tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if "worktrees" in tables:
+                count = c.execute("SELECT COUNT(*) FROM worktrees").fetchone()[0]
+                assert count == 0
 
 
 @pytest.mark.usefixtures("projects_yaml_pointing_to_bare_remote")

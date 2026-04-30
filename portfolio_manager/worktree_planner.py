@@ -208,8 +208,20 @@ def build_plan(
                         blocked.append(f"existing issue worktree does not have branch {final_branch_name!r}")
                         would_create = False
                     else:
-                        skipped_reason = "exact matching clean worktree already exists"
-                        would_create = False
+                        # Verify HEAD is actually on the expected branch
+                        from portfolio_manager.worktree_git import DEFAULT_TIMEOUTS as _DT
+                        from portfolio_manager.worktree_git import run_git as _run_git
+
+                        head = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=issue_path, timeout=_DT["rev-parse"])
+                        current = head.stdout.strip() if head.returncode == 0 else ""
+                        if final_branch_name and current != final_branch_name:
+                            blocked.append(
+                                f"existing issue worktree is on branch {current!r}, expected {final_branch_name!r}"
+                            )
+                            would_create = False
+                        else:
+                            skipped_reason = "exact matching clean worktree already exists"
+                            would_create = False
 
     # ---- If branch already exists in base repo without matching worktree → block ----
     if (
