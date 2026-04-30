@@ -84,7 +84,7 @@ def build_plan(
     config: PortfolioConfig,
     *,
     project_ref: str,
-    issue_number: int,
+    issue_number: int | None = None,
     base_branch: str | None = None,
     branch_name: str | None = None,
     refresh_base: bool = True,
@@ -101,7 +101,7 @@ def build_plan(
     if project is None:
         return WorktreePlan(
             project_id="",
-            issue_number=issue_number,
+            issue_number=issue_number or 0,
             base_path=root / "worktrees",
             issue_worktree_path=root / "worktrees",
             base_branch="",
@@ -117,7 +117,7 @@ def build_plan(
     # ---- Validate issue ----
     blocked: list[str] = []
     warnings: list[str] = []
-    if not isinstance(issue_number, int) or issue_number <= 0:
+    if issue_number is not None and (not isinstance(issue_number, int) or issue_number <= 0):
         blocked.append(f"issue_number must be positive int, got {issue_number!r}")
 
     # ---- Resolve branches ----
@@ -126,9 +126,10 @@ def build_plan(
         blocked.append(base_err)
     final_base_branch = resolved_base or ""
 
+    effective_issue = max(issue_number, 1) if issue_number is not None else 1
     try:
         final_branch_name = (
-            validate_branch_name(branch_name) if branch_name else default_branch_name(project.id, max(issue_number, 1))
+            validate_branch_name(branch_name) if branch_name else default_branch_name(project.id, effective_issue)
         )
     except ValueError as exc:
         blocked.append(f"invalid branch name: {exc}")
@@ -136,13 +137,16 @@ def build_plan(
 
     # ---- Resolve paths ----
     base_path = project.local.base_path
-    try:
-        issue_path = render_issue_worktree_path(
-            project.local.issue_worktree_pattern, project.id, max(issue_number, 1), root
-        )
-    except (TypeError, ValueError) as exc:
-        blocked.append(f"invalid issue worktree path: {exc}")
-        issue_path = base_path  # placeholder; not used when blocked
+    if issue_number is not None:
+        try:
+            issue_path = render_issue_worktree_path(
+                project.local.issue_worktree_pattern, project.id, effective_issue, root
+            )
+        except (TypeError, ValueError) as exc:
+            blocked.append(f"invalid issue worktree path: {exc}")
+            issue_path = base_path  # placeholder; not used when blocked
+    else:
+        issue_path = base_path  # no issue worktree for base-only plans
 
     remote_url = project.repo
     norm_remote = normalize_remote_url(remote_url) if remote_url else ""
@@ -150,7 +154,7 @@ def build_plan(
     if blocked:
         return WorktreePlan(
             project_id=project.id,
-            issue_number=issue_number,
+            issue_number=issue_number or 0,
             base_path=base_path,
             issue_worktree_path=issue_path,
             base_branch=final_base_branch,
@@ -190,7 +194,7 @@ def build_plan(
     # ---- Inspect existing issue worktree (idempotency / conflict detection) ----
     skipped_reason: str | None = None
     would_create = True
-    if issue_path.exists():
+    if issue_number is not None and issue_path.exists():
         if not is_git_repo(issue_path):
             blocked.append(f"issue path exists but is not a git repo: {issue_path}")
             would_create = False
@@ -235,6 +239,7 @@ def build_plan(
     if (
         not blocked
         and not skipped_reason
+        and issue_number is not None
         and base_exists
         and is_git_repo(base_path)
         and final_branch_name
@@ -269,7 +274,7 @@ def build_plan(
 
     return WorktreePlan(
         project_id=project.id,
-        issue_number=issue_number,
+        issue_number=issue_number or 0,
         base_path=base_path,
         issue_worktree_path=issue_path,
         base_branch=final_base_branch,

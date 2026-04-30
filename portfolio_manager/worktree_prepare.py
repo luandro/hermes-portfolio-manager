@@ -89,7 +89,10 @@ def clone_base_repo(
         return outcome
 
     actual_remote = get_origin_url(target_resolved)
-    if actual_remote and not remotes_equal(actual_remote, remote_url):
+    if not actual_remote:
+        outcome.blocked_reasons.append("post-clone repo has no origin remote")
+        return outcome
+    if not remotes_equal(actual_remote, remote_url):
         outcome.blocked_reasons.append(
             f"post-clone remote {normalize_remote_url(actual_remote)!r} does not match "
             f"{normalize_remote_url(remote_url)!r}"
@@ -136,7 +139,10 @@ def refresh_base_branch(
         return outcome
 
     actual_remote = get_origin_url(base_path)
-    if actual_remote and not remotes_equal(actual_remote, remote_url):
+    if not actual_remote:
+        outcome.blocked_reasons.append("base repo has no origin remote")
+        return outcome
+    if not remotes_equal(actual_remote, remote_url):
         outcome.blocked_reasons.append(f"base remote {normalize_remote_url(actual_remote)!r} does not match config")
         return outcome
 

@@ -760,7 +760,7 @@ class TestMvp5PathSymlinkEscape:
     def test_artifact_dir_path_traversal_blocked(self, tmp_path: Path) -> None:
         from portfolio_manager.worktree_artifacts import issue_artifact_dir
 
-        with pytest.raises((ValueError, AssertionError)):
+        with pytest.raises(ValueError):
             issue_artifact_dir(tmp_path, "../escape", 42)
 
     def test_inspect_path_outside_root_blocked(self, tmp_path: Path) -> None:
@@ -823,24 +823,21 @@ class TestMvp5CommandAllowlist:
 
     def test_no_build_or_test_runner_in_worktree_modules(self) -> None:
         # MVP 5 does not run any package-manager / build / test commands inside
-        # managed repos. Scan for direct invocations.
-        forbidden = (
-            '"npm"',
-            '"pnpm"',
-            '"yarn"',
-            '"pip"',
-            '"cargo"',
-            '"make"',
-            '"pytest"',
-        )
+        # managed repos. Scan for direct invocations (double-quoted, single-quoted, or bare word).
+        forbidden_names = ("npm", "pnpm", "yarn", "pip", "cargo", "make", "pytest")
         for src_file in WORKTREE_SOURCES:
             content = src_file.read_text()
-            for cmd in forbidden:
-                assert cmd not in content, (
-                    f"Forbidden runner {cmd} referenced in {src_file.relative_to(SRC_DIR.parent)}"
-                )
-
-
+            for name in forbidden_names:
+                # Double-quoted or single-quoted literal
+                if f'"{name}"' in content or f"'{name}'" in content:
+                    raise AssertionError(
+                        f"Forbidden runner '{name}' referenced in {src_file.relative_to(SRC_DIR.parent)}"
+                    )
+                # Bare word (must be standalone, not a substring of another word)
+                if re.search(rf"(?<![a-zA-Z0-9_-]){re.escape(name)}(?![a-zA-Z0-9_-])", content):
+                    raise AssertionError(
+                        f"Forbidden runner '{name}' referenced in {src_file.relative_to(SRC_DIR.parent)}"
+                    )
 class TestMvp5SecretRedaction:
     """Phase 13.4 — secrets never appear in artifacts or error JSON."""
 

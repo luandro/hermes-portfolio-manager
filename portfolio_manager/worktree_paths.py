@@ -96,13 +96,25 @@ def has_escaping_symlink(path: Path, root: Path) -> bool:
     """Return True if *path* (or any ancestor inside root) is a symlink that escapes root."""
     resolved_root = Path(root).resolve(strict=False)
     p = Path(path)
-    if not p.exists() and not p.is_symlink():
-        return False
-    try:
-        target = p.resolve(strict=False)
-    except OSError:
-        return True
-    return not target.is_relative_to(resolved_root)
+    # Walk from the given path up through ancestors until we reach the root.
+    # Check each component for a symlink that resolves outside root.
+    current = p
+    while True:
+        if current.is_symlink():
+            try:
+                target = current.resolve(strict=False)
+            except OSError:
+                return True
+            if not target.is_relative_to(resolved_root):
+                return True
+        # Stop when we reach or pass the root
+        try:
+            if current.resolve(strict=False) == resolved_root or current.parent == current:
+                break
+        except OSError:
+            break
+        current = current.parent
+    return False
 
 
 # ---------------------------------------------------------------------------

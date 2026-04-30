@@ -55,7 +55,8 @@ Tests live under tests/ as test_<area>.py.
 Skills live under skills/<skill-name>/SKILL.md.
 Config root resolution: explicit arg > AGENT_SYSTEM_ROOT > Path.home() / ".agent-system".
 Locks use state.acquire_lock / release_lock; mirror the worktree_locks.py shape.
-Tool result shape uses status="success"|"skipped"|"blocked"|"failed" (MVP 4+ convention).
+Tool result shape uses status="success"|"skipped"|"blocked"|"failed"; MVP 6 also permits
+  status="needs_user" for implementation jobs that require product judgment.
 Issue specs live at $ROOT/artifacts/issues/<project_id>/<draft_id>/ (MVP 3 layout) — REUSE issue_artifact_root.
 Worktree probes (worktree_git.run_git, get_clean_state, list_worktrees, get_origin_url, branch_exists)
   exist in portfolio_manager/worktree_git.py — REUSE; do not re-implement subprocess wrappers.
@@ -119,7 +120,7 @@ worktree state outside the issue worktree (no clean / reset / stash / push / com
 
 ```python
 {
-    "status": "success" | "skipped" | "blocked" | "failed",
+    "status": "success" | "skipped" | "blocked" | "failed" | "needs_user",
     "tool": "tool_name",
     "message": "Human-readable one-line result",
     "data": {},
@@ -128,7 +129,8 @@ worktree state outside the issue worktree (no clean / reset / stash / push / com
 }
 ```
 
-`blocked` is preferred over guessing on ambiguity. `failed` is for unexpected exceptions after mutation started.
+`blocked` is preferred over guessing on ambiguity. `needs_user` is for explicit product-judgment
+requests from a harness job. `failed` is for unexpected exceptions after mutation started.
 
 ---
 
@@ -150,7 +152,7 @@ portfolio_implementation_explain               (why blocked / needs_user)
 ## Required Dev CLI Commands
 
 ```bash
-python dev_cli.py implementation-plan          --project-ref <p> --issue-number 42 --root /tmp/agent-system-test --json
+python dev_cli.py implementation-plan          --project-ref <p> --issue-number 42 --harness-id forge --root /tmp/agent-system-test --json
 python dev_cli.py implementation-start         --project-ref <p> --issue-number 42 --harness-id forge --confirm false --root /tmp/agent-system-test --json
 python dev_cli.py implementation-start         --project-ref <p> --issue-number 42 --harness-id forge --confirm true  --root /tmp/agent-system-test --json
 python dev_cli.py implementation-apply-review-fixes --project-ref <p> --issue-number 42 --pr-number 130 --review-stage-id stage1 \
@@ -175,20 +177,90 @@ portfolio_manager/implementation_artifacts.py    NEW   (writers + redaction for 
 portfolio_manager/implementation_preflight.py    NEW   (worktree clean / branch match / source artifact present)
 portfolio_manager/implementation_planner.py      NEW   (pure plan logic)
 portfolio_manager/harness_runner.py              NEW   (allowlisted subprocess wrapper for harness commands)
+portfolio_manager/implementation_changes.py      NEW   (changed-file collection from git status/diff output)
 portfolio_manager/implementation_scope_guard.py  NEW   (changed files vs source-spec scope; protected paths)
 portfolio_manager/implementation_test_quality.py NEW   (test-first evidence; tests-map-to-acceptance)
 portfolio_manager/implementation_commit.py       NEW   (single local commit through allowlisted git commands)
 portfolio_manager/implementation_jobs.py         NEW   (initial_implementation + review_fix orchestrators)
 portfolio_manager/implementation_tools.py        NEW   (six tool handlers, thin wrappers)
-portfolio_manager/schemas.py                     EXTEND (six new pydantic input schemas)
+portfolio_manager/schemas.py                     EXTEND (six new OpenAI-style schema dicts)
 portfolio_manager/state.py                       EXTEND (implementation_jobs table + idempotent ALTERs)
 portfolio_manager/__init__.py                    EXTEND (register six new tools)
-dev_cli.py                                       EXTEND (seven new CLI commands)
+dev_cli.py                                       EXTEND (six new CLI commands)
 skills/implementation-run/SKILL.md               NEW
 config/harnesses.yaml                            NEW   (committed example; runtime copy lives under $ROOT/config/)
 ```
 
 If equivalents already exist (a shared redaction helper, a generic lock wrapper), reuse them — do not duplicate.
+
+---
+
+## Harness Configuration and Protocol
+
+`$ROOT/config/harnesses.yaml` is server-side policy. MVP 6 reads it but never writes it.
+
+Required shape:
+
+```yaml
+harnesses:
+  - id: forge
+    command: ["forge", "run"]
+    env_passthrough: ["OPENAI_API_KEY"]
+    timeout_seconds: 1800
+    max_files_changed: 20
+    required_checks: ["unit_tests", "lint"]
+    checks:
+      unit_tests:
+        command: ["uv", "run", "pytest"]
+        timeout_seconds: 600
+      lint:
+        command: ["uv", "run", "ruff", "check", "."]
+        timeout_seconds: 300
+    workspace_subpath: null
+```
+
+Rules:
+
+```txt
+command and every checks.<id>.command are argv arrays. Shell strings are invalid.
+required_checks must reference keys under checks and must use allowlisted IDs:
+  lint, typecheck, unit_tests, format_check.
+No command interpolation. The runner passes paths through environment variables only.
+```
+
+Harness environment variables:
+
+```txt
+PORTFOLIO_IMPLEMENTATION_INPUT        absolute path to input-request.json
+PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR absolute path to the job artifact dir
+PORTFOLIO_IMPLEMENTATION_SOURCE       absolute path to the source spec artifact
+PORTFOLIO_IMPLEMENTATION_JOB_ID       job id
+GIT_TERMINAL_PROMPT                   always "0"
+```
+
+Harness result protocol:
+
+```txt
+The harness may write $PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR/harness-result.json.
+If present, MVP 6 consumes these fields:
+  status: "implemented" | "needs_user" | "failed"
+  message: string
+  test_first: list of {phase: "red"|"green"|"waived", command: list[str], exit_code: int, summary: string}
+  changed_files_hint: optional list[str]          (advisory only; git remains source of truth)
+  needs_user: optional {question: string, context: dict}
+
+If harness-result.json is absent, MVP 6 falls back to return code + captured output:
+  returncode 0 => implemented
+  nonzero => failed
+No hidden chain-of-thought, private provider metadata, or secrets may be copied into artifacts.
+```
+
+Review-fix naming convention:
+
+```txt
+Use pr_number in schemas, CLI args, SQLite columns, locks, and helper signatures.
+Do not introduce pr_id unless a later MVP adds a distinct GitHub node-id requirement.
+```
 
 ---
 
@@ -258,10 +330,10 @@ Status: [ ]
 ### Test first
 Add `tests/test_structure.py` cases (extend the existing file):
 ```txt
-test_implementation_modules_exist                 (imports for the 13 new portfolio_manager/implementation_*.py + harness_*.py modules)
+test_implementation_modules_exist                 (imports for the 14 new portfolio_manager/implementation_*.py + harness_*.py modules)
 test_implementation_run_skill_folder_exists
 test_implementation_tools_registered              (six tool names appear in _TOOL_REGISTRY)
-test_dev_cli_implementation_commands_registered   (seven CLI subcommands)
+test_dev_cli_implementation_commands_registered   (six CLI subcommands)
 test_no_duplicate_tool_names
 test_existing_worktree_tools_still_callable       (back-compat smoke for MVP 5 tools)
 ```
@@ -347,7 +419,12 @@ Add to `portfolio_manager/implementation_paths.py`:
 def implementation_artifact_dir(root: Path, project_id: str, issue_number: int, job_id: str) -> Path:
     # $ROOT/artifacts/implementations/<project_id>/issue-<n>/<job_id>/
 def resolve_source_artifact(root: Path, conn, project_id: str, issue_number: int) -> Path | None:
-    # consult issues.spec_artifact_path then issue_drafts artifact_path; verify file exists and is under root
+    # Returns the issue spec markdown file for the issue, not just its artifact directory.
+    # Resolution order:
+    #   1. issues.spec_artifact_path when it points to an existing file.
+    #   2. issues.spec_artifact_path / "spec.md" when it points to an existing directory.
+    #   3. issue_drafts.artifact_path / "spec.md" for the draft linked by github_issue_number.
+    # Verify the returned file exists and resolves under $ROOT/artifacts/issues.
 ```
 
 ### Verification
@@ -358,7 +435,8 @@ pytest tests/test_implementation_paths.py -q
 ### Acceptance
 ```txt
 Paths always contained under root/artifacts/implementations.
-Source artifact resolver never returns a path outside $ROOT.
+Source artifact resolver returns a concrete spec file (`spec.md` or equivalent), never a directory,
+and never returns a path outside `$ROOT/artifacts/issues`.
 ```
 
 ---
@@ -380,6 +458,9 @@ test_harness_command_path_must_be_absolute_or_basename_only_no_traversal
 test_harness_timeout_seconds_required_positive_int_under_max
 test_harness_max_files_changed_required
 test_harness_required_checks_must_be_array_of_allowlisted_check_ids
+test_harness_checks_must_be_mapping_of_check_ids_to_command_arrays
+test_required_checks_must_reference_defined_checks
+test_check_timeout_seconds_required_positive_int_under_max
 test_get_harness_by_id_returns_typed_model
 test_get_harness_by_id_unknown_returns_none
 test_harness_id_field_must_match_HARNESS_ID_RE
@@ -390,13 +471,20 @@ Use `tmp_path` to write fake `config/harnesses.yaml` files.
 Add `portfolio_manager/harness_config.py`:
 ```python
 @dataclass(frozen=True)
+class HarnessCheckConfig:
+    id: str
+    command: list[str]          # argv form, no shell string
+    timeout_seconds: int
+
+@dataclass(frozen=True)
 class HarnessConfig:
     id: str
     command: list[str]            # argv form, no shell string
     env_passthrough: list[str]    # env var names allowed
     timeout_seconds: int
     max_files_changed: int
-    required_checks: list[str]    # ids of allowlisted check commands
+    required_checks: list[str]    # ids referencing checks
+    checks: dict[str, HarnessCheckConfig]
     workspace_subpath: str | None # optional sub-dir under issue_worktree_path
 
 ALLOWED_CHECK_IDS = {"lint", "typecheck", "unit_tests", "format_check"}
@@ -413,6 +501,7 @@ pytest tests/test_harness_config.py -q
 ### Acceptance
 ```txt
 Bad command shapes (string, traversal, empty) are rejected at load time, not at run time.
+required_checks cannot reference an undefined check command.
 Unknown harness id returns None — never raises.
 ```
 
@@ -446,7 +535,7 @@ CREATE TABLE IF NOT EXISTS implementation_jobs (
   project_id TEXT NOT NULL,
   issue_number INTEGER,
   worktree_id TEXT,
-  pr_id TEXT,
+  pr_number INTEGER,
   review_stage_id TEXT,
   source_artifact_path TEXT,
   status TEXT NOT NULL CHECK(status IN ('planned','blocked','running','failed','succeeded','needs_user')),
@@ -625,7 +714,7 @@ Add `portfolio_manager/implementation_locks.py`. Mirror `worktree_locks.with_iss
 IMPLEMENTATION_LOCK_TTL = 60 * 60
 class ImplementationLockBusy(RuntimeError): ...
 def with_implementation_lock(conn, project_id: str, issue_number: int): ...
-def with_implementation_review_lock(conn, project_id: str, pr_id: str): ...
+def with_implementation_review_lock(conn, project_id: str, pr_number: int): ...
 ```
 On contention, raise the typed exception so handlers translate to `status="blocked"`, never `failed`.
 
@@ -678,7 +767,7 @@ class PreflightResult:
     source_artifact_path: Path | None
 
 def preflight_initial_implementation(conn, *, project_id, issue_number, expected_branch, root) -> PreflightResult: ...
-def preflight_review_fix(conn, *, project_id, issue_number, pr_id, expected_branch,
+def preflight_review_fix(conn, *, project_id, issue_number, pr_number, expected_branch,
                           approved_comment_ids: list[str], fix_scope: list[str], root) -> PreflightResult: ...
 ```
 Use `worktree_state.get_worktree`, `worktree_git.get_clean_state`, `worktree_git.branch_exists`,
@@ -714,12 +803,22 @@ test_plan_schema_accepts_optional_expected_branch
 ### Implementation
 Add to `portfolio_manager/schemas.py`:
 ```python
-class ImplementationPlanInput(BaseModel):
-    project_ref: str
-    issue_number: int = Field(gt=0)
-    harness_id: str
-    expected_branch: str | None = None
-    root: str | None = None
+PORTFOLIO_IMPLEMENTATION_PLAN_SCHEMA = {
+    "name": "portfolio_implementation_plan",
+    "description": "Plan a confirmed implementation job without mutating SQLite, artifacts, or worktrees.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {"type": "string"},
+            "issue_number": {"type": "integer", "minimum": 1},
+            "harness_id": {"type": "string"},
+            "expected_branch": {"type": "string"},
+            "root": {"type": "string"},
+        },
+        "required": ["project_ref", "issue_number", "harness_id"],
+        "additionalProperties": False,
+    },
+}
 ```
 
 ### Verification
@@ -771,7 +870,7 @@ class ImplementationPlan:
     warnings: list[str]
 
 def build_initial_plan(conn, root, *, project_ref, issue_number, harness_id, expected_branch) -> ImplementationPlan: ...
-def build_review_fix_plan(conn, root, *, project_ref, issue_number, pr_id, harness_id,
+def build_review_fix_plan(conn, root, *, project_ref, issue_number, pr_number, harness_id,
                            review_stage_id, review_iteration, approved_comment_ids, fix_scope) -> ImplementationPlan: ...
 ```
 Pure functions — no SQLite writes, no artifact writes, no subprocess.
@@ -809,9 +908,13 @@ test_runner_enforces_timeout_seconds_from_harness_config
 test_runner_kills_process_group_on_timeout
 test_runner_captures_stdout_stderr_truncated_to_64KB_each
 test_runner_redacts_token_patterns_in_captured_output
+test_runner_passes_portfolio_input_artifact_source_env_vars
+test_runner_reads_harness_result_json_when_present
+test_runner_maps_harness_result_status_needs_user
 test_runner_returns_typed_result_with_returncode_duration_truncated_flag
 test_runner_rejects_command_path_with_shell_metachar
 test_runner_rejects_command_when_workspace_dirty_at_entry      (re-checks via worktree_git.get_clean_state)
+test_run_required_check_uses_check_command_and_timeout
 ```
 
 ### Implementation
@@ -825,12 +928,19 @@ class HarnessResult:
     stderr: str
     truncated: bool
     timed_out: bool
+    harness_status: str | None     # implemented | needs_user | failed from harness-result.json
+    harness_message: str | None
 
 def run_harness(*, harness: HarnessConfig, workspace: Path, root: Path,
                 source_artifact_path: Path, instructions: dict,
+                artifact_dir: Path, input_request_path: Path,
                 extra_env: dict[str, str] | None = None) -> HarnessResult: ...
+def run_required_check(*, check: HarnessCheckConfig, workspace: Path, root: Path,
+                       artifact_dir: Path, extra_env: dict[str, str] | None = None) -> HarnessResult: ...
 ```
-Use `subprocess.Popen(..., start_new_session=True)`, no `shell=True`, allowlist check on `harness.command[0]` basename, redact env values not in passthrough.
+Use `subprocess.Popen(..., start_new_session=True)`, no `shell=True`, allowlist check on the command basename,
+redact env values not in passthrough, set the harness protocol env vars, and consume
+`artifact_dir / "harness-result.json"` when present.
 
 ### Verification
 ```bash
@@ -842,6 +952,53 @@ pytest tests/test_harness_runner.py -q
 Forbidden commands and dirty workspaces raise before subprocess starts.
 Timeouts terminate the process group, never orphan children.
 Captured output never contains tokens or env values.
+```
+
+---
+
+## 8.2 Changed-file collector  [L2]
+
+Status: [ ]
+
+### Test first
+`tests/test_implementation_changes.py`:
+```txt
+test_collect_changed_files_uses_git_status_porcelain
+test_collect_changed_files_includes_untracked_files
+test_collect_changed_files_detects_renames
+test_collect_changed_files_normalizes_to_posix_relative_paths
+test_collect_changed_files_blocks_absolute_or_dotdot_paths
+test_collect_changed_files_rejects_paths_outside_workspace
+test_collect_changed_files_requires_workspace_under_worktrees_root
+test_collect_changed_files_allows_dirty_workspace_after_harness_for_scope_gate
+```
+
+### Implementation
+Add `portfolio_manager/implementation_changes.py`:
+```python
+@dataclass(frozen=True)
+class ChangedFiles:
+    files: list[str]
+    statuses: list[dict[str, str]]  # {path, status, old_path?}
+
+def collect_changed_files(workspace: Path, *, root: Path) -> ChangedFiles: ...
+```
+Use `worktree_git.run_git` with read-only commands only:
+```txt
+git status --porcelain=v1 --untracked-files=all
+git diff --name-status --find-renames HEAD
+```
+Extend `worktree_git.run_git` allowlist only as needed for these read-only diff/status commands.
+
+### Verification
+```bash
+pytest tests/test_implementation_changes.py -q
+```
+
+### Acceptance
+```txt
+Changed file paths are git-derived, POSIX-relative, and cannot escape the workspace.
+This helper never writes SQLite, artifacts, or worktree files.
 ```
 
 ---
@@ -867,7 +1024,7 @@ Add `portfolio_manager/implementation_test_quality.py::collect_test_first_eviden
 
 ### Verification
 ```bash
-pytest tests/test_implementation_test_quality.py::test_evidence -q
+pytest tests/test_implementation_test_quality.py -q -k evidence
 ```
 
 ### Acceptance
@@ -957,7 +1114,48 @@ A harness that produces no meaningful tests cannot reach the commit step.
 
 # Phase 10 — Local Commit
 
-## 10.1 Local commit helper  [L3]
+## 10.1 Extend git wrapper for local commit only  [L3]
+
+Status: [ ]
+
+### Test first
+`tests/test_implementation_commit.py`:
+```txt
+test_worktree_git_allows_add_A_for_implementation_commit
+test_worktree_git_allows_commit_with_per_command_user_config_and_m_message
+test_worktree_git_allows_rev_parse_head
+test_worktree_git_rejects_commit_amend
+test_worktree_git_rejects_commit_without_message
+test_worktree_git_rejects_commit_with_global_config
+test_worktree_git_still_rejects_push_rebase_reset_clean_stash
+```
+
+### Implementation
+Extend `portfolio_manager/worktree_git.py` allowlist surgically, or add a narrowly-scoped wrapper in
+`portfolio_manager/implementation_commit.py` that still calls `worktree_git.run_git` after validation.
+Allowed MVP 6 git write commands:
+```txt
+git add -A
+git -c user.name=<name> -c user.email=<email> commit -m <message>
+git rev-parse HEAD
+```
+All other commit forms are forbidden, especially `--amend`, `--reset-author`, global config writes,
+push, rebase, reset, clean, stash, checkout, and pull.
+
+### Verification
+```bash
+pytest tests/test_implementation_commit.py tests/test_worktree_git.py -q
+```
+
+### Acceptance
+```txt
+MVP 6 can make exactly one local commit through a constrained path without weakening MVP 5's
+remote-mutation and repo-rewrite protections.
+```
+
+---
+
+## 10.2 Local commit helper  [L3]
 
 Status: [ ]
 
@@ -989,6 +1187,7 @@ git -c user.name=<n> -c user.email=<e> commit -m <message>
 git rev-parse HEAD
 ```
 Forbidden subcommands (`push`, `--amend`, `rebase`, `reset`, `clean`, `stash`) must remain blocked at the runner allowlist layer.
+This task depends on 10.1; do not bypass the wrapper with raw `subprocess`.
 
 ### Verification
 ```bash
@@ -1017,22 +1216,32 @@ test_start_schema_rejects_unknown_field
 ```
 
 ### Implementation
-Add `ImplementationStartInput` to `schemas.py`:
+Add `PORTFOLIO_IMPLEMENTATION_START_SCHEMA` to `schemas.py`:
 ```python
-class ImplementationStartInput(BaseModel):
-    project_ref: str
-    issue_number: int = Field(gt=0)
-    harness_id: str
-    expected_branch: str | None = None
-    base_sha: str | None = None
-    instructions: dict | None = None
-    confirm: bool = False
-    root: str | None = None
+PORTFOLIO_IMPLEMENTATION_START_SCHEMA = {
+    "name": "portfolio_implementation_start",
+    "description": "Run a confirmed initial_implementation job in a prepared issue worktree.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {"type": "string"},
+            "issue_number": {"type": "integer", "minimum": 1},
+            "harness_id": {"type": "string"},
+            "expected_branch": {"type": "string"},
+            "base_sha": {"type": "string"},
+            "instructions": {"type": "object"},
+            "confirm": {"type": "boolean", "default": False},
+            "root": {"type": "string"},
+        },
+        "required": ["project_ref", "issue_number", "harness_id"],
+        "additionalProperties": False,
+    },
+}
 ```
 
 ### Verification
 ```bash
-pytest tests/test_implementation_tools.py::test_start_schema -q
+pytest tests/test_implementation_tools.py -q -k start_schema
 ```
 
 ### Acceptance
@@ -1072,7 +1281,8 @@ Add `portfolio_manager/implementation_jobs.py::run_initial_implementation(...)`.
 build_initial_plan → confirm gate → insert_job(planned) → with_implementation_lock →
   update_job_status(running) → write plan/preflight/commands/input-request →
   preflight_initial_implementation → if not ok: blocked + finish_job
-  run_harness → write changed-files.json + checks.json (run required_checks via run_harness call) →
+  run_harness → collect_changed_files → run required_checks via run_required_check →
+  write changed-files.json + checks.json →
   collect_test_first_evidence → check_scope → check_test_quality →
   if any gate fails: blocked + finish_job
   make_local_commit → write commit.json + result.json + summary.md → finish_job(succeeded)
@@ -1080,7 +1290,7 @@ build_initial_plan → confirm gate → insert_job(planned) → with_implementat
 
 ### Verification
 ```bash
-pytest tests/test_implementation_jobs.py::test_initial_impl -q
+pytest tests/test_implementation_jobs.py -q -k initial_impl
 ```
 
 ### Acceptance
@@ -1102,17 +1312,20 @@ Status: [ ]
 `tests/test_implementation_tools.py`:
 ```txt
 test_apply_review_fixes_schema_defaults_confirm_false
-test_apply_review_fixes_schema_requires_pr_id_and_review_stage_id
+test_apply_review_fixes_schema_requires_pr_number_and_review_stage_id
 test_apply_review_fixes_schema_requires_non_empty_approved_comment_ids
 test_apply_review_fixes_schema_validates_review_iteration_positive
 ```
 
 ### Implementation
-Add `ImplementationApplyReviewFixesInput` to `schemas.py` per spec § Reusable Harness Job Contract.
+Add `PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA` to `schemas.py` per spec § Reusable Harness Job Contract,
+using OpenAI-style schema dicts matching the existing file. Required fields:
+`project_ref`, `issue_number`, `pr_number`, `review_stage_id`, `review_iteration`,
+`approved_comment_ids`, `fix_scope`, and `harness_id`. `confirm` defaults to false.
 
 ### Verification
 ```bash
-pytest tests/test_implementation_tools.py::test_apply_review_fixes_schema -q
+pytest tests/test_implementation_tools.py -q -k apply_review_fixes_schema
 ```
 
 ### Acceptance
@@ -1151,7 +1364,7 @@ Add `implementation_jobs.run_review_fix(...)`. Reuse the initial-implementation 
 
 ### Verification
 ```bash
-pytest tests/test_implementation_jobs.py::test_review_fix -q
+pytest tests/test_implementation_jobs.py -q -k review_fix
 ```
 
 ### Acceptance
@@ -1173,6 +1386,9 @@ Status: [ ]
 test_plan_tool_returns_success_for_clean_path
 test_plan_tool_returns_blocked_with_reason
 test_plan_tool_does_not_persist_state
+test_status_schema_accepts_job_id_or_project_ref_issue_number
+test_list_schema_accepts_optional_project_issue_status_filters
+test_explain_schema_requires_job_id
 test_status_tool_returns_row_for_known_job_id
 test_status_tool_blocks_for_unknown_job_id
 test_list_tool_filters_by_project_and_issue
@@ -1183,7 +1399,9 @@ test_explain_tool_returns_blocked_for_unknown_job_id
 ```
 
 ### Implementation
-Add `portfolio_manager/implementation_tools.py` with thin handlers:
+Add `PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA`, `PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA`,
+and `PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA` to `portfolio_manager/schemas.py` as OpenAI-style
+schema dicts. Add `portfolio_manager/implementation_tools.py` with thin handlers:
 ```python
 def _handle_portfolio_implementation_plan(args, **kw) -> str: ...
 def _handle_portfolio_implementation_status(args, **kw) -> str: ...
@@ -1253,7 +1471,7 @@ test_cli_registers_implementation_explain
 ```
 
 ### Implementation
-Extend `dev_cli.py` with the seven subcommands listed in Required Dev CLI Commands. Reuse existing `_to_bool`, `--root`, `--json` patterns. For `--approved-comment-ids`, accept comma-separated list and split.
+Extend `dev_cli.py` with the six subcommands listed in Required Dev CLI Commands. Reuse existing `_to_bool`, `--root`, `--json` patterns. For `--approved-comment-ids`, accept comma-separated list and split.
 
 ### Verification
 ```bash
@@ -1479,7 +1697,7 @@ Reuse MVP 5's `bare_remote` fixture from `tests/fixtures/worktree_fixtures.py`.
 
 ### Verification
 ```bash
-pytest tests/fixtures/ -q
+python -m py_compile tests/fixtures/implementation_fixtures.py
 ```
 
 ### Acceptance
@@ -1508,7 +1726,7 @@ Call the tool handler against the prepared worktree fixture + fake harness.
 
 ### Verification
 ```bash
-pytest tests/test_implementation_e2e.py::test_e2e_initial_impl -q
+pytest tests/test_implementation_e2e.py -q -k e2e_initial_impl
 ```
 
 ### Acceptance
@@ -1626,7 +1844,7 @@ MVP 6 is complete when:
 All MVP 1–5 tests still pass.
 All MVP 6 tests pass.
 Six new tools registered: plan, start, apply_review_fixes, status, list, explain.
-Seven new dev_cli subcommands work and return shared result JSON.
+Six new dev_cli subcommands work and return shared result JSON.
 skills/implementation-run/SKILL.md exists and instructs plan-first + confirm-required behavior.
 $ROOT/config/harnesses.yaml load + validation works; missing file returns empty with warning.
 implementation_jobs SQLite table created idempotently; status + job_type CHECK constraints enforced.
@@ -1657,9 +1875,9 @@ docs/product/project-handoff.md updated to reflect MVP 6 implemented (after 18.1
 5.1                                     locks
 6.1                                     preflight
 7.1 → 7.2                               planner
-8.1                                     harness runner
+8.1 → 8.2                               harness runner + changed-file collection
 9.1 → 9.2 → 9.3                         test-first + scope + test-quality gates
-10.1                                    local commit
+10.1 → 10.2                             git allowlist + local commit
 11.1 → 11.2                             initial_implementation orchestrator
 12.1 → 12.2                             review_fix orchestrator
 13.1 → 13.2                             tool handlers
@@ -1698,7 +1916,9 @@ Use `blocked` / `skipped` / `needs_user` / `failed` instead of uncaught exceptio
 
 ## Subprocess discipline
 
-Every harness/git/gh call goes through `harness_runner.run_harness` or `worktree_git.run_git`. Each call must have:
+Every harness/check/git/gh call goes through `harness_runner.run_harness`,
+`harness_runner.run_required_check`, `implementation_commit.make_local_commit`, or
+`worktree_git.run_git`. Each call must have:
 ```txt
 argument array (no shell=True)
 explicit timeout

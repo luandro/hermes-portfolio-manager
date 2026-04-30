@@ -207,12 +207,12 @@ def _handle_portfolio_worktree_prepare_base(args: dict[str, Any], **kwargs: Any)
     except ConfigError as exc:
         return _blocked(tool, str(exc), reason="config_error")
 
-    # Build a minimal plan using issue 1 as a placeholder so we can validate the
+    # Build a minimal plan without an issue number so we only validate the
     # project + base path + branch up-front without needing a real issue.
     plan = build_plan(
         config,
         project_ref=project_ref,
-        issue_number=1,
+        issue_number=None,
         base_branch=args.get("base_branch"),
         refresh_base=_coerce_bool(args.get("refresh_base"), default=True),
         root=root,
