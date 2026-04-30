@@ -1,7 +1,7 @@
 # Fix GAP 1: Replace Built-in Skills
 
 ## Context
-You are fixing portfolio-manager MVP 4 to match SPEC_4.md. DO NOT read SPEC_4.md — all requirements are below.
+You are fixing portfolio-manager MVP 4 to match docs/mvps/mvp4-spec.md. DO NOT read docs/mvps/mvp4-spec.md — all requirements are below.
 
 Working directory: portfolio-manager (repo root)
 Branch: feature/mvp4-maintenance-skills

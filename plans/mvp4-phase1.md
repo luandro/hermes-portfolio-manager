@@ -5,7 +5,7 @@
 Portfolio manager plugin MVP 4: Maintenance Skills. Phase 0.3 structure tests already exist. 2 tests still failing (tools_registered, tool_schemas_exist). 5 stub modules exist with docstrings only.
 
 Read these files FIRST:
-- SPEC_4.md (lines 1-600 for Phase 1 context)
+- docs/mvps/mvp4-spec.md (lines 1-600 for Phase 1 context)
 - portfolio_manager/state.py (existing SQLite schema)
 - portfolio_manager/schemas.py (existing schema definitions)
 - portfolio_manager/config.py (existing config loader patterns)

@@ -1,4 +1,4 @@
-# PROJECT_HANDOFF.md — Hermes Portfolio Manager / Multi-Project Agent System
+# Project Handoff — Hermes Portfolio Manager / Multi-Project Agent System
 
 ## Purpose of This Document
 
@@ -42,9 +42,7 @@ The system must grow in safe stages. Each MVP has strict boundaries.
 
 # Current Roadmap Position
 
-The intended current state is that MVPs 1–3 have been designed and are ready to be implemented or verified as implemented.
-
-If the repository already claims MVPs 1–3 are implemented, the next agent must verify that claim before continuing.
+MVP 4 is the current merge boundary. Treat MVPs 1-4 as the baseline only after the branch is merged or the implementation is otherwise confirmed with tests and smoke checks.
 
 Do not assume implementation status from this document alone.
 
@@ -52,15 +50,16 @@ Do not assume implementation status from this document alone.
 
 | Area | Intended Status | Required Verification |
 |---|---:|---|
-| MVP 1 — Portfolio visibility / read-only heartbeat | Implemented or ready for implementation | Run full tests; verify Hermes plugin loads; run read-only heartbeat smoke test |
-| MVP 2 — Project administration | Implemented or ready for implementation | Run full tests; verify project add/pause/resume/archive flow using test root |
-| MVP 3 — Issue creation and brainstorming | Implemented or ready for implementation | Run full tests; verify draft, dry-run, duplicate detection, and create-from-draft using test repo or mocks |
-| MVP 4 — Maintenance skills | Not started | Create SPEC.md and PROGRESS.md first |
-| MVP 5+ — Worktrees, implementation loops, review ladder, QA, budgeting | Not started | Must not be implemented before prior MVPs are green |
+| MVP 1 - Portfolio visibility / read-only heartbeat | Baseline | Run full tests; verify Hermes plugin loads; run read-only heartbeat smoke test |
+| MVP 2 - Project administration | Baseline | Run full tests; verify project add/pause/resume/archive flow using test root |
+| MVP 3 - Issue creation and brainstorming | Baseline | Run full tests; verify draft, dry-run, duplicate detection, and create-from-draft using test repo or mocks |
+| MVP 4 - Maintenance skills | Merge boundary | Run full tests; verify maintenance tools and local draft behavior |
+| MVP 5 - Worktree preparation | Specified, not started | Must not start before MVPs 1-4 are green |
+| MVP 6-10 - Implementation, review, QA, operations, constrained autonomy | Roadmap specs only | Must not implement before previous MVPs are green |
 
 ## Verification Gate Before New Work
 
-Before starting MVP 4 or changing architecture, run:
+Before starting MVP 5 or changing architecture, run:
 
 ```bash
 pytest
@@ -72,9 +71,10 @@ Then verify, at minimum:
 MVP 1: portfolio status and heartbeat work.
 MVP 2: project admin works with $HOME/.agent-system or test root.
 MVP 3: issue draft and dry-run issue creation work without unsafe side effects.
+MVP 4: maintenance checks, reports, and optional local draft creation work.
 ```
 
-If any MVP 1–3 tests fail, fix them before starting new MVP design or implementation.
+If any MVP 1-4 tests fail, fix them before starting MVP 5 design or implementation.
 
 ---
 
@@ -195,9 +195,9 @@ MVP 3: GitHub issue creation only
 MVP 4: maintenance checks only
 MVP 5: worktree preparation
 MVP 6: implementation harness orchestration
-MVP 7: review ladder
+MVP 7: pull request creation and review ladder
 MVP 8: QA scripts and merge readiness
-MVP 9: provider/budget-aware scheduling
+MVP 9: operations, temporary overrides, and provider/budget-aware scheduling
 MVP 10: constrained auto-development / auto-merge policy
 ```
 
@@ -306,13 +306,20 @@ The detailed specs and progress trackers should exist as separate files or canva
 Expected handoff package:
 
 ```txt
-PROJECT_HANDOFF.md
-MVP1_SPEC.md
-MVP1_PROGRESS.md
-MVP2_SPEC.md
-MVP2_PROGRESS.md
-MVP3_SPEC.md
-MVP3_PROGRESS.md
+docs/product/project-handoff.md
+docs/mvps/mvp1-spec.md
+docs/mvps/mvp1-progress.md
+docs/mvps/mvp2-spec.md
+docs/mvps/mvp2-progress.md
+docs/mvps/mvp3-progress.md
+docs/mvps/mvp4-spec.md
+docs/mvps/mvp4-progress.md
+docs/mvps/mvp5-spec.md
+docs/mvps/mvp6-spec.md
+docs/mvps/mvp7-spec.md
+docs/mvps/mvp8-spec.md
+docs/mvps/mvp9-spec.md
+docs/mvps/mvp10-spec.md
 ```
 
 If files have different names, locate them and update this section.
@@ -320,12 +327,19 @@ If files have different names, locate them and update this section.
 Current planned documents from this work:
 
 ```txt
-SPEC.md — Hermes Portfolio Manager Plugin MVP 1
-PROGRESS.md — Hermes Portfolio Manager Plugin MVP 1, Agent-Ready Version
-SPEC.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration
-PROGRESS.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration, Agent-Ready Revised Version
-SPEC.md — Hermes Portfolio Manager Plugin MVP 3: Issue Creation and Brainstorming
-PROGRESS.md — Hermes Portfolio Manager Plugin MVP 3: Issue Creation and Brainstorming, Final Agent-Ready Version
+docs/mvps/mvp1-spec.md — Hermes Portfolio Manager Plugin MVP 1
+docs/mvps/mvp1-progress.md — Hermes Portfolio Manager Plugin MVP 1, Agent-Ready Version
+docs/mvps/mvp2-spec.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration
+docs/mvps/mvp2-progress.md — Hermes Portfolio Manager Plugin MVP 2: Project Administration, Agent-Ready Revised Version
+docs/mvps/mvp3-progress.md — Hermes Portfolio Manager Plugin MVP 3: Issue Creation and Brainstorming, Final Agent-Ready Version
+docs/mvps/mvp4-spec.md — Hermes Portfolio Manager Plugin MVP 4: Maintenance Skills
+docs/mvps/mvp4-progress.md — Hermes Portfolio Manager Plugin MVP 4: Maintenance Skills
+docs/mvps/mvp5-spec.md — Hermes Portfolio Manager Plugin MVP 5: Worktree Preparation
+docs/mvps/mvp6-spec.md — Hermes Portfolio Manager Plugin MVP 6: Implementation Harness Orchestration
+docs/mvps/mvp7-spec.md — Hermes Portfolio Manager Plugin MVP 7: Pull Request Creation and Review Ladder
+docs/mvps/mvp8-spec.md — Hermes Portfolio Manager Plugin MVP 8: QA and Merge Readiness
+docs/mvps/mvp9-spec.md — Hermes Portfolio Manager Plugin MVP 9: Operations, Temporary Overrides, and Budget Scheduling
+docs/mvps/mvp10-spec.md — Hermes Portfolio Manager Plugin MVP 10: Constrained Autonomy and Auto-Merge Policy
 ```
 
 ---
@@ -676,9 +690,9 @@ Future automation must add capability gradually:
 MVP 4: maintenance checks, still no code changes
 MVP 5: worktree preparation
 MVP 6: implementation harness orchestration
-MVP 7: review ladder
+MVP 7: pull request creation and review ladder
 MVP 8: QA scripts and human merge readiness
-MVP 9: budget/provider-aware scheduling
+MVP 9: operations, temporary overrides, and budget/provider-aware scheduling
 MVP 10: constrained auto-development and auto-merge policy
 ```
 
@@ -752,13 +766,15 @@ The next agent should follow this exact sequence.
 Read:
 
 ```txt
-PROJECT_HANDOFF.md
-MVP1_SPEC.md
-MVP1_PROGRESS.md
-MVP2_SPEC.md
-MVP2_PROGRESS.md
-MVP3_SPEC.md
-MVP3_PROGRESS.md
+docs/product/project-handoff.md
+docs/mvps/mvp1-spec.md
+docs/mvps/mvp1-progress.md
+docs/mvps/mvp2-spec.md
+docs/mvps/mvp2-progress.md
+docs/mvps/mvp3-progress.md
+docs/mvps/mvp4-spec.md
+docs/mvps/mvp4-progress.md
+docs/mvps/mvp5-spec.md
 ```
 
 If names differ, locate equivalent files.
@@ -771,24 +787,23 @@ Run:
 pytest
 ```
 
-Then inspect whether MVPs 1–3 are implemented or only specified.
+Then inspect whether MVPs 1-4 are implemented or only specified.
 
 Update the status table in this handoff if needed.
 
-## Step 3: Do Not Start MVP 4 Until MVPs 1–3 Are Green
+## Step 3: Do Not Start MVP 5 Until MVPs 1-4 Are Green
 
 If tests fail, fix regressions first.
 
-## Step 4: Continue with MVP 4
+## Step 4: Continue with MVP 5
 
 Create:
 
 ```txt
-MVP4_SPEC.md
-MVP4_PROGRESS.md
+docs/mvps/mvp5-progress.md
 ```
 
-Do not implement MVP 4 before writing and reviewing those documents.
+Do not implement MVP 5 before writing and reviewing the progress plan.
 
 ## Step 5: Preserve Safety Boundaries
 
@@ -809,184 +824,26 @@ until the roadmap reaches those MVPs.
 
 # Next Roadmap
 
-## MVP 4 — Maintenance Skills
-
-### Purpose
-
-Allow the user to configure and run simple recurring maintenance checks per project.
-
-Maintenance checks should be implemented as easy-to-add skill folders or modules, not hardcoded workflows.
-
-### Examples
+MVP 4 is already specified and is the current merge boundary. The remaining roadmap source files are:
 
 ```txt
-stale issue check
-open PR health check
-README/AGENTS.md freshness check
-docs link check
-broken CI summary
-security/dependency alert summary
-untriaged issue digest
-old branch/worktree report
+docs/mvps/mvp5-spec.md  - Worktree preparation
+docs/mvps/mvp6-spec.md  - Implementation harness orchestration
+docs/mvps/mvp7-spec.md  - Pull request creation and review ladder
+docs/mvps/mvp8-spec.md  - QA and merge readiness
+docs/mvps/mvp9-spec.md  - Operations, temporary overrides, and budget scheduling
+docs/mvps/mvp10-spec.md - Constrained autonomy and auto-merge policy
 ```
 
-### Scope
-
-MVP 4 should run checks and produce reports or issue drafts.
-
-It may call MVP 3 tools to create drafts or GitHub issues only when explicitly configured and safe.
-
-### Non-Goals
-
-MVP 4 must not:
+The key boundaries are:
 
 ```txt
-create worktrees
-modify repositories
-run coding harnesses
-open PRs
-merge PRs
-auto-fix anything
-```
-
-### Likely Tools
-
-```txt
-portfolio_maintenance_skill_list
-portfolio_maintenance_skill_explain
-portfolio_maintenance_skill_enable
-portfolio_maintenance_skill_disable
-portfolio_maintenance_due
-portfolio_maintenance_run
-portfolio_maintenance_run_project
-portfolio_maintenance_report
-```
-
-### Safety Notes
-
-Maintenance skills should start read-only.
-
-If a maintenance check finds a problem, it should normally create a local issue draft, not a GitHub issue directly.
-
-## MVP 5 — Worktree Preparation
-
-### Purpose
-
-Safely prepare local worktrees for issue implementation.
-
-### Scope
-
-```txt
-clone missing base repos
-create issue worktrees
-sync base branch safely
-detect dirty/conflicted worktrees
-lock worktree operations
-```
-
-### Non-Goals
-
-No coding harness execution yet.
-
-## MVP 6 — Implementation / Coding Harness Orchestration
-
-### Purpose
-
-Run selected coding agents/harnesses against issue-specific worktrees.
-
-### Harness candidates
-
-```txt
-Hermes skills
-Claude Code
-Codex
-Forge Code
-Junie/Gemini
-other configured harnesses
-```
-
-### Key Requirements
-
-```txt
-provider budget checks
-model availability checks
-scope-creep detection
-meaningful test enforcement
-artifact logs
-no high-impact auto-merge
-```
-
-## MVP 7 — Review Ladder
-
-### Purpose
-
-Run staged PR review using cheap/free reviewers first, then stronger/more expensive reviewers.
-
-### Example Ladder
-
-```txt
-Greptile / CappyAI loops
-Gemini review
-Codex review
-DeepSeek review
-final human review
-```
-
-Exact reviewer names and APIs must be verified before implementation.
-
-## MVP 8 — QA Scripts and Human Merge Readiness
-
-### Purpose
-
-Generate human QA scripts and summarize merge readiness.
-
-The user should receive:
-
-```txt
-what changed
-how to test it
-what risks remain
-which checks passed
-which review agents approved
-whether it is ready to merge
-```
-
-## MVP 9 — Provider/Budget-Aware Scheduling
-
-### Purpose
-
-Heartbeat checks provider/model usage limits and chooses work based on available budget.
-
-### Examples
-
-```txt
-low models available -> low-risk maintenance and drafting
-high models available -> architecture reviews or complex implementation
-API budget low -> pause expensive review ladder
-user active hours -> avoid conflicting with human work
-```
-
-## MVP 10 — Constrained Auto-Development and Auto-Merge Policy
-
-### Purpose
-
-Allow low-risk, small-scope issues to move through implementation, review, QA, and merge policy with minimal human intervention.
-
-### Strong Boundary
-
-High-impact PRs must never be automatically merged.
-
-Auto-merge, if ever enabled, must require:
-
-```txt
-low risk
-small scope
-tests pass
-review ladder approved
-QA script generated
-no protected paths changed
-no security/auth/migration/infrastructure changes
-project policy allows it
+MVP 5 prepares worktrees but does not run coding harnesses.
+MVP 6 runs confirmed implementation jobs but does not push, open PRs, review, or merge.
+MVP 7 may push and open PRs, then run bounded staged review, but does not merge.
+MVP 8 prepares QA and merge-readiness evidence, but does not provide broad autonomy.
+MVP 9 schedules work and budgets providers, including temporary overrides, but does not bypass safety gates.
+MVP 10 adds constrained autonomy only for explicitly allowed low-risk work.
 ```
 
 ---
@@ -997,13 +854,12 @@ The next agent should verify or resolve these before implementation decisions.
 
 ```txt
 Which Hermes plugin API version is installed?
-Are MVPs 1–3 actually implemented in the repo, or only specified?
-Are all MVP 1–3 tests passing?
+Are MVPs 1-4 actually implemented in the repo, or only specified?
+Are all MVP 1-4 tests passing?
 Are we using PyYAML + Pydantic v2 in the actual code?
 Where are the final SPEC/PROGRESS files stored in the repository?
 Which GitHub repositories are safe for real manual smoke tests?
 Which Telegram users are authorized to control the system?
-Should MVP 4 maintenance checks create drafts only, or optionally GitHub issues?
 How should active hours / quiet hours be configured?
 Which provider budget APIs or CLIs are available?
 Which review agents are actually available and authenticated?
@@ -1021,7 +877,7 @@ Do not:
 create one Hermes agent per repo
 move project policy into repo-local YAML
 return to /srv/agent-system as default root
-start MVP 4 before MVPs 1–3 are verified green
+start MVP 5 before MVPs 1-4 are verified green
 add worktree creation before MVP 5
 run coding harnesses before MVP 6
 create PRs before implementation orchestration exists
@@ -1041,7 +897,7 @@ bypass tests
 Use this exact instruction when handing off:
 
 ```txt
-Read PROJECT_HANDOFF.md first. Verify MVP 1–3 implementation status by running tests and inspecting the repo. Do not start MVP 4 until MVPs 1–3 are confirmed passing. If they are passing, create MVP4_SPEC.md and MVP4_PROGRESS.md for Maintenance Skills using the same test-first, safety-gated style as previous MVPs.
+Read docs/product/project-handoff.md first. Verify MVP 1-4 implementation status by running tests and inspecting the repo. Do not start MVP 5 until MVPs 1-4 are confirmed passing. If they are passing, create docs/mvps/mvp5-progress.md from docs/mvps/mvp5-spec.md using the same test-first, safety-gated style as previous MVPs.
 ```
 
 ---

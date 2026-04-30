@@ -2,7 +2,7 @@
 
 You are reviewing PR #4 for the portfolio-manager MVP 4 maintenance skills system.
 
-The implementation intentionally diverges from SPEC_4.md in several places. Some divergences are improvements over the spec; others are bugs. Your job is to judge EACH divergence and classify it.
+The implementation intentionally diverges from docs/mvps/mvp4-spec.md in several places. Some divergences are improvements over the spec; others are bugs. Your job is to judge EACH divergence and classify it.
 
 ## Divergences to evaluate
 
@@ -38,7 +38,7 @@ Question: Is this a meaningful divergence? Draft creation is opt-in anyway (crea
 
 ## Instructions
 
-1. Read SPEC_4.md fully to understand the intent behind each requirement.
+1. Read docs/mvps/mvp4-spec.md fully to understand the intent behind each requirement.
 2. Read the actual implementation files to understand how each divergence manifests.
 3. For each divergence, classify as:
    - FIX: Real bug or meaningful gap that should be fixed before merge

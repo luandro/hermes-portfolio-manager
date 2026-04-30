@@ -1,4 +1,4 @@
-# MVP_PLANNING_GUIDE.md — How to Create SPEC.md and PROGRESS.md for Future MVPs
+# MVP Planning Guide — How to Create Specs and Progress Plans
 
 ## Purpose
 
@@ -7,7 +7,7 @@ This guide explains how to design the next MVPs for the Hermes Portfolio Manager
 Use it together with:
 
 ```txt
-PROJECT_HANDOFF.md
+docs/product/project-handoff.md
 ```
 
 The goal is that each future chat can reliably produce:
@@ -28,27 +28,27 @@ The best context package should stay small.
 Recommended files:
 
 ```txt
-PROJECT_HANDOFF.md
-MVP_PLANNING_GUIDE.md
+docs/product/project-handoff.md
+docs/mvps/planning-guide.md
 ```
 
 This is better than splitting the guidance across many files because future agents are less likely to miss important constraints.
 
-## What PROJECT_HANDOFF.md Does
+## What docs/product/project-handoff.md Does
 
-`PROJECT_HANDOFF.md` explains:
+`docs/product/project-handoff.md` explains:
 
 ```txt
 what the system is
 where the roadmap is
-what MVPs 1–3 decided
+what completed MVPs decided
 what must not be broken
 what comes next
 ```
 
 ## What This Guide Does
 
-`MVP_PLANNING_GUIDE.md` explains:
+`docs/mvps/planning-guide.md` explains:
 
 ```txt
 how to design the next SPEC.md
@@ -760,7 +760,7 @@ Use this flow for each new MVP.
 Prompt:
 
 ```txt
-Read PROJECT_HANDOFF.md and MVP_PLANNING_GUIDE.md.
+Read docs/product/project-handoff.md and docs/mvps/planning-guide.md.
 Create SPEC.md for MVP X: <name>.
 Critique it carefully for ambiguity, safety gaps, missing tests, and scope creep.
 Then create the revised SPEC.md as canvas.
@@ -793,7 +793,7 @@ Then revise it until it is implementation-ready.
 Prompt:
 
 ```txt
-Read PROJECT_HANDOFF.md, MVP_PLANNING_GUIDE.md, MVPX_SPEC.md, and MVPX_PROGRESS.md.
+Read docs/product/project-handoff.md, docs/mvps/planning-guide.md, MVPX_SPEC.md, and MVPX_PROGRESS.md.
 Run pytest first.
 Do not start implementation unless prior MVPs are green.
 Follow MVPX_PROGRESS.md exactly, test-first.
@@ -806,7 +806,7 @@ Follow MVPX_PROGRESS.md exactly, test-first.
 Use this when starting a new MVP:
 
 ```txt
-Read PROJECT_HANDOFF.md and MVP_PLANNING_GUIDE.md.
+Read docs/product/project-handoff.md and docs/mvps/planning-guide.md.
 Create MVPX_SPEC.md for <MVP name>.
 It must follow the staged safety roadmap, preserve prior MVP boundaries, define exact tools, schemas, state changes, allowed/disallowed commands, locking, idempotency, recovery, dev CLI, tests, manual smoke tests, acceptance criteria, and definition of done.
 Critique it first, then create the final canvas document.
@@ -819,7 +819,7 @@ Critique it first, then create the final canvas document.
 Use this after the SPEC is approved:
 
 ```txt
-Read PROJECT_HANDOFF.md, MVP_PLANNING_GUIDE.md, and MVPX_SPEC.md.
+Read docs/product/project-handoff.md, docs/mvps/planning-guide.md, and MVPX_SPEC.md.
 Create MVPX_PROGRESS.md.
 Make it agent-ready: small scoped tasks, each with Test first, Implementation, Verification, and Acceptance.
 Include preflight regression, pure logic before handlers, mocked external integrations, security hardening, local e2e, manual Hermes smoke tests, definition of done, and future-MVP exclusions.

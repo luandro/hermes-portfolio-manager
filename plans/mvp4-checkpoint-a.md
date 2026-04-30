@@ -5,8 +5,8 @@
 You are implementing MVP 4 of the Hermes Portfolio Manager plugin: **Maintenance Skills**.
 
 Read these files FIRST:
-- `SPEC_4.md` — full specification
-- `PROGRESS_4.md` — phased implementation plan with test-first tasks
+- `docs/mvps/mvp4-spec.md` — full specification
+- `docs/mvps/mvp4-progress.md` — phased implementation plan with test-first tasks
 
 The baseline is 471 passing tests on MVPs 1-3. Do NOT break existing tests.
 

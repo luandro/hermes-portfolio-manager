@@ -9,7 +9,7 @@ You are analyzing a codebase for spec conformance. DO NOT modify any files. Prod
 - 690 tests passing, 58 files changed, ~8k lines
 
 ## Task
-Read SPEC_4.md (the spec) and compare against the actual implementation. I have identified the gaps below. Your job is to:
+Read docs/mvps/mvp4-spec.md (the spec) and compare against the actual implementation. I have identified the gaps below. Your job is to:
 1. Verify each gap by reading the actual code
 2. Classify each gap as: BLOCKER (must fix before merge), IMPORTANT (should fix), MINOR (nice to have), DEFER (post-merge)
 3. For each gap, recommend ONE of: rewrite, extend, rename, add, accept-as-is
@@ -77,7 +77,7 @@ Verify lock names and TTLs match.
 
 ## Analysis Instructions
 
-1. Read SPEC_4.md fully (2106 lines)
+1. Read docs/mvps/mvp4-spec.md fully (2106 lines)
 2. Read the actual implementation files to verify each gap
 3. Read tests to understand coverage gaps
 4. For each gap, classify severity and recommend action

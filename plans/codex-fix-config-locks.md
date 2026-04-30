@@ -1,7 +1,7 @@
 # Fix GAP 7+8: Config Cascade + Maintenance Locks
 
 ## Context
-You are fixing portfolio-manager MVP 4 to match SPEC_4.md.
+You are fixing portfolio-manager MVP 4 to match docs/mvps/mvp4-spec.md.
 Working directory: /home/luandro/Dev/hermes-multi-projects/portfolio-manager
 Branch: feature/mvp4-maintenance-skills
 

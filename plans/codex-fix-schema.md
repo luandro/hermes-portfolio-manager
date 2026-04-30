@@ -1,7 +1,7 @@
 # Fix GAP 2+3+5: Schema, Indexes, State Helpers
 
 ## Context
-You are fixing portfolio-manager MVP 4 to match SPEC_4.md. DO NOT read SPEC_4.md — all requirements are below.
+You are fixing portfolio-manager MVP 4 to match docs/mvps/mvp4-spec.md. DO NOT read docs/mvps/mvp4-spec.md — all requirements are below.
 
 Working directory: /home/luandro/Dev/hermes-multi-projects/portfolio-manager
 Branch: feature/mvp4-maintenance-skills

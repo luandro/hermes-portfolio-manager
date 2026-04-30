@@ -166,20 +166,42 @@ Remote connection details stored at `~/.config/hermes-deploy/config.json`:
 }
 ```
 
-See [docs/deploy-remote.md](./docs/deploy-remote.md) for full details.
+See [the remote deployment plan](./plans/deploy-remote-script.md) for full details.
 
 ---
 
 ## Roadmap
 
-**Current Version (MVP 1):** Read-only visibility, configuration parsing, GitHub CLI integration, and local worktree inspection.
+The project grows through strict safety layers:
 
-**Future Considerations (MVP 2+):**
-* Adding or archiving projects directly via Telegram.
-* Autonomous issue implementation and PR creation.
-* Review ladder automation and AI-driven code review.
-* Automated local worktree creation and teardown.
-* Maintenance skills and auto-merge capabilities.
+| MVP | Capability | Spec |
+|---|---|---|
+| 1 | Read-only portfolio visibility | [MVP 1 spec](./docs/mvps/mvp1-spec.md) |
+| 2 | Project administration | [MVP 2 spec](./docs/mvps/mvp2-spec.md) |
+| 3 | Issue creation and brainstorming | [MVP 3 progress](./docs/mvps/mvp3-progress.md) |
+| 4 | Maintenance skills | [MVP 4 spec](./docs/mvps/mvp4-spec.md) |
+| 5 | Worktree preparation | [MVP 5 spec](./docs/mvps/mvp5-spec.md), [progress](./docs/mvps/mvp5-progress.md) |
+| 6 | Implementation harness orchestration | [MVP 6 spec](./docs/mvps/mvp6-spec.md) |
+| 7 | Pull request and review ladder | [MVP 7 spec](./docs/mvps/mvp7-spec.md) |
+| 8 | QA and merge readiness | [MVP 8 spec](./docs/mvps/mvp8-spec.md) |
+| 9 | Operations, temporary overrides, and budget scheduling | [MVP 9 spec](./docs/mvps/mvp9-spec.md) |
+| 10 | Constrained autonomy and auto-merge policy | [MVP 10 spec](./docs/mvps/mvp10-spec.md) |
+
+See [the documentation index](./docs/README.md) and [audio-friendly product stories](./docs/product/user-stories.md) for the full staged roadmap.
+
+---
+
+## Documentation
+
+Start with [docs/README.md](./docs/README.md). It indexes:
+
+* product context and narrated user stories,
+* MVP specs and progress plans,
+* Hermes plugin API notes,
+* active implementation plans,
+* Hermes skill instructions.
+
+The most important product docs are [project handoff](./docs/product/project-handoff.md), [user stories](./docs/product/user-stories.md), [MVP planning guide](./docs/mvps/planning-guide.md), and [progress authoring guide](./docs/mvps/progress-md-authoring-guide.md).
 
 ---
 
@@ -193,7 +215,7 @@ Contributions are what make the open source community such an amazing place to l
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-Please refer to [`AGENTS.md`](./AGENTS.md) and [`SPEC.md`](./SPEC.md) for architectural guidelines and agent instructions.
+Please refer to [`AGENTS.md`](./AGENTS.md) and [`docs/mvps/mvp1-spec.md`](./docs/mvps/mvp1-spec.md) for architectural guidelines and agent instructions.
 
 ---
 

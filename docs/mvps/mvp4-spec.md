@@ -1,4 +1,4 @@
-# MVP4_SPEC.md — Hermes Portfolio Manager Plugin MVP 4: Maintenance Skills
+# MVP 4 Spec — Hermes Portfolio Manager Plugin Maintenance Skills
 
 ## Purpose
 
@@ -1276,7 +1276,7 @@ projects:
         required_files:
           - README.md
           - AGENTS.md
-          - MVP_PLANNING_GUIDE.md
+          - docs/mvps/planning-guide.md
 ```
 
 ### Config rules
@@ -2101,6 +2101,6 @@ Implement due computation and run tools. Actual recurring invocation remains a H
 
 ### Agent-readiness verdict
 
-This SPEC is ready to turn into `MVP4_PROGRESS.md` if MVP 1-3 tests are green and PR #3 is treated as the implemented baseline.
+This SPEC is ready to turn into `docs/mvps/mvp4-progress.md` if MVP 1-3 tests are green and PR #3 is treated as the implemented baseline.
 
-Before implementation, create `MVP4_PROGRESS.md` with test-first phases and do not let the coding agent implement directly from this SPEC alone.
+Before implementation, create `docs/mvps/mvp4-progress.md` with test-first phases and do not let the coding agent implement directly from this SPEC alone.

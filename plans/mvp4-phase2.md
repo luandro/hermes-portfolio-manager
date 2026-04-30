@@ -134,7 +134,7 @@ Write tests in `tests/test_maintenance_registry.py`:
 ## Reference Files
 
 Read these before implementing:
-- SPEC_4.md (lines 306-560 for skill interface and built-in skill specs)
+- docs/mvps/mvp4-spec.md (lines 306-560 for skill interface and built-in skill specs)
 - portfolio_manager/maintenance_models.py (already exists)
 - portfolio_manager/maintenance_registry.py (already exists)
 - portfolio_manager/maintenance_config.py (for DEFAULT_CONFIG reference)

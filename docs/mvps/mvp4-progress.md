@@ -398,15 +398,15 @@ repo_guidance_docs fails safely and never treats malformed GitHub responses as s
 The dev agent should add these files to the repository before implementation or in the first documentation checkpoint:
 
 ```txt
-MVP4_SPEC.md
-MVP4_PROGRESS.md
+docs/mvps/mvp4-spec.md
+docs/mvps/mvp4-progress.md
 ```
 
 Rules:
 
 ```txt
 Do not leave the MVP 4 source of truth only in chat/canvas.
-Do not mark PROJECT_HANDOFF.md as MVP 4 complete until tests and smoke checks pass.
+Do not mark docs/product/project-handoff.md as MVP 4 complete until tests and smoke checks pass.
 ```
 
 ---
@@ -2370,9 +2370,9 @@ No code test required, but final `pytest` must already pass.
 Update repository docs as appropriate:
 
 ```txt
-Add MVP4_SPEC.md if not already committed.
-Add MVP4_PROGRESS.md.
-Update PROJECT_HANDOFF.md status table only after implementation is verified.
+Add docs/mvps/mvp4-spec.md if not already committed.
+Add docs/mvps/mvp4-progress.md.
+Update docs/product/project-handoff.md status table only after implementation is verified.
 Mention MVP 4 completion criteria and smoke-test notes.
 ```
 
@@ -2414,7 +2414,7 @@ Resolved findings are marked resolved.
 Security tests prove no forbidden commands, no shell=True, safe paths, and redaction.
 Manual CLI smoke passes.
 Manual Hermes smoke passes.
-PROJECT_HANDOFF.md is updated only after verification.
+docs/product/project-handoff.md is updated only after verification.
 ```
 
 ---
