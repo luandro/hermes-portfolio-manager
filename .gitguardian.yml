@@ -1,4 +1,5 @@
+version: 2
+
 secret:
-  scanning:
-    ignore:
-      - tests/test_maintenance_artifacts.py
+  ignored_paths:
+    - 'tests/test_maintenance_artifacts.py'
