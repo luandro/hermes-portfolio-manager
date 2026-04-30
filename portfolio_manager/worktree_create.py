@@ -83,7 +83,7 @@ def create_issue_worktree(
         return outcome
 
     base_state = get_clean_state(base_path)
-    if base_state in ("merge_conflict", "rebase_conflict", "dirty_uncommitted"):
+    if base_state in ("merge_conflict", "rebase_conflict", "dirty_uncommitted", "dirty_untracked", "probe_failed"):
         outcome.blocked_reasons.append(f"base repo is {base_state}; create blocked")
         return outcome
 
@@ -93,7 +93,10 @@ def create_issue_worktree(
             outcome.blocked_reasons.append(f"issue path exists but is not a git repo: {issue_resolved}")
             return outcome
         wt_remote = get_origin_url(issue_resolved)
-        if wt_remote and not remotes_equal(wt_remote, remote_url):
+        if not wt_remote:
+            outcome.blocked_reasons.append("existing issue worktree has no origin remote")
+            return outcome
+        if not remotes_equal(wt_remote, remote_url):
             outcome.blocked_reasons.append(
                 f"existing issue worktree has wrong remote {normalize_remote_url(wt_remote)!r}"
             )
@@ -104,6 +107,7 @@ def create_issue_worktree(
             "rebase_conflict",
             "dirty_uncommitted",
             "dirty_untracked",
+            "probe_failed",
         ):
             outcome.blocked_reasons.append(f"existing issue worktree is {wt_state}; refuse to overwrite")
             return outcome

@@ -182,8 +182,10 @@ def build_plan(
             state = get_clean_state(base_path)
             if state in ("merge_conflict", "rebase_conflict"):
                 blocked.append(f"base repo in {state}; refresh blocked")
-            elif state in ("dirty_uncommitted",):
-                blocked.append("base repo has uncommitted changes; refresh blocked")
+            elif state in ("dirty_uncommitted", "dirty_untracked"):
+                blocked.append(f"base repo has {state}; refresh blocked")
+            elif state == "probe_failed":
+                blocked.append("base repo state could not be probed; refresh blocked")
 
     # ---- Inspect existing issue worktree (idempotency / conflict detection) ----
     skipped_reason: str | None = None
@@ -199,7 +201,13 @@ def build_plan(
                 would_create = False
             else:
                 wt_state = get_clean_state(issue_path)
-                if wt_state in ("merge_conflict", "rebase_conflict", "dirty_uncommitted", "dirty_untracked"):
+                if wt_state in (
+                    "merge_conflict",
+                    "rebase_conflict",
+                    "dirty_uncommitted",
+                    "dirty_untracked",
+                    "probe_failed",
+                ):
                     blocked.append(f"existing issue worktree is {wt_state}")
                     would_create = False
                 else:

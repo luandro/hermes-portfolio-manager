@@ -34,12 +34,18 @@ def test_skill_mentions_dry_run_then_confirm() -> None:
     text = _read()
     assert "dry-run" in text or "dry_run" in text
     assert "confirm" in text
+    dry_idx = text.find("dry-run") if "dry-run" in text else text.find("dry_run")
+    confirm_idx = text.find("confirm")
+    assert dry_idx < confirm_idx, "dry-run should appear before confirm in skill doc"
 
 
 def test_skill_mentions_blocked_over_guessing() -> None:
     text = _read()
     assert "blocked" in text
     assert "guess" in text
+    blocked_idx = text.find("blocked")
+    guess_idx = text.find("guess")
+    assert blocked_idx < guess_idx, "blocked should appear before guess in skill doc"
 
 
 def test_skill_lists_six_expected_tools() -> None:

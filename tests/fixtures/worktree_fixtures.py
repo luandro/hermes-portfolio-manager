@@ -65,7 +65,7 @@ def projects_yaml_pointing_to_bare_remote(bare_remote: Path, agent_root: Path) -
             projects:
               - id: testproj
                 name: Test Project
-                repo: file://{bare_remote}
+                repo: {bare_remote.as_uri()}
                 priority: high
                 status: active
                 default_branch: main

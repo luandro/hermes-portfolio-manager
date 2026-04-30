@@ -32,6 +32,7 @@ ALLOWED_WORKTREE_STATES = frozenset(
         "dirty_uncommitted",
         "merge_conflict",
         "rebase_conflict",
+        "probe_failed",
         "blocked",
         "failed",
     }

@@ -64,9 +64,13 @@ def clone_base_repo(
     except ValueError as exc:
         outcome.blocked_reasons.append(f"clone target escapes root: {exc}")
         return outcome
-    if target_resolved.exists() and any(target_resolved.iterdir()):
-        outcome.blocked_reasons.append(f"clone target exists and is non-empty: {target_resolved}")
-        return outcome
+    if target_resolved.exists():
+        if not target_resolved.is_dir():
+            outcome.blocked_reasons.append(f"clone target exists and is not a directory: {target_resolved}")
+            return outcome
+        if any(target_resolved.iterdir()):
+            outcome.blocked_reasons.append(f"clone target exists and is non-empty: {target_resolved}")
+            return outcome
 
     target_resolved.parent.mkdir(parents=True, exist_ok=True)
     if not remote_url or remote_url.startswith("-"):
@@ -120,6 +124,14 @@ def refresh_base_branch(
         return outcome
     if state == "dirty_uncommitted":
         outcome.blocked_reasons.append("base repo has uncommitted changes; refresh blocked")
+        outcome.final_state = state
+        return outcome
+    if state == "dirty_untracked":
+        outcome.blocked_reasons.append("base repo has untracked files; refresh blocked")
+        outcome.final_state = state
+        return outcome
+    if state == "probe_failed":
+        outcome.blocked_reasons.append("base repo state could not be probed; refresh blocked")
         outcome.final_state = state
         return outcome
 

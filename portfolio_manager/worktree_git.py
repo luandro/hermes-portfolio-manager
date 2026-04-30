@@ -143,6 +143,8 @@ def run_gh(args: list[str], *, cwd: Path, timeout: int) -> subprocess.CompletedP
     leader = args[0]
     if leader not in _GH_ALLOWED_LEADERS:
         raise GitCommandError(f"gh subcommand {leader!r} not allowlisted")
+    if leader == "auth" and not (len(args) >= 2 and args[1] == "status"):
+        raise GitCommandError("gh auth only allows status subcommand")
     if "--method" in args:
         idx = args.index("--method")
         method = args[idx + 1] if idx + 1 < len(args) else ""
@@ -185,12 +187,14 @@ def run_gh(args: list[str], *, cwd: Path, timeout: int) -> subprocess.CompletedP
 # 2.2 Read-only probes
 # ---------------------------------------------------------------------------
 
-CleanState = Literal["clean", "dirty_uncommitted", "dirty_untracked", "merge_conflict", "rebase_conflict"]
+CleanState = Literal[
+    "clean", "dirty_uncommitted", "dirty_untracked", "merge_conflict", "rebase_conflict", "probe_failed"
+]
 
 
 def is_git_repo(path: Path) -> bool:
     """Return True iff *path* is inside a git work tree."""
-    if not path.exists():
+    if not path.exists() or not path.is_dir():
         return False
     r = run_git(["rev-parse", "--is-inside-work-tree"], cwd=path, timeout=DEFAULT_TIMEOUTS["rev-parse"])
     return r.returncode == 0 and r.stdout.strip() == "true"
@@ -220,6 +224,8 @@ def get_clean_state(path: Path) -> CleanState:
     if _git_path(path, "MERGE_HEAD").exists():
         return "merge_conflict"
     r = run_git(["status", "--porcelain=v1"], cwd=path, timeout=DEFAULT_TIMEOUTS["status"])
+    if r.returncode != 0:
+        return "probe_failed"
     modified: list[str] = []
     untracked: list[str] = []
     conflict: list[str] = []
