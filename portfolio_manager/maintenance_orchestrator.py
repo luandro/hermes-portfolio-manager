@@ -453,11 +453,11 @@ def _run_maintenance_unlocked(
                     meta = frow[7]
                     if isinstance(meta, str):
                         try:
-                            import json as _json
-
-                            meta = _json.loads(meta)
+                            meta = json.loads(meta)
                         except (ValueError, TypeError):
                             meta = {}
+                    if not isinstance(meta, dict):
+                        meta = {}
                     run_findings.append(
                         MaintenanceFinding(
                             fingerprint=frow[0],
