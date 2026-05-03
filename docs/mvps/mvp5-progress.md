@@ -176,7 +176,7 @@ If equivalents already exist (e.g. a generic redaction helper), reuse them — d
 
 ## 0.1 Confirm baseline green  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Run the existing suite:
@@ -196,7 +196,7 @@ pytest exits 0, OR the user has explicitly accepted the baseline.
 
 ## 0.2 Inspect existing worktree + lock + artifact contracts  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None.
@@ -223,7 +223,7 @@ No code changed.
 
 ## 0.3 Add structure tests for MVP 5 modules  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Add `tests/test_structure.py` cases (extend the existing file):
@@ -253,7 +253,7 @@ These are pure functions with no I/O. They are the security boundary. Get them r
 
 ## 1.1 Branch name validator  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py`:
@@ -294,7 +294,7 @@ No filesystem or subprocess calls.
 
 ## 1.2 Path containment + symlink escape guard  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py` (continued):
@@ -329,7 +329,7 @@ Symlink escapes are caught. Pattern substitution accepts only validated int issu
 
 ## 1.3 Remote URL normalizer  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_paths.py` (continued):
@@ -367,7 +367,7 @@ appear verbatim in artifact-bound output.
 
 ## 2.1 Allowlisted subprocess wrapper  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_git.py`:
@@ -403,7 +403,7 @@ Forbidden subcommands raise before subprocess starts. Timeouts respect spec defa
 
 ## 2.2 Read-only git probes  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_git.py` (use a local bare repo fixture, see Task 14.1):
@@ -444,7 +444,7 @@ Probes are pure read-only. They never write to the repo.
 
 ## 3.1 Worktree id keys + (optional) additive columns  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_state.py`:
@@ -480,7 +480,7 @@ Existing MVP 1–4 state tests still pass. ALTERs run at most once.
 
 ## 3.2 Worktree state upsert + read helpers  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_state.py` (continued):
@@ -519,7 +519,7 @@ Upserts are idempotent on the worktree id key. Invalid state values rejected.
 
 ## 4.1 Artifact path helpers  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_artifacts.py`:
@@ -549,7 +549,7 @@ Paths always contained under root/artifacts/worktrees.
 
 ## 4.2 Artifact writers + redaction  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_artifacts.py` (continued):
@@ -589,7 +589,7 @@ No artifact ever contains a credential, token, or env var value.
 
 ## 5.1 Worktree lock context managers  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_locks.py`:
@@ -624,7 +624,7 @@ Locks always released in finally. Stable acquisition order. Contention → block
 
 ## 6.1 Plan input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -658,7 +658,7 @@ Schema validates per spec § Tool Specifications.
 
 ## 6.2 Plan logic (pure)  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_planner.py`:
@@ -714,7 +714,7 @@ Plan never writes anywhere.
 
 ## 6.3 Plan tool handler  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py` (continued):
@@ -744,7 +744,7 @@ Handler is < 40 lines. Logic lives in the planner.
 
 ## 7.1 Prepare-base input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -774,7 +774,7 @@ Defaults match spec.
 
 ## 7.2 Clone-if-missing logic  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_prepare.py`:
@@ -799,7 +799,7 @@ Clone never runs without confirm=true. Bad post-clone remote triggers blocked + 
 
 ## 7.3 Safe base-branch refresh logic  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_prepare.py` (continued):
@@ -829,7 +829,7 @@ No path escapes ff-only semantics. Divergence → blocked, never auto-resolved.
 
 ## 7.4 Prepare-base handler with locks + artifacts  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -872,7 +872,7 @@ Lock always released. Artifacts written for real runs only.
 
 ## 8.1 Create-issue input schema  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -893,7 +893,7 @@ Defaults match spec.
 
 ## 8.2 Idempotency check (the hard part)  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_create.py`:
@@ -927,7 +927,7 @@ Tests cover every outcome path. No mutation in this function.
 
 ## 8.3 Create worktree command  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_create.py` (continued):
@@ -955,7 +955,7 @@ Single allowlisted command runs. No fallback strategy attaches an existing branc
 
 ## 8.4 Create-issue handler with both locks + artifacts  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -993,7 +993,7 @@ No forbidden command can be reached from this code path (verified by Phase 13 te
 
 ## 9.1 Extend portfolio_worktree_inspect (back-compat)  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -1018,7 +1018,7 @@ MVP 1 inspect tests still pass unchanged. New parameters work as specified.
 
 ## 9.2 portfolio_worktree_list  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -1043,7 +1043,7 @@ Side effect (SQLite) only when inspect=true.
 
 ## 9.3 portfolio_worktree_explain  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_tools.py`:
@@ -1069,7 +1069,7 @@ Always read-only at filesystem level. Optional SQLite inspection update is allow
 
 ## 10.1 worktree_reconcile helper  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_reconcile.py`:
@@ -1101,7 +1101,7 @@ Reconcile is safe to call before any mutation tool to recover from prior crashes
 
 ## 11.1 Add CLI parser entries  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_dev_cli.py`:
@@ -1126,7 +1126,7 @@ All commands print valid JSON shared result objects when invoked with --json.
 
 ## 11.2 CLI behavior tests with test root  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_dev_cli.py`:
@@ -1150,7 +1150,7 @@ JSON exit code and shape match shared result format.
 
 ## 12.1 Add `worktree-prepare` skill folder  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_skill.py` (new file) or extend `test_skills.py`:
@@ -1178,7 +1178,7 @@ A Hermes agent reading this skill cannot reasonably skip plan-first or confirm-r
 
 ## 13.1 Branch validation security tests  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py` (extend):
@@ -1200,7 +1200,7 @@ Bad branch names cannot reach run_git via any tool path.
 
 ## 13.2 Path / symlink escape tests  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
@@ -1220,7 +1220,7 @@ No tool path can escape $ROOT/worktrees.
 
 ## 13.3 Command allowlist tests  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
@@ -1242,7 +1242,7 @@ Forbidden commands cannot be introduced without breaking a security test.
 
 ## 13.4 Secret redaction tests  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_security.py`:
@@ -1266,7 +1266,7 @@ E2E tests must use **local temporary Git repos**, never real GitHub. Create a si
 
 ## 14.1 Local bare-repo fixture  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None (this task is the fixture itself).
@@ -1295,7 +1295,7 @@ Fixtures usable by all E2E tests below. No network access needed.
 
 ## 14.2 E2E: prepare base end-to-end  [L2]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
@@ -1318,7 +1318,7 @@ Real clone + ff happen exactly once with confirm; blocked paths report dirty/con
 
 ## 14.3 E2E: create issue worktree + idempotency  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
@@ -1339,7 +1339,7 @@ Repeat call is a no-op. Mismatched branch state always blocks.
 
 ## 14.4 E2E: dirty / conflict / divergence block paths  [L3]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 `tests/test_worktree_e2e.py`:
@@ -1363,7 +1363,7 @@ state mutated beyond inspection rows.
 
 ## 15.1 Full pytest  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 Run the full suite:
@@ -1383,7 +1383,7 @@ pytest exits 0 with no skipped MVP 5 tests.
 
 ## 15.2 Update handoff status  [L1]
 
-Status: [ ]
+Status: [x]
 
 ### Test first
 None.

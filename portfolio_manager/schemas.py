@@ -1057,6 +1057,127 @@ PORTFOLIO_MAINTENANCE_REPORT_SCHEMA = {
 }
 
 # ---------------------------------------------------------------------------
+# MVP 5 — Worktree Preparation
+# ---------------------------------------------------------------------------
+
+_PROJECT_REF = {
+    "type": "string",
+    "description": "Project reference (id, owner/repo, name, or URL).",
+}
+_ISSUE_NUMBER = {
+    "type": "integer",
+    "description": "GitHub issue number (positive integer).",
+}
+_BRANCH_NAME = {
+    "type": "string",
+    "description": "Branch name. Defaults to agent/<project_id>/issue-<n>.",
+}
+_BASE_BRANCH = {
+    "type": "string",
+    "description": "Base branch to fork from. Defaults to project default_branch.",
+}
+_REFRESH_BASE = {
+    "type": "boolean",
+    "description": "Whether to ff-only fetch+merge the base branch first. Defaults to true.",
+}
+_DRY_RUN = {
+    "type": "boolean",
+    "description": "Plan-only mode (no mutation). Defaults to true.",
+}
+_CONFIRM = {
+    "type": "boolean",
+    "description": "Required true alongside dry_run=false to actually mutate.",
+}
+_ROOT = {
+    "type": "string",
+    "description": "Optional agent system root override.",
+}
+
+PORTFOLIO_WORKTREE_PLAN_SCHEMA = {
+    "name": "portfolio_worktree_plan",
+    "description": "Plan a worktree creation for an issue. Read-only — never mutates.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": _PROJECT_REF,
+            "issue_number": _ISSUE_NUMBER,
+            "base_branch": _BASE_BRANCH,
+            "branch_name": _BRANCH_NAME,
+            "refresh_base": _REFRESH_BASE,
+            "root": _ROOT,
+        },
+        "required": ["project_ref", "issue_number"],
+    },
+}
+
+PORTFOLIO_WORKTREE_PREPARE_BASE_SCHEMA = {
+    "name": "portfolio_worktree_prepare_base",
+    "description": "Clone (if missing) and ff-only refresh the base repo for a project.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": _PROJECT_REF,
+            "base_branch": _BASE_BRANCH,
+            "refresh_base": _REFRESH_BASE,
+            "dry_run": _DRY_RUN,
+            "confirm": _CONFIRM,
+            "root": _ROOT,
+        },
+        "required": ["project_ref"],
+    },
+}
+
+PORTFOLIO_WORKTREE_CREATE_ISSUE_SCHEMA = {
+    "name": "portfolio_worktree_create_issue",
+    "description": "Create an issue worktree (idempotent on exact-match clean state).",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": _PROJECT_REF,
+            "issue_number": _ISSUE_NUMBER,
+            "base_branch": _BASE_BRANCH,
+            "branch_name": _BRANCH_NAME,
+            "refresh_base": _REFRESH_BASE,
+            "dry_run": _DRY_RUN,
+            "confirm": _CONFIRM,
+            "root": _ROOT,
+        },
+        "required": ["project_ref", "issue_number"],
+    },
+}
+
+PORTFOLIO_WORKTREE_LIST_SCHEMA = {
+    "name": "portfolio_worktree_list",
+    "description": "List discovered worktrees (base + issue) per project.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": _PROJECT_REF,
+            "include_archived": {"type": "boolean", "description": "Include archived projects."},
+            "include_paused": {"type": "boolean", "description": "Include paused projects."},
+            "inspect": {"type": "boolean", "description": "Run inspection probes (writes SQLite when true)."},
+            "root": _ROOT,
+        },
+        "required": [],
+    },
+}
+
+PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA = {
+    "name": "portfolio_worktree_explain",
+    "description": "Explain a worktree state and suggest the next safe action.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": _PROJECT_REF,
+            "issue_number": _ISSUE_NUMBER,
+            "root": _ROOT,
+        },
+        "required": ["project_ref"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # All schemas in order
 # ---------------------------------------------------------------------------
 
@@ -1099,4 +1220,10 @@ ALL_SCHEMAS = [
     PORTFOLIO_MAINTENANCE_RUN_SCHEMA,
     PORTFOLIO_MAINTENANCE_RUN_PROJECT_SCHEMA,
     PORTFOLIO_MAINTENANCE_REPORT_SCHEMA,
+    # MVP 5
+    PORTFOLIO_WORKTREE_PLAN_SCHEMA,
+    PORTFOLIO_WORKTREE_PREPARE_BASE_SCHEMA,
+    PORTFOLIO_WORKTREE_CREATE_ISSUE_SCHEMA,
+    PORTFOLIO_WORKTREE_LIST_SCHEMA,
+    PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA,
 ]

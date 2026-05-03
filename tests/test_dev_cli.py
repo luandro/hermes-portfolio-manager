@@ -440,3 +440,95 @@ def test_dev_cli_issue_draft_management(tmp_path: Path) -> None:
     )
     discarded = _parse_json(discard_result)
     assert discarded["status"] == "success"
+
+
+# ---------------------------------------------------------------------------
+# MVP 5 — worktree CLI commands
+# ---------------------------------------------------------------------------
+
+
+def test_cli_registers_worktree_plan() -> None:
+    import dev_cli
+
+    assert "worktree-plan" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_plan" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_registers_worktree_prepare_base() -> None:
+    import dev_cli
+
+    assert "worktree-prepare-base" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_prepare_base" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_registers_worktree_create_issue() -> None:
+    import dev_cli
+
+    assert "worktree-create-issue" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_create_issue" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_registers_worktree_list() -> None:
+    import dev_cli
+
+    assert "worktree-list" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_list" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_registers_worktree_inspect() -> None:
+    import dev_cli
+
+    assert "worktree-inspect" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_inspect" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_registers_worktree_explain() -> None:
+    import dev_cli
+
+    assert "worktree-explain" in dev_cli.TOOL_HANDLERS
+    assert "portfolio_worktree_explain" in dev_cli.TOOL_HANDLERS
+
+
+def test_cli_worktree_plan_returns_blocked_for_unknown_project(tmp_path: Path) -> None:
+    root = _write_config(tmp_path, [])
+    result = _run_cli(
+        "worktree-plan",
+        "--project-ref",
+        "does-not-exist",
+        "--issue-number",
+        "42",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "blocked", parsed
+    assert parsed["tool"] == "portfolio_worktree_plan"
+
+
+def test_cli_worktree_list_returns_empty_array_for_empty_root(tmp_path: Path) -> None:
+    root = _write_config(tmp_path, [])
+    result = _run_cli(
+        "worktree-list",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success", parsed
+    data = parsed.get("data", {})
+    assert data.get("worktrees") == []
+
+
+def test_cli_worktree_inspect_blocks_path_outside_root(tmp_path: Path) -> None:
+    root = _write_config(tmp_path, [])
+    escape = tmp_path / "escape" / "outside"
+    escape.mkdir(parents=True, exist_ok=True)
+    result = _run_cli(
+        "worktree-inspect",
+        "--path",
+        str(escape),
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "blocked", parsed
+    assert "outside" in parsed.get("message", "").lower() or "escape" in parsed.get("message", "").lower()
