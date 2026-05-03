@@ -188,7 +188,7 @@ portfolio_manager/state.py                       EXTEND (implementation_jobs tab
 portfolio_manager/__init__.py                    EXTEND (register six new tools)
 dev_cli.py                                       EXTEND (six new CLI commands)
 skills/implementation-run/SKILL.md               NEW
-config/harnesses.yaml                            NEW   (committed example; runtime copy lives under $ROOT/config/)
+config/harnesses.yaml.example                    NEW   (committed example reference; the runtime copy lives at $ROOT/config/harnesses.yaml and is NEVER committed)
 ```
 
 If equivalents already exist (a shared redaction helper, a generic lock wrapper), reuse them — do not duplicate.
@@ -198,6 +198,9 @@ If equivalents already exist (a shared redaction helper, a generic lock wrapper)
 ## Harness Configuration and Protocol
 
 `$ROOT/config/harnesses.yaml` is server-side policy. MVP 6 reads it but never writes it.
+The committed reference at `config/harnesses.yaml.example` shows realistic forge / codex /
+claude-code entries; an operator copies and adapts it into the runtime location. The runtime
+file is never committed.
 
 Required shape:
 
@@ -228,7 +231,7 @@ required_checks must reference keys under checks and must use allowlisted IDs:
 No command interpolation. The runner passes paths through environment variables only.
 ```
 
-Harness environment variables:
+Harness environment variables (set BY MVP 6 for every harness invocation):
 
 ```txt
 PORTFOLIO_IMPLEMENTATION_INPUT        absolute path to input-request.json
@@ -236,6 +239,31 @@ PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR absolute path to the job artifact dir
 PORTFOLIO_IMPLEMENTATION_SOURCE       absolute path to the source spec artifact
 PORTFOLIO_IMPLEMENTATION_JOB_ID       job id
 GIT_TERMINAL_PROMPT                   always "0"
+```
+
+Provider/credential environment variables (NOT set by MVP 6):
+
+```txt
+MVP 6 does NOT export any provider, model, or API-key environment variable for any
+harness. It only forwards env vars that:
+  (a) are listed in the harness entry's env_passthrough, AND
+  (b) are already present in the runtime environment of the process invoking the plugin.
+
+Examples and ownership:
+  forge        operator (or the Hermes agent runner systemd unit / shell profile) must
+               export FORGE_SESSION__PROVIDER_ID, FORGE_SESSION__MODEL_ID, and
+               FORGE_HTTP_READ_TIMEOUT before invoking the plugin. MVP 6 does not pick
+               provider/model and does not poll any usage script. Provider switching
+               (e.g. zai vs openai_compatible based on usage thresholds) is deferred
+               to a later MVP.
+  codex        operator exports OPENAI_API_KEY.
+  claude-code  operator exports ANTHROPIC_API_KEY. claude-code reads the project's
+               AGENTS.md natively, so no extra plumbing is required for instructions.
+
+If a required env var is in env_passthrough but missing from the environment, the
+harness will fail at runtime; MVP 6 surfaces the harness's exit code in error.json
+without trying to recover. The skill doc must state this explicitly so operators know
+to export provider env vars before calling implementation_start.
 ```
 
 Harness result protocol:
@@ -704,14 +732,14 @@ test_implementation_lock_acquired_and_released
 test_lock_name_is_implementation_issue_project_issue        (e.g. implementation:issue:<id>:<n>)
 test_lock_released_on_exception
 test_lock_contention_raises_typed_error                     (ImplementationLockBusy)
-test_default_ttl_is_60_minutes                              (longer than worktree TTL — harness can be slow)
+test_default_ttl_is_90_minutes                              (must exceed harness timeout + checks budget)
 test_lock_must_be_acquired_after_worktree_locks_when_combined
 ```
 
 ### Implementation
 Add `portfolio_manager/implementation_locks.py`. Mirror `worktree_locks.with_issue_lock` shape:
 ```python
-IMPLEMENTATION_LOCK_TTL = 60 * 60
+IMPLEMENTATION_LOCK_TTL = 90 * 60   # 90 min: must exceed harness timeout (e.g. 1800s) + checks (lint+pytest budgets) with margin
 class ImplementationLockBusy(RuntimeError): ...
 def with_implementation_lock(conn, project_id: str, issue_number: int): ...
 def with_implementation_review_lock(conn, project_id: str, pr_number: int): ...
@@ -988,7 +1016,18 @@ Use `worktree_git.run_git` with read-only commands only:
 git status --porcelain=v1 --untracked-files=all
 git diff --name-status --find-renames HEAD
 ```
-Extend `worktree_git.run_git` allowlist only as needed for these read-only diff/status commands.
+Concrete edits to `portfolio_manager/worktree_git.py`:
+```txt
+_GIT_ALLOWED_LEADERS: add "diff"
+_check_git_args:
+  add a per-leader rule that "diff" only accepts the read-only flag set
+  {"--name-only", "--name-status", "--find-renames", "--no-color", "HEAD", "HEAD~1"}
+  and rejects everything else (no -p, no patch generation, no path filters that escape).
+```
+MVP 5 security tests (`tests/test_security.py::TestMvp5CommandAllowlist`) scope to
+`worktree*.py` and forbid the substrings `git push`, `git commit`, `git reset`, `git clean`,
+`git stash`, `git rebase`. Adding `diff` to the allowlist does not introduce any of those
+substrings, so those tests remain green without modification.
 
 ### Verification
 ```bash
@@ -1016,11 +1055,33 @@ test_evidence_records_failing_test_run_before_implementation
 test_evidence_records_passing_test_run_after_implementation
 test_evidence_blocks_when_no_failing_test_phase_found
 test_evidence_allows_explicit_no_test_path_with_reason     (spec § Safety Rule 4)
+test_evidence_waiver_requires_nonempty_reason_string
 test_evidence_writer_redacts_paths_under_user_home
 ```
 
 ### Implementation
 Add `portfolio_manager/implementation_test_quality.py::collect_test_first_evidence(...)` returning a structure suitable for `test-first-evidence.md`. Drives `git status` snapshots and harness output sections — does NOT execute tests itself; it consumes the harness's check output.
+
+Test-first waiver protocol (spec § Safety Rule 4):
+```txt
+The harness signals an explicit no-test-path waiver by including a top-level field
+"test_first_waiver" in $PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR/harness-result.json:
+
+  {
+    "status": "implemented",
+    "test_first_waiver": {
+      "reason": "<one-line human-readable reason, >= 10 chars, no secrets, no user-home paths>"
+    },
+    ...
+  }
+
+Rules:
+  - reason is required and non-empty; missing or empty -> waiver rejected -> job blocked.
+  - Reason text is redacted through errors.redact_secrets before being written to artifacts.
+  - Waivers are recorded in test-first-evidence.md and surfaced in summary.md.
+  - A waiver does NOT bypass scope guard or test-quality for review_fix doc-only paths
+    (those have their own bypass in 9.3); it only relaxes the failing-test-phase requirement.
+```
 
 ### Verification
 ```bash
@@ -1098,7 +1159,19 @@ test_quality_writer_produces_test_quality_md_with_per_test_summary
 Add `portfolio_manager/implementation_test_quality.py::check_test_quality(...)`. Heuristics:
 1. Count new test files / functions in `changed-files.json`.
 2. Read each test, look for non-trivial assertions (`assert ... ==`, `pytest.raises`, etc).
-3. Cross-reference acceptance-criteria IDs from the source artifact (markdown headers / explicit IDs).
+3. Cross-reference the source artifact body. The check is intentionally lexical, not
+   semantic. Two acceptance modes — pass either:
+   a) `acceptance_criteria_ids`: if the spec front-matter or a fenced section labelled
+      `acceptance-criteria` (case-insensitive) declares explicit IDs (e.g. `AC-1`,
+      `AC-2`), at least one new test name OR test-body string must reference one of
+      those IDs verbatim.
+   b) `keyword_overlap`: if no explicit IDs are present, extract the >=4-character
+      identifier-like tokens from the spec body (case-folded, deduped, stop-word
+      filtered) and require at least 3 distinct tokens to appear in the union of new
+      test file names + test function names + test bodies.
+4. The mode used is recorded in `test-quality.md`. Specs without a recognisable spec
+   body return `blocked` with reason `spec_unparseable_for_test_quality` rather than
+   silently passing.
 
 ### Verification
 ```bash
@@ -1131,16 +1204,48 @@ test_worktree_git_still_rejects_push_rebase_reset_clean_stash
 ```
 
 ### Implementation
-Extend `portfolio_manager/worktree_git.py` allowlist surgically, or add a narrowly-scoped wrapper in
-`portfolio_manager/implementation_commit.py` that still calls `worktree_git.run_git` after validation.
-Allowed MVP 6 git write commands:
+MVP 5 currently lists `commit` in `_GIT_FORBIDDEN` so even a permitted leader could not pass.
+The MVP 6 edit is surgical:
+
+```txt
+_GIT_FORBIDDEN: REMOVE "commit"  (still listed in MVP 5 substring grep — see below)
+_GIT_ALLOWED_LEADERS: ADD "add", "commit"
+_check_git_args:
+  leader == "add"      -> args must equal ["add", "-A"] exactly
+  leader == "commit"   -> args must:
+                            * begin with one or more "-c user.name=<v>" / "-c user.email=<v>"
+                              pairs (per-command config only; never -c outside this allowlist)
+                            * include exactly one "-m" followed by a single message string
+                            * NOT include any of: --amend, --reset-author, --no-verify,
+                              --allow-empty, --signoff, -F, --file, -e, --edit, --reedit-message,
+                              --fixup, --squash, --gpg-sign, -S, --no-gpg-sign
+                            * include no path arguments (use "git add -A" first)
+  leader == "rev-parse"-> existing rule (already allowlisted)
+```
+
+Allowed MVP 6 git write commands (the only forms the new `_check_git_args` accepts):
 ```txt
 git add -A
 git -c user.name=<name> -c user.email=<email> commit -m <message>
 git rev-parse HEAD
 ```
-All other commit forms are forbidden, especially `--amend`, `--reset-author`, global config writes,
-push, rebase, reset, clean, stash, checkout, and pull.
+
+Substring-scope conflict with MVP 5 security tests:
+```txt
+tests/test_security.py::TestMvp5CommandAllowlist::test_only_allowlisted_git_subcommands_in_worktree_modules
+  scans worktree*.py and forbids the substring "git commit". worktree_git.py is exempted
+  from that scan. To keep the substring out of the OTHER worktree modules, the new commit
+  helper lives in portfolio_manager/implementation_commit.py (NOT a worktree*.py file) and
+  invokes worktree_git.run_git with the args list directly. No string "git commit" appears
+  in any worktree*.py module.
+
+tests/test_security.py::TestMvp5CommandAllowlist::test_no_pr_remote_mutation_in_worktree_modules
+  also forbids "git commit" substring in worktree*.py — same scoping applies; no edits
+  to that test are required.
+```
+
+All other commit forms are forbidden, especially `--amend`, `--reset-author`, `--no-verify`,
+global config writes, push, rebase, reset, clean, stash, checkout, and pull.
 
 ### Verification
 ```bash
@@ -1530,10 +1635,25 @@ test_skill_lists_six_expected_tools
 test_skill_warns_no_push_no_pr_no_review_decision
 test_skill_warns_no_worktree_mutation_outside_harness
 test_skill_describes_review_fix_callable_only_after_mvp7
+test_skill_states_operator_exports_provider_env_vars
 ```
 
 ### Implementation
 Create `skills/implementation-run/SKILL.md`. Cover spec § User Stories, the six tools, the confirmation flow, and explicit non-goals.
+
+The skill must include an "Operator prerequisites" section stating, in plain language, that:
+```txt
+- MVP 6 does NOT pick a provider or model and does NOT load API keys.
+- The operator (or the systemd unit / shell profile that launches the Hermes agent) is
+  responsible for exporting the harness's required env vars before any
+  implementation_start call. Concretely:
+    forge       export FORGE_SESSION__PROVIDER_ID, FORGE_SESSION__MODEL_ID, and
+                optionally FORGE_HTTP_READ_TIMEOUT.
+    codex       export OPENAI_API_KEY.
+    claude-code export ANTHROPIC_API_KEY.
+- If those env vars are absent, the job will run but the harness will fail; MVP 6 will
+  return the harness exit code in error.json and will not retry.
+```
 
 ### Verification
 ```bash
@@ -1678,16 +1798,48 @@ Add to `tests/fixtures/implementation_fixtures.py`:
 ```python
 @pytest.fixture
 def fake_harness_script(tmp_path) -> Path:
-    """Write a Python script that:
-       1. reads the input-request.json passed via env var,
-       2. modifies a single file in cwd,
-       3. exits 0.
-       Returns the script path.
+    """Write a Python script that emulates a coding harness.
+
+    Behavior is controlled by environment variables read inside the script (the runner
+    sets only PORTFOLIO_IMPLEMENTATION_* env vars; tests inject a FAKE_HARNESS_MODE
+    via the harness command argv so it survives env scrubbing). Modes:
+
+        ok                  modify one file under cwd, write harness-result.json with
+                            status="implemented", exit 0 (default)
+        ok_no_result_json   modify one file, exit 0, do NOT write harness-result.json
+                            (covers the fallback path: returncode 0 -> implemented)
+        nonzero             write nothing, exit 2 (covers status=failed via returncode)
+        timeout             sleep longer than the configured harness timeout, never exit
+                            (covers timeout + process-group kill)
+        needs_user          write harness-result.json with status="needs_user" and a
+                            populated "needs_user" object, exit 0
+        protected_path      modify a file matching project_config.protected_paths,
+                            exit 0 (covers scope-guard block)
+        out_of_scope        modify a file outside the issue spec scope, exit 0
+                            (covers scope-guard block for initial_implementation)
+        no_tests            modify only non-test source files, exit 0
+                            (covers test-quality block when no failing-test phase exists)
+        empty_tests         add a test file whose only assert is `assert True`, exit 0
+                            (covers test-quality block on meaningless asserts)
+        with_waiver         modify only docs, write harness-result.json with status=
+                            "implemented" and a valid test_first_waiver.reason
+                            (covers waiver acceptance path in 9.1)
+        review_fix_in       for review_fix tests: modify only files inside fix_scope
+        review_fix_out      for review_fix tests: modify a file outside fix_scope
+                            (covers scope-guard block in 12.2)
+
+    The fixture writes the script with all modes implemented; tests pick a mode via
+    the harness command argv: ["python", str(script_path), "<mode>"].
+    Returns the script path.
     """
 
 @pytest.fixture
 def harnesses_yaml_with_fake(fake_harness_script, tmp_path) -> Path:
-    """Write $ROOT/config/harnesses.yaml referencing the fake script."""
+    """Write $ROOT/config/harnesses.yaml referencing the fake script.
+
+    Generates one harness entry per mode the test needs, OR a single 'fake' harness
+    whose argv ends with the mode arg. Tests pass mode via a parametrized helper.
+    """
 
 @pytest.fixture
 def prepared_issue_worktree(bare_remote, tmp_path) -> dict:

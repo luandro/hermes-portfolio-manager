@@ -1,0 +1,98 @@
+# Example harness configuration for MVP 6.
+#
+# This file is informational. The runtime copy lives at
+# $ROOT/config/harnesses.yaml (server-side policy). MVP 6 reads it but never
+# writes it.
+#
+# Schema is normative in docs/mvps/mvp6-progress.md (Phase 2.1) and
+# docs/mvps/mvp6-spec.md. Required keys per harness:
+#   id                  matches HARNESS_ID_RE  ^[a-z0-9][a-z0-9_-]{0,63}$
+#   command             argv array (no shell strings)
+#   env_passthrough     list of env var names allowed through harness_runner
+#   timeout_seconds     positive int, under runner max
+#   max_files_changed   scope-guard ceiling for the commit gate
+#   required_checks     subset of {lint, typecheck, unit_tests, format_check}
+#   checks              mapping of check id -> { command (argv), timeout_seconds }
+#   workspace_subpath   optional sub-dir under issue_worktree_path, or null
+#
+# MVP 6 does NOT load API keys, perform provider/model selection, or run a
+# usage-check script. If a harness needs credentials, the env var name must be
+# listed in env_passthrough AND already exported in the runtime environment.
+# Anything beyond that (provider switching, budget tracking) is deferred to a
+# later MVP.
+#
+# Each entry below is a realistic starting point. Adjust per project and
+# commit the runtime copy out-of-band.
+
+harnesses:
+
+  # Forge CLI -- the primary coding harness used in this project.
+  # Provider/model are selected via env vars exported before invocation.
+  # MVP 6 does not switch providers; the operator chooses upstream.
+  - id: forge
+    command: ["forge", "run"]
+    env_passthrough:
+      - FORGE_SESSION__PROVIDER_ID
+      - FORGE_SESSION__MODEL_ID
+      - FORGE_HTTP_READ_TIMEOUT
+    timeout_seconds: 1800
+    max_files_changed: 20
+    required_checks: ["unit_tests", "lint"]
+    checks:
+      unit_tests:
+        command: ["uv", "run", "pytest", "--tb=short", "-q"]
+        timeout_seconds: 600
+      lint:
+        command: ["uv", "run", "ruff", "check", "."]
+        timeout_seconds: 300
+    workspace_subpath: null
+
+  # OpenAI Codex CLI.
+  - id: codex
+    command: ["codex"]
+    env_passthrough:
+      - OPENAI_API_KEY
+    timeout_seconds: 1200
+    max_files_changed: 20
+    required_checks: ["unit_tests", "lint"]
+    checks:
+      unit_tests:
+        command: ["uv", "run", "pytest", "--tb=short", "-q"]
+        timeout_seconds: 600
+      lint:
+        command: ["uv", "run", "ruff", "check", "."]
+        timeout_seconds: 300
+    workspace_subpath: null
+
+  # Claude Code CLI.
+  # Note: claude-code reads AGENTS.md natively, so the project's existing
+  # AGENTS.md guides behavior without extra plumbing from MVP 6.
+  - id: claude-code
+    command: ["claude", "--print"]
+    env_passthrough:
+      - ANTHROPIC_API_KEY
+    timeout_seconds: 1800
+    max_files_changed: 20
+    required_checks: ["unit_tests", "lint"]
+    checks:
+      unit_tests:
+        command: ["uv", "run", "pytest", "--tb=short", "-q"]
+        timeout_seconds: 600
+      lint:
+        command: ["uv", "run", "ruff", "check", "."]
+        timeout_seconds: 300
+    workspace_subpath: null
+
+  # Kilo -- placeholder. Concrete invocation is TBD.
+  # Leave commented until the team confirms command, env vars, and timeouts.
+  # - id: kilo
+  #   command: ["kilo"]
+  #   env_passthrough: []
+  #   timeout_seconds: 1200
+  #   max_files_changed: 20
+  #   required_checks: ["unit_tests"]
+  #   checks:
+  #     unit_tests:
+  #       command: ["uv", "run", "pytest", "--tb=short", "-q"]
+  #       timeout_seconds: 600
+  #   workspace_subpath: null

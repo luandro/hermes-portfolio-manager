@@ -8,6 +8,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from portfolio_manager.implementation_tools import (
+    _handle_portfolio_implementation_apply_review_fixes,
+    _handle_portfolio_implementation_explain,
+    _handle_portfolio_implementation_list,
+    _handle_portfolio_implementation_plan,
+    _handle_portfolio_implementation_start,
+    _handle_portfolio_implementation_status,
+)
 from portfolio_manager.maintenance_tools import (
     _handle_portfolio_maintenance_due,
     _handle_portfolio_maintenance_report,
@@ -112,6 +120,19 @@ TOOL_HANDLERS: dict[str, Callable[..., str]] = {
     "portfolio_worktree_explain": _handle_portfolio_worktree_explain,
     "worktree-explain": _handle_portfolio_worktree_explain,
     "worktree-inspect": _handle_portfolio_worktree_inspect,
+    # MVP 6 — implementation runner
+    "portfolio_implementation_plan": _handle_portfolio_implementation_plan,
+    "implementation-plan": _handle_portfolio_implementation_plan,
+    "portfolio_implementation_start": _handle_portfolio_implementation_start,
+    "implementation-start": _handle_portfolio_implementation_start,
+    "portfolio_implementation_apply_review_fixes": _handle_portfolio_implementation_apply_review_fixes,
+    "implementation-apply-review-fixes": _handle_portfolio_implementation_apply_review_fixes,
+    "portfolio_implementation_status": _handle_portfolio_implementation_status,
+    "implementation-status": _handle_portfolio_implementation_status,
+    "portfolio_implementation_list": _handle_portfolio_implementation_list,
+    "implementation-list": _handle_portfolio_implementation_list,
+    "portfolio_implementation_explain": _handle_portfolio_implementation_explain,
+    "implementation-explain": _handle_portfolio_implementation_explain,
 }
 
 
@@ -174,6 +195,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--refresh-base", type=str, help="Refresh base branch (true/false)")
     parser.add_argument("--inspect", type=str, help="Run inspection probes (true/false)")
     parser.add_argument("--path", help="Explicit worktree path for inspect/explain")
+    # MVP 6 implementation args
+    parser.add_argument("--harness-id", help="Harness ID for implementation runner")
+    parser.add_argument("--expected-branch", help="Expected branch name")
+    parser.add_argument("--base-sha", help="Base commit SHA")
+    parser.add_argument("--pr-number", type=int, help="PR number for review fixes")
+    parser.add_argument("--review-stage-id", help="Review stage ID")
+    parser.add_argument("--review-iteration", type=int, help="Review iteration number")
+    parser.add_argument("--approved-comment-ids", help="Comma-separated approved comment IDs")
+    parser.add_argument("--fix-scope", help="Comma-separated file patterns for fix scope")
+    parser.add_argument("--instructions", help="JSON string with harness instructions")
     parser.add_argument("--root", help="System root path override")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     args = parser.parse_args(argv)
@@ -269,6 +300,26 @@ def main(argv: list[str] | None = None) -> None:
         handler_args["inspect"] = _to_bool(args.inspect)
     if args.path is not None:
         handler_args["path"] = args.path
+    if args.harness_id is not None:
+        handler_args["harness_id"] = args.harness_id
+    if args.expected_branch is not None:
+        handler_args["expected_branch"] = args.expected_branch
+    if args.base_sha is not None:
+        handler_args["base_sha"] = args.base_sha
+    if args.pr_number is not None:
+        handler_args["pr_number"] = args.pr_number
+    if args.review_stage_id is not None:
+        handler_args["review_stage_id"] = args.review_stage_id
+    if args.review_iteration is not None:
+        handler_args["review_iteration"] = args.review_iteration
+    if args.approved_comment_ids is not None:
+        handler_args["approved_comment_ids"] = args.approved_comment_ids.split(",")
+    if args.fix_scope is not None:
+        handler_args["fix_scope"] = args.fix_scope.split(",")
+    if args.instructions is not None:
+        import json as _json
+
+        handler_args["instructions"] = _json.loads(args.instructions)
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

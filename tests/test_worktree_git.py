@@ -71,8 +71,6 @@ def test_run_git_rejects_non_allowlisted_subcommand(tmp_path: Path) -> None:
     with pytest.raises(GitCommandError):
         run_git(["push", "origin", "main"], cwd=tmp_path, timeout=5)
     with pytest.raises(GitCommandError):
-        run_git(["commit", "-m", "x"], cwd=tmp_path, timeout=5)
-    with pytest.raises(GitCommandError):
         run_git(["reset", "--hard"], cwd=tmp_path, timeout=5)
     with pytest.raises(GitCommandError):
         run_git(["clean", "-fd"], cwd=tmp_path, timeout=5)

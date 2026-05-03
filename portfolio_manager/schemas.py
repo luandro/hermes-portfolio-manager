@@ -1178,6 +1178,152 @@ PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA = {
 
 
 # ---------------------------------------------------------------------------
+# MVP 6 — Implementation Runner
+# ---------------------------------------------------------------------------
+
+PORTFOLIO_IMPLEMENTATION_PLAN_SCHEMA = {
+    "name": "portfolio_implementation_plan",
+    "description": "Plan a confirmed implementation job without mutating SQLite, artifacts, or worktrees.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {"type": "string"},
+            "issue_number": {"type": "integer", "minimum": 1},
+            "harness_id": {"type": "string"},
+            "expected_branch": {"type": "string"},
+            "root": {"type": "string"},
+        },
+        "required": ["project_ref", "issue_number", "harness_id"],
+        "additionalProperties": False,
+    },
+}
+
+PORTFOLIO_IMPLEMENTATION_START_SCHEMA = {
+    "name": "portfolio_implementation_start",
+    "description": "Run a confirmed initial_implementation job in a prepared issue worktree.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {"type": "string"},
+            "issue_number": {"type": "integer", "minimum": 1},
+            "harness_id": {"type": "string"},
+            "expected_branch": {"type": "string"},
+            "base_sha": {"type": "string"},
+            "instructions": {"type": "object"},
+            "confirm": {"type": "boolean", "default": False},
+            "root": {"type": "string"},
+        },
+        "required": ["project_ref", "issue_number", "harness_id"],
+        "additionalProperties": False,
+    },
+}
+
+PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA = {
+    "name": "portfolio_implementation_apply_review_fixes",
+    "description": "Apply approved review fixes for a PR. MVP 7 calls this after classifying review feedback.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {"type": "string"},
+            "issue_number": {"type": "integer", "minimum": 1},
+            "pr_number": {"type": "integer", "minimum": 1},
+            "review_stage_id": {"type": "string"},
+            "review_iteration": {"type": "integer", "minimum": 1},
+            "approved_comment_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of approved comment IDs to address",
+            },
+            "fix_scope": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "File patterns that may be modified",
+            },
+            "harness_id": {"type": "string"},
+            "confirm": {"type": "boolean", "default": False},
+            "root": {"type": "string"},
+        },
+        "required": [
+            "project_ref",
+            "issue_number",
+            "pr_number",
+            "review_stage_id",
+            "review_iteration",
+            "approved_comment_ids",
+            "fix_scope",
+            "harness_id",
+        ],
+        "additionalProperties": False,
+    },
+}
+
+PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA = {
+    "name": "portfolio_implementation_status",
+    "description": "Get the status of an implementation run.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {
+                "type": "string",
+                "description": "Project reference (id, owner/repo, name, or URL).",
+            },
+            "issue_number": {
+                "type": "integer",
+                "description": "GitHub issue number.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional agent system root override.",
+            },
+        },
+        "required": ["project_ref", "issue_number"],
+    },
+}
+
+PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA = {
+    "name": "portfolio_implementation_list",
+    "description": "List implementation runs, optionally filtered by project.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {
+                "type": "string",
+                "description": "Optional project reference to filter.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional agent system root override.",
+            },
+        },
+        "required": [],
+    },
+}
+
+PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA = {
+    "name": "portfolio_implementation_explain",
+    "description": "Explain an implementation run state and suggest next actions.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_ref": {
+                "type": "string",
+                "description": "Project reference (id, owner/repo, name, or URL).",
+            },
+            "issue_number": {
+                "type": "integer",
+                "description": "GitHub issue number.",
+            },
+            "root": {
+                "type": "string",
+                "description": "Optional agent system root override.",
+            },
+        },
+        "required": ["project_ref", "issue_number"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # All schemas in order
 # ---------------------------------------------------------------------------
 
@@ -1226,4 +1372,11 @@ ALL_SCHEMAS = [
     PORTFOLIO_WORKTREE_CREATE_ISSUE_SCHEMA,
     PORTFOLIO_WORKTREE_LIST_SCHEMA,
     PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA,
+    # MVP 6
+    PORTFOLIO_IMPLEMENTATION_PLAN_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_START_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA,
 ]

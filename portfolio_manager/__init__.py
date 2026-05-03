@@ -5,6 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from portfolio_manager.implementation_tools import (
+    _handle_portfolio_implementation_apply_review_fixes,
+    _handle_portfolio_implementation_explain,
+    _handle_portfolio_implementation_list,
+    _handle_portfolio_implementation_plan,
+    _handle_portfolio_implementation_start,
+    _handle_portfolio_implementation_status,
+)
 from portfolio_manager.maintenance_tools import (
     _handle_portfolio_maintenance_due,
     _handle_portfolio_maintenance_report,
@@ -19,6 +27,13 @@ from portfolio_manager.schemas import (
     PORTFOLIO_CONFIG_VALIDATE_SCHEMA,
     PORTFOLIO_GITHUB_SYNC_SCHEMA,
     PORTFOLIO_HEARTBEAT_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA,
+    # MVP 6 implementation schemas
+    PORTFOLIO_IMPLEMENTATION_PLAN_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_START_SCHEMA,
+    PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA,
     PORTFOLIO_ISSUE_CREATE_FROM_DRAFT_SCHEMA,
     PORTFOLIO_ISSUE_CREATE_SCHEMA,
     PORTFOLIO_ISSUE_DISCARD_DRAFT_SCHEMA,
@@ -179,6 +194,29 @@ _TOOL_REGISTRY: list[tuple[str, dict[str, Any], Any]] = [
     ),
     ("portfolio_worktree_list", PORTFOLIO_WORKTREE_LIST_SCHEMA, _handle_portfolio_worktree_list),
     ("portfolio_worktree_explain", PORTFOLIO_WORKTREE_EXPLAIN_SCHEMA, _handle_portfolio_worktree_explain),
+    # MVP 6 — implementation runner
+    ("portfolio_implementation_plan", PORTFOLIO_IMPLEMENTATION_PLAN_SCHEMA, _handle_portfolio_implementation_plan),
+    (
+        "portfolio_implementation_start",
+        PORTFOLIO_IMPLEMENTATION_START_SCHEMA,
+        _handle_portfolio_implementation_start,
+    ),
+    (
+        "portfolio_implementation_apply_review_fixes",
+        PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA,
+        _handle_portfolio_implementation_apply_review_fixes,
+    ),
+    (
+        "portfolio_implementation_status",
+        PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA,
+        _handle_portfolio_implementation_status,
+    ),
+    ("portfolio_implementation_list", PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA, _handle_portfolio_implementation_list),
+    (
+        "portfolio_implementation_explain",
+        PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA,
+        _handle_portfolio_implementation_explain,
+    ),
 ]
 
 # Skills directory: check repo-root skills/ first, fall back to plugin-local

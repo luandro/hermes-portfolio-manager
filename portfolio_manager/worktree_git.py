@@ -39,13 +39,14 @@ _GIT_ALLOWED_LEADERS = frozenset(
         "switch",
         "merge",
         "merge-base",
+        "diff",
+        "add",
+        "commit",
     }
 )
 
 #: Subcommands explicitly forbidden anywhere in the args list.
-_GIT_FORBIDDEN = frozenset(
-    {"push", "commit", "reset", "clean", "stash", "rebase", "tag", "rm", "mv", "checkout", "pull"}
-)
+_GIT_FORBIDDEN = frozenset({"push", "reset", "clean", "stash", "rebase", "tag", "rm", "mv", "checkout", "pull"})
 
 #: Default per-command timeouts (seconds).
 DEFAULT_TIMEOUTS = {
@@ -60,6 +61,9 @@ DEFAULT_TIMEOUTS = {
     "merge-base": 30,
     "fetch": 120,
     "clone": 300,
+    "diff": 30,
+    "add": 30,
+    "commit": 30,
 }
 
 
@@ -70,29 +74,86 @@ class GitCommandError(Exception):
 def _check_git_args(args: list[str]) -> None:
     if not args:
         raise GitCommandError("empty git arg list")
-    if any(tok in _GIT_FORBIDDEN for tok in args):
+
+    # Strip leading global '-c' pairs (git -c key=val <subcommand> ...)
+    # These are per-command config overrides, not subcommand flags.
+    remaining = list(args)
+    while remaining and remaining[0] == "-c":
+        if len(remaining) < 2:
+            raise GitCommandError("git -c requires a value")
+        val = remaining[1]
+        if not val.startswith("user.name=") and not val.startswith("user.email="):
+            raise GitCommandError(f"git -c only allows user.name/user.email overrides, got {val!r}")
+        remaining = remaining[2:]
+
+    if not remaining:
+        raise GitCommandError("no git subcommand after -c options")
+
+    if any(tok in _GIT_FORBIDDEN for tok in remaining):
         raise GitCommandError(f"forbidden git subcommand in {args!r}")
-    leader = args[0]
+
+    leader = remaining[0]
     if leader not in _GIT_ALLOWED_LEADERS:
         raise GitCommandError(f"git subcommand {leader!r} not allowlisted")
+
     # Extra restrictions on merge: only --ff-only allowed.
-    if leader == "merge" and "--ff-only" not in args:
+    if leader == "merge" and "--ff-only" not in remaining:
         raise GitCommandError("git merge requires --ff-only")
     # Extra restrictions on fetch: never --force.
-    if leader == "fetch" and any(a in {"--force", "-f"} for a in args):
+    if leader == "fetch" and any(a in {"--force", "-f"} for a in remaining):
         raise GitCommandError("git fetch --force is forbidden")
     # branch: only read-only flags allowed
     if leader == "branch":
         _BRANCH_ALLOWED_FLAGS = {"--show-current", "--list", "-a", "-r", "--all", "--remotes"}
-        for a in args[1:]:
+        for a in remaining[1:]:
             if a.startswith("-") and a not in _BRANCH_ALLOWED_FLAGS:
                 raise GitCommandError(f"git branch flag {a!r} not allowed")
     # remote: only get-url allowed
-    if leader == "remote" and (len(args) < 2 or args[1] != "get-url"):
+    if leader == "remote" and (len(remaining) < 2 or remaining[1] != "get-url"):
         raise GitCommandError("git remote only allows get-url subcommand")
     # worktree: only list and add allowed
-    if leader == "worktree" and (len(args) < 2 or args[1] not in {"list", "add"}):
+    if leader == "worktree" and (len(remaining) < 2 or remaining[1] not in {"list", "add"}):
         raise GitCommandError("git worktree only allows list/add subcommands")
+    # diff: only read-only flags allowed
+    if leader == "diff":
+        _DIFF_ALLOWED = {"--name-only", "--name-status", "--find-renames", "--no-color", "HEAD", "HEAD~1"}
+        for a in remaining[1:]:
+            if a not in _DIFF_ALLOWED:
+                raise GitCommandError(f"git diff flag {a!r} not allowed")
+    # add: only 'git add -A' is allowed
+    if leader == "add" and remaining != ["add", "-A"]:
+        raise GitCommandError("git add only allows exactly 'add -A'")
+    # commit: strict flag validation for safe local commits
+    if leader == "commit":
+        _COMMIT_DANGEROUS_FLAGS = frozenset(
+            {
+                "--amend",
+                "--reset-author",
+                "--no-verify",
+                "--allow-empty",
+                "--signoff",
+                "-F",
+                "--file",
+                "-e",
+                "--edit",
+                "--reedit-message",
+                "--fixup",
+                "--squash",
+                "--gpg-sign",
+                "-S",
+                "--no-gpg-sign",
+            }
+        )
+        # Reject any dangerous flags anywhere in args (check first for clear errors)
+        for a in args:
+            if a in _COMMIT_DANGEROUS_FLAGS:
+                raise GitCommandError(f"'commit' flag {a!r} is forbidden")
+        commit_remaining = list(remaining[1:])
+        # Must have exactly -m <message> and nothing else
+        if not commit_remaining or commit_remaining[0] != "-m":
+            raise GitCommandError("'commit' requires exactly one -m flag")
+        if len(commit_remaining) != 2:
+            raise GitCommandError("'commit' -m must be followed by exactly one message string")
 
 
 def _redact(text: str) -> str:
