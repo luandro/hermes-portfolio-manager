@@ -144,7 +144,7 @@ def run_harness(
         except subprocess.TimeoutExpired:
             timed_out = True
             try:
-                os.killpg(proc.pid, signal.SIGKILL)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             except OSError:
                 proc.kill()
             stdout_bytes, stderr_bytes = proc.communicate()
@@ -253,7 +253,7 @@ def run_required_check(
         except subprocess.TimeoutExpired:
             timed_out = True
             try:
-                os.killpg(proc.pid, signal.SIGKILL)
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             except OSError:
                 proc.kill()
             stdout_bytes, stderr_bytes = proc.communicate()

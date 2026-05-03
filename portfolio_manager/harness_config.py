@@ -143,14 +143,14 @@ def _validate_harness_entry(raw: dict[str, Any], idx: int) -> HarnessConfig:
 
     # --- timeout_seconds ---
     raw_timeout = raw.get("timeout_seconds")
-    if not isinstance(raw_timeout, int) or raw_timeout <= 0:
+    if not isinstance(raw_timeout, int) or isinstance(raw_timeout, bool) or raw_timeout <= 0:
         errors.append(f"{prefix}: 'timeout_seconds' must be a positive integer")
     elif raw_timeout > MAX_TIMEOUT:
         errors.append(f"{prefix}: 'timeout_seconds' must be <= {MAX_TIMEOUT}, got {raw_timeout}")
 
     # --- max_files_changed ---
     raw_max_files = raw.get("max_files_changed")
-    if not isinstance(raw_max_files, int) or raw_max_files <= 0:
+    if not isinstance(raw_max_files, int) or isinstance(raw_max_files, bool) or raw_max_files <= 0:
         errors.append(f"{prefix}: 'max_files_changed' must be a positive integer")
 
     # --- required_checks ---
@@ -183,7 +183,7 @@ def _validate_harness_entry(raw: dict[str, Any], idx: int) -> HarnessConfig:
                 errors.append(str(exc))
 
             check_timeout = check_val.get("timeout_seconds")
-            if not isinstance(check_timeout, int) or check_timeout <= 0:
+            if not isinstance(check_timeout, int) or isinstance(check_timeout, bool) or check_timeout <= 0:
                 errors.append(f"{check_prefix}: 'timeout_seconds' must be a positive integer")
             elif check_timeout > MAX_TIMEOUT:
                 errors.append(f"{check_prefix}: 'timeout_seconds' must be <= {MAX_TIMEOUT}, got {check_timeout}")

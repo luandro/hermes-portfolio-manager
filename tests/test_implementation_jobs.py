@@ -719,6 +719,7 @@ class TestInitialImplRealRun:
                 f"implementation:issue:{project_id}:{issue_number}",
                 "already held",
             )
+            yield  # pragma: no cover
 
         with (
             patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=plan),

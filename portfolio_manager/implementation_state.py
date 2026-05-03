@@ -106,7 +106,7 @@ def update_job_status(conn: sqlite3.Connection, job_id: str, *, status: str, **f
     params.append(job_id)
 
     conn.execute(
-        f"UPDATE implementation_jobs SET {', '.join(sets)} WHERE job_id=?",  # nosec B608
+        f"UPDATE implementation_jobs SET {', '.join(sets)} WHERE job_id=?",  # nosec B608 — fields from _ALLOWED_UPDATE_FIELDS allowlist; values parameterized
         params,
     )
     conn.commit()
@@ -178,7 +178,7 @@ def list_jobs(
 
     where = " AND ".join(conditions) if conditions else "1=1"
     rows = conn.execute(
-        f"SELECT * FROM implementation_jobs WHERE {where} ORDER BY created_at DESC",  # nosec B608
+        f"SELECT * FROM implementation_jobs WHERE {where} ORDER BY created_at DESC",  # nosec B608 — WHERE clause built from fixed condition strings; values parameterized
         params,
     ).fetchall()
     return [_row_to_dict(conn, r) for r in rows]

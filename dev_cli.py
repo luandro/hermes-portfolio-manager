@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -319,7 +320,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.instructions is not None:
         import json as _json
 
-        handler_args["instructions"] = _json.loads(args.instructions)
+        try:
+            handler_args["instructions"] = _json.loads(args.instructions)
+        except (_json.JSONDecodeError, ValueError) as exc:
+            print(f"Error: --instructions is not valid JSON: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

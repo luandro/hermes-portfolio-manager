@@ -101,7 +101,8 @@ def build_initial_plan(
         blocked_reasons.append(f"Invalid harness_id: {exc}")
 
     # Look up harness config
-    if not any("harness_id" in r for r in blocked_reasons):
+    harness_id_valid = not any(r.startswith("Invalid harness_id:") for r in blocked_reasons)
+    if harness_id_valid:
         harness = get_harness(root, harness_id)
         if harness is None:
             blocked_reasons.append(f"Unknown harness_id: {harness_id!r}")
@@ -201,7 +202,8 @@ def build_review_fix_plan(
         blocked_reasons.append(f"Invalid harness_id: {exc}")
 
     # Look up harness config
-    if not any("harness_id" in r for r in blocked_reasons):
+    harness_id_valid = not any(r.startswith("Invalid harness_id:") for r in blocked_reasons)
+    if harness_id_valid:
         harness = get_harness(root, harness_id)
         if harness is None:
             blocked_reasons.append(f"Unknown harness_id: {harness_id!r}")

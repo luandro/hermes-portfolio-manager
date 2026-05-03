@@ -96,6 +96,8 @@ def resolve_source_artifact(
 
     def _verify(path: Path) -> Path | None:
         """Return *path* if it exists and is under issues root, else None."""
+        if not path.is_absolute():
+            path = root / path
         resolved = path.resolve()
         if not resolved.is_relative_to(issues_root):
             raise ValueError(f"Source artifact path escapes root: {resolved}")

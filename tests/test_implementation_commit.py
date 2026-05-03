@@ -67,7 +67,7 @@ class TestWorktreeGitAllowlist:
         """git add -A passes the allowlist check."""
         captured: dict = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -80,7 +80,7 @@ class TestWorktreeGitAllowlist:
         """git -c user.name=X -c user.email=Y commit -m msg passes validation."""
         captured: dict = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -96,7 +96,7 @@ class TestWorktreeGitAllowlist:
         """git rev-parse HEAD is allowlisted (pre-existing)."""
         captured: dict = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "abc123\n", "")
 
@@ -202,7 +202,7 @@ class TestCommitHelper:
         captured_calls: list[dict] = []
         original_run = subprocess.run
 
-        def tracking_run(*args, **kwargs):  # type: ignore[no-untyped-def]
+        def tracking_run(*args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured_calls.append({"args": args[0] if args else kwargs.get("args"), "kwargs": kwargs})
             return original_run(*args, **kwargs)
 
@@ -224,7 +224,7 @@ class TestCommitHelper:
         captured_cmds: list[list[str]] = []
         original_run = subprocess.run
 
-        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured_cmds.append(list(args))
             return original_run(args, **kwargs)
 
@@ -326,7 +326,7 @@ class TestCommitHelper:
         captured_cmds: list[list[str]] = []
         original_run = subprocess.run
 
-        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]
+        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
             captured_cmds.append(list(args))
             return original_run(args, **kwargs)
 

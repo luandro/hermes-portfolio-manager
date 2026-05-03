@@ -288,8 +288,12 @@ def test_atomic_replace_used_for_every_artifact_write(artifact_dir: Path) -> Non
     # We verify this by confirming issue_artifacts.write_text_atomic is called,
     # which internally uses os.replace. We patch it and verify the call count.
     with (
-        patch("portfolio_manager.issue_artifacts.write_text_atomic", wraps=ia._ia.write_text_atomic) as mock_wta,
-        patch("portfolio_manager.issue_artifacts.write_json_atomic", wraps=ia._ia.write_json_atomic) as mock_wja,
+        patch(
+            "portfolio_manager.implementation_artifacts._ia.write_text_atomic", wraps=ia._ia.write_text_atomic
+        ) as mock_wta,
+        patch(
+            "portfolio_manager.implementation_artifacts._ia.write_json_atomic", wraps=ia._ia.write_json_atomic
+        ) as mock_wja,
     ):
         ia.write_plan_md(artifact_dir, {"steps": []})
         ia.write_summary_md(artifact_dir, "done")

@@ -357,8 +357,8 @@ def _run_initial_impl_inner(
         )
         check_results.append(
             {
-                "id": check_id,
-                "returncode": cr.returncode,
+                "check_id": check_id,
+                "exit_code": cr.returncode,
                 "stdout": cr.stdout[:2000],
                 "stderr": cr.stderr[:2000],
                 "timed_out": cr.timed_out,
@@ -368,9 +368,9 @@ def _run_initial_impl_inner(
     write_checks_json(artifact_dir, check_results)
 
     # Check if any required check failed
-    failed_checks = [c for c in check_results if c["returncode"] != 0]
+    failed_checks = [c for c in check_results if c["exit_code"] != 0]
     if failed_checks:
-        reasons = [f"check {c['id']} failed (exit {c['returncode']})" for c in failed_checks]
+        reasons = [f"check {c['check_id']} failed (exit {c['exit_code']})" for c in failed_checks]
         _finish_blocked_impl(conn, job_id, artifact_dir, "; ".join(reasons))
         return _blocked_impl_result(job_id, "; ".join(reasons))
 
@@ -848,8 +848,8 @@ def _run_review_fix_inner(
         )
         check_results.append(
             {
-                "id": check_id,
-                "returncode": cr.returncode,
+                "check_id": check_id,
+                "exit_code": cr.returncode,
                 "stdout": cr.stdout[:2000],
                 "stderr": cr.stderr[:2000],
                 "timed_out": cr.timed_out,
@@ -859,9 +859,9 @@ def _run_review_fix_inner(
     write_checks_json(artifact_dir, check_results)
 
     # Check if any required check failed
-    failed_checks = [c for c in check_results if c["returncode"] != 0]
+    failed_checks = [c for c in check_results if c["exit_code"] != 0]
     if failed_checks:
-        reasons = [f"check {c['id']} failed (exit {c['returncode']})" for c in failed_checks]
+        reasons = [f"check {c['check_id']} failed (exit {c['exit_code']})" for c in failed_checks]
         _finish_blocked(conn, job_id, artifact_dir, "; ".join(reasons))
         return _blocked_result(job_id, "; ".join(reasons))
 

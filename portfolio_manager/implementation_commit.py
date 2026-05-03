@@ -36,6 +36,10 @@ def make_local_commit(
     Returns the SHA of the new commit, or ``None`` if the tree was clean
     (nothing to commit).
     """
+    # Sanitize to prevent config injection via embedded newlines
+    author_name = author_name.replace("\n", " ").replace("\r", " ")
+    author_email = author_email.replace("\n", "").replace("\r", "")
+
     # 1. Skip if clean
     state = get_clean_state(workspace)
     if state == "clean":

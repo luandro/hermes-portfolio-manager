@@ -57,6 +57,11 @@ def collect_changed_files(workspace: Path, *, root: Path) -> ChangedFiles:
             continue
         xy = line[:2]
         filepath = line[3:]
+        old_path_status: str | None = None
+        if " -> " in filepath:
+            old_part, new_part = filepath.split(" -> ", 1)
+            old_path_status = PurePosixPath(old_part).as_posix() if _is_safe_relative_path(old_part) else None
+            filepath = new_part
         if not _is_safe_relative_path(filepath):
             continue
         # Normalize to POSIX
@@ -64,7 +69,10 @@ def collect_changed_files(workspace: Path, *, root: Path) -> ChangedFiles:
         if posix_path in seen_paths:
             continue
         seen_paths.add(posix_path)
-        statuses.append({"path": posix_path, "status": xy})
+        entry: dict[str, str] = {"path": posix_path, "status": xy}
+        if old_path_status is not None:
+            entry["old_path"] = old_path_status
+        statuses.append(entry)
 
     # Collect renames from git diff
     diff_result = run_git(

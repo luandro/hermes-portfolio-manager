@@ -32,7 +32,7 @@ from portfolio_manager.worktree_git import (
 def test_run_git_uses_argument_array(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["args"] = args
         captured["shell"] = kwargs.get("shell", False)
         return subprocess.CompletedProcess(args, 0, "git version 2.0\n", "")
@@ -46,7 +46,7 @@ def test_run_git_uses_argument_array(tmp_path: Path) -> None:
 def test_run_git_sets_GIT_TERMINAL_PROMPT_zero(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["env"] = kwargs.get("env")
         return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -58,7 +58,7 @@ def test_run_git_sets_GIT_TERMINAL_PROMPT_zero(tmp_path: Path) -> None:
 def test_run_git_applies_timeout_per_command(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["timeout"] = kwargs["timeout"]
         return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -83,7 +83,7 @@ def test_run_git_rejects_non_allowlisted_subcommand(tmp_path: Path) -> None:
 def test_run_git_redacts_credentials_in_stderr_capture(tmp_path: Path) -> None:
     leaked = "fatal: cannot access https://user:ghp_AAAA1111@github.com/o/r.git\n"
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         return subprocess.CompletedProcess(args, 128, "", leaked)
 
     with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):

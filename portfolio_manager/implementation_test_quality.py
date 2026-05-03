@@ -290,8 +290,11 @@ def check_test_quality(
 
     # 4. For review_fix with doc-only fix_scope: bypass test quality
     if job_type == "review_fix" and fix_scope is not None:
-        doc_only = all(f.endswith((".md", ".txt", ".rst")) or f.startswith("doc") for f in fix_scope if f.strip())
-        if doc_only and fix_scope:
+        stripped = [f.strip() for f in fix_scope if f.strip()]
+        doc_only = bool(stripped) and all(
+            f.endswith((".md", ".txt", ".rst")) or f.startswith("docs/") for f in stripped
+        )
+        if doc_only:
             return QualityCheckResult(
                 ok=True,
                 reasons=["doc_only_fix_scope_bypass"],
