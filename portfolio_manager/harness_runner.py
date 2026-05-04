@@ -42,9 +42,16 @@ def _build_safe_env(env_passthrough: list[str], extra_env: dict[str, str] | None
     """Build a minimal safe environment for the harness subprocess.
 
     Only forwards env vars listed in *env_passthrough* that exist in
-    ``os.environ``. Always sets ``GIT_TERMINAL_PROMPT=0``.
+    ``os.environ``. Always sets ``GIT_TERMINAL_PROMPT=0`` and forwards
+    essential OS vars (PATH, HOME, USER, LANG, LC_ALL, TMPDIR) so child
+    processes can find executables and function correctly.
     """
     env: dict[str, str] = {"GIT_TERMINAL_PROMPT": "0"}
+    # Always forward essential OS vars so child processes can find executables
+    for baseline in ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR"):
+        val = os.environ.get(baseline)
+        if val is not None:
+            env[baseline] = val
     for name in env_passthrough:
         val = os.environ.get(name)
         if val is not None:

@@ -444,8 +444,13 @@ def _run_initial_impl_inner(
             "blocked_reason": evidence.blocked_reason,
         },
     )
+    # NOTE(MVP): evidence.blocked_reason is recorded in artifacts but not yet
+    # used to block the job. Test-first blocking will be enforced in a later MVP.
 
     # --- Scope guard ---
+    # NOTE(MVP): spec_scope and protected_paths are empty — scope enforcement
+    # (spec-scoped changes + protected-path blocking) is deferred to a later MVP.
+    # Only max_files_changed is enforced here.
     scope_check = check_scope(
         changed_files=changed.files,
         spec_scope=[],
@@ -972,6 +977,8 @@ def _run_review_fix_inner(
         return _blocked_result(job_id, "; ".join(reasons))
 
     # --- Scope guard: use fix_scope instead of full spec scope ---
+    # NOTE(MVP): protected_paths is empty — protected-path blocking is deferred
+    # to a later MVP. Only max_files_changed and fix_scope are enforced here.
     scope_check = check_scope(
         changed_files=changed.files,
         spec_scope=[],  # review_fix uses fix_scope, not spec scope

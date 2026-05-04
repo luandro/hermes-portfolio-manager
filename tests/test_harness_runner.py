@@ -94,9 +94,11 @@ def test_runner_only_passes_env_in_env_passthrough_list() -> None:
 
 def test_runner_strips_HOME_PATH_to_minimal_safe_set() -> None:
     env = _build_safe_env([])
-    # Should NOT contain HOME or PATH unless explicitly in passthrough
-    assert "HOME" not in env
-    assert "PATH" not in env
+    # Essential OS vars (PATH, HOME, etc.) are always forwarded for child processes
+    assert "PATH" in env
+    assert "HOME" in env
+    # Arbitrary env vars should NOT be present unless explicitly in passthrough
+    assert "RANDOM_UNSET_VAR" not in env
 
 
 # ---------------------------------------------------------------------------
