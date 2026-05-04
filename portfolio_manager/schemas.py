@@ -1241,6 +1241,7 @@ PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA = {
             },
             "harness_id": {"type": "string"},
             "expected_branch": {"type": "string"},
+            "base_sha": {"type": "string"},
             "confirm": {"type": "boolean", "default": False},
             "root": {"type": "string"},
         },

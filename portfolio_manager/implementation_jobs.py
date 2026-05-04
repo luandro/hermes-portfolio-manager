@@ -635,6 +635,7 @@ def run_review_fix(
     fix_scope: list[str],
     harness_id: str,
     expected_branch: str | None = None,
+    base_sha: str | None = None,
     confirm: bool = False,
 ) -> dict[str, Any]:
     """Run a review-fix job for approved review comments.
@@ -742,6 +743,7 @@ def run_review_fix(
                 review_iteration=review_iteration,
                 approved_comment_ids=approved_comment_ids,
                 fix_scope=fix_scope,
+                expected_base_sha=base_sha,
             )
     except ImplementationLockBusy as exc:
         return {
@@ -783,6 +785,7 @@ def _run_review_fix_inner(
     review_iteration: int,
     approved_comment_ids: list[str],
     fix_scope: list[str],
+    expected_base_sha: str | None,
 ) -> dict[str, Any]:
     """Inner execution of a review-fix job, already holding the lock."""
     import sqlite3
@@ -839,6 +842,13 @@ def _run_review_fix_inner(
     if source_artifact is None:
         _finish_blocked(conn, job_id, artifact_dir, "No source artifact resolved")
         return _blocked_result(job_id, "No source artifact resolved")
+
+    if expected_base_sha is not None:
+        current_head = _current_head_sha(workspace)
+        if current_head != expected_base_sha:
+            reason = f"base_sha mismatch: expected {expected_base_sha}, got {current_head or 'unknown'}"
+            _finish_blocked(conn, job_id, artifact_dir, reason)
+            return _blocked_result(job_id, reason)
 
     harness_workspace = _resolve_harness_workspace(workspace, root, harness.workspace_subpath)
     input_request_path = artifact_dir / "input-request.json"

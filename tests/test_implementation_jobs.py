@@ -932,6 +932,28 @@ class TestReviewFixRealRun:
 
         conn.close()
 
+    def test_review_fix_blocks_when_expected_base_sha_mismatches_head(self, tmp_path: Path):
+        """Caller-provided base_sha must match current review-fix worktree HEAD before harness execution."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        spec_path = root / "artifacts" / "issues" / "test-proj" / "42" / "spec.md"
+        plan = _make_plan(workspace_path=workspace, source_artifact_path=spec_path)
+        harness = _make_harness()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch("portfolio_manager.implementation_jobs.run_harness") as mock_harness,
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            kwargs["base_sha"] = "not-the-current-head"
+            result = run_review_fix(conn, root, **kwargs)
+
+        assert result["status"] == "blocked"
+        assert "base_sha mismatch" in result["reason"]
+        mock_harness.assert_not_called()
+        conn.close()
+
 
 class TestReviewFixArtifacts:
     def test_review_fix_writes_artifacts_linking_review_stage_and_comment_ids(self, tmp_path: Path):

@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from portfolio_manager.config import resolve_root
+from portfolio_manager.errors import redact_secrets
 
 if TYPE_CHECKING:
     import sqlite3
@@ -39,7 +40,7 @@ def _result(
     summary: str | None = None,
     reason: str | None = None,
 ) -> str:
-    return json.dumps(
+    return _json_result(
         {
             "status": status,
             "tool": tool,
@@ -49,6 +50,20 @@ def _result(
             "reason": reason,
         }
     )
+
+
+def _json_result(result: dict[str, Any]) -> str:
+    return json.dumps(_redact_value(result), ensure_ascii=False)
+
+
+def _redact_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact_secrets(value)
+    if isinstance(value, list):
+        return [_redact_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _redact_value(item) for key, item in value.items()}
+    return value
 
 
 @contextlib.contextmanager
@@ -328,7 +343,7 @@ def _handle_portfolio_implementation_start(args: dict[str, Any]) -> str:
                 instructions=args.get("instructions"),
                 confirm=bool(args.get("confirm", False)),
             )
-            return json.dumps(result)
+            return _json_result(result)
     except ImplementationLockBusy as exc:
         return _result(
             "blocked",
@@ -361,9 +376,10 @@ def _handle_portfolio_implementation_apply_review_fixes(args: dict[str, Any]) ->
                 fix_scope=args["fix_scope"],
                 harness_id=args["harness_id"],
                 expected_branch=args.get("expected_branch"),
+                base_sha=args.get("base_sha"),
                 confirm=bool(args.get("confirm", False)),
             )
-            return json.dumps(result)
+            return _json_result(result)
     except ImplementationLockBusy as exc:
         return _result(
             "blocked",

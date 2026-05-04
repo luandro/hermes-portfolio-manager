@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 import textwrap
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -20,9 +20,6 @@ from portfolio_manager.harness_runner import (
     run_harness,
     run_required_check,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _make_harness(**overrides) -> HarnessConfig:
@@ -149,7 +146,7 @@ def test_runner_sets_cwd_to_workspace_path(tmp_path: Path) -> None:
         artifact_dir=artifact_dir,
         input_request_path=input_path,
     )
-    assert result.stdout.strip() == str(workspace)
+    assert Path(result.stdout.strip()).resolve() == workspace.resolve()
 
 
 def test_runner_workspace_path_must_be_under_worktrees_root(tmp_path: Path) -> None:

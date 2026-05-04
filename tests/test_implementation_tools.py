@@ -367,6 +367,24 @@ class TestExplainTool:
         assert "needs_user" in result["message"]
         assert "Which API version?" in result["message"]
 
+    def test_explain_tool_redacts_persisted_failure_reason(self, tmp_root: Path) -> None:
+        from portfolio_manager.implementation_tools import _handle_portfolio_implementation_explain
+
+        conn = _open_conn(tmp_root)
+        _insert_job(conn, job_id="job-secret", status="blocked", failure_reason="token=abc123secret")
+        conn.close()
+
+        result_str = _handle_portfolio_implementation_explain(
+            {
+                "project_ref": "test-proj",
+                "issue_number": 42,
+                "root": str(tmp_root),
+            }
+        )
+        result = _parse(result_str)
+        assert "abc123secret" not in result_str
+        assert result["message"] == "Job job-secret is in state 'blocked'. Reason: token=***"
+
     def test_explain_tool_returns_blocked_for_unknown_project(self, tmp_root: Path) -> None:
         from portfolio_manager.implementation_tools import _handle_portfolio_implementation_explain
 
@@ -452,6 +470,32 @@ class TestStartHandler:
         assert result["status"] == "blocked"
         assert "lock" in result["reason"].lower() or "busy" in result["reason"].lower()
 
+    @patch("portfolio_manager.implementation_tools.run_initial_implementation")
+    def test_start_handler_redacts_result_json(self, mock_run: MagicMock, tmp_root: Path) -> None:
+        from portfolio_manager.implementation_tools import _handle_portfolio_implementation_start
+
+        mock_run.return_value = {
+            "status": "needs_user",
+            "tool": "portfolio_implementation_start",
+            "message": "Need token ghp_AAAA1111BBBB",
+            "data": {"needs_user": {"question": "Use ghp_AAAA1111BBBB?"}},
+            "summary": "Need token ghp_AAAA1111BBBB",
+            "reason": None,
+        }
+
+        result_str = _handle_portfolio_implementation_start(
+            {
+                "project_ref": "test-proj",
+                "issue_number": 42,
+                "harness_id": "test-harness",
+                "confirm": True,
+                "root": str(tmp_root),
+            }
+        )
+        result = _parse(result_str)
+        assert "ghp_AAAA1111BBBB" not in result_str
+        assert result["data"]["needs_user"]["question"] == "Use ghp_***?"
+
 
 # ---------------------------------------------------------------------------
 # Apply review fixes handler tests
@@ -512,6 +556,41 @@ class TestApplyReviewFixesHandler:
         result = _parse(result_str)
         assert result["status"] == "success"
         mock_run.assert_called_once()
+
+    @patch("portfolio_manager.implementation_tools.run_review_fix")
+    def test_apply_review_fixes_handler_passes_base_sha_and_redacts_result(
+        self, mock_run: MagicMock, tmp_root: Path
+    ) -> None:
+        from portfolio_manager.implementation_tools import _handle_portfolio_implementation_apply_review_fixes
+
+        mock_run.return_value = {
+            "status": "failed",
+            "tool": "portfolio_implementation_apply_review_fixes",
+            "message": "failed with ghp_AAAA1111BBBB",
+            "data": {},
+            "summary": "failed with ghp_AAAA1111BBBB",
+            "reason": "ghp_AAAA1111BBBB",
+        }
+
+        result_str = _handle_portfolio_implementation_apply_review_fixes(
+            {
+                "project_ref": "test-proj",
+                "issue_number": 42,
+                "pr_number": 7,
+                "review_stage_id": "rs-1",
+                "review_iteration": 1,
+                "approved_comment_ids": ["c1"],
+                "fix_scope": ["src/"],
+                "harness_id": "test-harness",
+                "base_sha": "abc123",
+                "confirm": True,
+                "root": str(tmp_root),
+            }
+        )
+        result = _parse(result_str)
+        assert "ghp_AAAA1111BBBB" not in result_str
+        assert result["reason"] == "ghp_***"
+        assert mock_run.call_args.kwargs["base_sha"] == "abc123"
 
 
 # ---------------------------------------------------------------------------
