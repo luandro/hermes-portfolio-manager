@@ -282,6 +282,38 @@ def _run_initial_impl_inner(
         extra_env={"PORTFOLIO_IMPLEMENTATION_JOB_ID": job_id},
     )
 
+    # Gate: non-zero exit or timeout always means failure
+    if harness_result.timed_out or harness_result.returncode != 0:
+        write_error_json(
+            artifact_dir,
+            {
+                "error": "harness failed",
+                "returncode": harness_result.returncode,
+                "timed_out": harness_result.timed_out,
+                "stderr": harness_result.stderr[:2000],
+                "job_id": job_id,
+            },
+        )
+        finish_job(
+            conn,
+            job_id,
+            status="failed",
+            commit_sha=None,
+            artifact_path=str(artifact_dir),
+            failure_reason=(
+                "harness timed out" if harness_result.timed_out else f"harness exit code {harness_result.returncode}"
+            ),
+        )
+        return _shared_result(
+            "failed",
+            tool,
+            "Harness failed.",
+            data={"job_id": job_id, "returncode": harness_result.returncode},
+            reason=(
+                "harness timed out" if harness_result.timed_out else f"harness exit code {harness_result.returncode}"
+            ),
+        )
+
     # Check harness status — needs_user shortcut
     if harness_result.harness_status == "needs_user":
         needs_user_data = _read_needs_user_from_harness_result(artifact_dir)
@@ -348,7 +380,25 @@ def _run_initial_impl_inner(
     for check_id in plan.required_checks:
         check_config = harness.checks.get(check_id)
         if check_config is None:
-            continue
+            write_error_json(
+                artifact_dir,
+                {"error": f"required check {check_id!r} not found in harness config", "job_id": job_id},
+            )
+            finish_job(
+                conn,
+                job_id,
+                status="failed",
+                commit_sha=None,
+                artifact_path=str(artifact_dir),
+                failure_reason=f"required check {check_id!r} not configured",
+            )
+            return _shared_result(
+                "failed",
+                tool,
+                f"Required check {check_id!r} is not configured in harness.",
+                data={"job_id": job_id},
+                reason=f"missing required check: {check_id}",
+            )
         cr = run_required_check(
             check=check_config,
             workspace=workspace,
@@ -774,6 +824,43 @@ def _run_review_fix_inner(
         extra_env={"PORTFOLIO_IMPLEMENTATION_JOB_ID": job_id},
     )
 
+    # Gate: non-zero exit or timeout always means failure
+    if harness_result.timed_out or harness_result.returncode != 0:
+        write_error_json(
+            artifact_dir,
+            {
+                "error": "harness failed",
+                "returncode": harness_result.returncode,
+                "timed_out": harness_result.timed_out,
+                "stderr": harness_result.stderr[:2000],
+                "job_id": job_id,
+            },
+        )
+        finish_job(
+            conn,
+            job_id,
+            status="failed",
+            commit_sha=None,
+            artifact_path=str(artifact_dir),
+            failure_reason=(
+                "harness timed out" if harness_result.timed_out else f"harness exit code {harness_result.returncode}"
+            ),
+        )
+        return {
+            "status": "failed",
+            "tool": "portfolio_implementation_apply_review_fixes",
+            "message": "Harness failed.",
+            "data": {"job_id": job_id, "returncode": harness_result.returncode},
+            "summary": (
+                "harness timed out"
+                if harness_result.timed_out
+                else f"Review-fix harness failed (exit {harness_result.returncode})."
+            ),
+            "reason": (
+                "harness timed out" if harness_result.timed_out else f"harness exit code {harness_result.returncode}"
+            ),
+        }
+
     # Check harness status — needs_user shortcut
     if harness_result.harness_status == "needs_user":
         needs_user_data = _read_needs_user_from_harness_result(artifact_dir)
@@ -839,7 +926,26 @@ def _run_review_fix_inner(
     for check_id in plan.required_checks:
         check_config = harness.checks.get(check_id)
         if check_config is None:
-            continue
+            write_error_json(
+                artifact_dir,
+                {"error": f"required check {check_id!r} not found in harness config", "job_id": job_id},
+            )
+            finish_job(
+                conn,
+                job_id,
+                status="failed",
+                commit_sha=None,
+                artifact_path=str(artifact_dir),
+                failure_reason=f"required check {check_id!r} not configured",
+            )
+            return {
+                "status": "failed",
+                "tool": "portfolio_implementation_apply_review_fixes",
+                "message": f"Required check {check_id!r} is not configured in harness.",
+                "data": {"job_id": job_id},
+                "summary": f"Missing required check: {check_id}",
+                "reason": f"missing required check: {check_id}",
+            }
         cr = run_required_check(
             check=check_config,
             workspace=workspace,
@@ -1067,7 +1173,9 @@ def _read_needs_user_from_harness_result(artifact_dir: Path) -> dict[str, Any]:
     if result_path.is_file():
         try:
             data = json.loads(result_path.read_text(encoding="utf-8"))
-            return dict(data.get("needs_user", {}))
+            needs_user = data.get("needs_user", {})
+            if isinstance(needs_user, dict):
+                return dict(needs_user)
         except (json.JSONDecodeError, OSError):
             pass
     return {}

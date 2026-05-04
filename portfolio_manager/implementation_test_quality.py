@@ -126,7 +126,7 @@ class QualityCheckResult:
 
 # Heuristic patterns for non-trivial assertions
 _NON_TRIVIAL_ASSERT_RE = re.compile(
-    r"assert\s+.*(?:==|!=|<=|>=|<|>|in\s|not\s+in|is\s+not|is\sNone|isinstance|len\(|bool\()"
+    r"assert\s+.*(?:==|!=|<=|>=|<|>|in\s|not\s+in|is\s+not|is\s+None|isinstance|len\(|bool\()"
 )
 _PYTEST_RAISES_RE = re.compile(r"pytest\.raises\(")
 _ASSERT_NOT_RE = re.compile(r"assert\s+not\s+")

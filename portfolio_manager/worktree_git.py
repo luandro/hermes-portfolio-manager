@@ -105,7 +105,12 @@ def _check_git_args(args: list[str]) -> None:
     # branch: only read-only flags allowed
     if leader == "branch":
         _BRANCH_ALLOWED_FLAGS = {"--show-current", "--list", "-a", "-r", "--all", "--remotes"}
-        for a in remaining[1:]:
+        branch_args = remaining[1:]
+        if branch_args == ["--show-current"]:
+            return
+        if not branch_args or branch_args[0] not in {"--list", "-a", "-r", "--all", "--remotes"}:
+            raise GitCommandError("git branch only allows read-only show/list forms")
+        for a in branch_args:
             if a.startswith("-") and a not in _BRANCH_ALLOWED_FLAGS:
                 raise GitCommandError(f"git branch flag {a!r} not allowed")
     # remote: only get-url allowed

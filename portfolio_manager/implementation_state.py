@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     import sqlite3
 
 ALLOWED_STATUS = {"planned", "blocked", "running", "failed", "succeeded", "needs_user"}
+_TERMINAL_STATUS = {"succeeded", "failed", "needs_user", "blocked"}
 ALLOWED_JOB_TYPES = {"initial_implementation", "review_fix", "qa_fix"}
 
 _ALLOWED_UPDATE_FIELDS = frozenset(
@@ -126,8 +127,8 @@ def finish_job(
     Validates the transition is allowed before writing. Terminal states
     (succeeded, failed) cannot be overwritten.
     """
-    if status not in ALLOWED_STATUS:
-        raise ValueError(f"Invalid status: {status!r}")
+    if status not in _TERMINAL_STATUS:
+        raise ValueError(f"finish_job requires terminal status, got: {status!r}")
 
     row = conn.execute("SELECT status FROM implementation_jobs WHERE job_id=?", (job_id,)).fetchone()
     if row is None:

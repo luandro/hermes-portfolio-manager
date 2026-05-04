@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 from portfolio_manager.implementation_jobs import run_initial_implementation, run_review_fix
 from portfolio_manager.implementation_locks import ImplementationLockBusy
 from portfolio_manager.implementation_planner import build_initial_plan
-from portfolio_manager.implementation_state import list_jobs
+from portfolio_manager.implementation_state import get_job, list_jobs
 from portfolio_manager.state import init_state, open_state
 
 logger = logging.getLogger(__name__)
@@ -126,6 +126,25 @@ def _handle_portfolio_implementation_status(args: dict[str, Any]) -> str:
     try:
         root_arg = args.get("root")
         with _open_db(root_arg) as (root_path, conn):
+            # Direct job_id lookup path
+            job_id = args.get("job_id")
+            if isinstance(job_id, str) and job_id:
+                job = get_job(conn, job_id)
+                if job is None:
+                    return _result(
+                        "blocked",
+                        tool,
+                        f"Unknown job_id: {job_id}",
+                        reason="no job found",
+                    )
+                return _result(
+                    "success",
+                    tool,
+                    f"Job {job['job_id']} status: {job['status']}.",
+                    data={"job": job},
+                    summary=f"Job status: {job['status']}.",
+                )
+
             project_ref = args.get("project_ref")
             issue_number = args.get("issue_number")
 
@@ -133,8 +152,8 @@ def _handle_portfolio_implementation_status(args: dict[str, Any]) -> str:
                 return _result(
                     "blocked",
                     tool,
-                    "project_ref and issue_number are required.",
-                    reason="missing project_ref or issue_number",
+                    "job_id, or project_ref and issue_number are required.",
+                    reason="missing job_id or project_ref/issue_number",
                 )
 
             # Resolve project_ref to project_id via planner helper
@@ -180,13 +199,27 @@ def _handle_portfolio_implementation_list(args: dict[str, Any]) -> str:
         root_arg = args.get("root")
         with _open_db(root_arg) as (root_path, conn):
             project_ref = args.get("project_ref")
+            issue_number = args.get("issue_number")
+            status = args.get("status")
             project_id: str | None = None
             if project_ref:
                 from portfolio_manager.implementation_planner import _resolve_project_id
 
                 project_id = _resolve_project_id(conn, root_path, project_ref)
+                if project_id is None:
+                    return _result(
+                        "blocked",
+                        tool,
+                        f"Could not resolve project_ref: {project_ref!r}",
+                        reason=f"unknown project_ref: {project_ref!r}",
+                    )
 
-            jobs = list_jobs(conn, project_id=project_id)
+            jobs = list_jobs(
+                conn,
+                project_id=project_id,
+                issue_number=int(issue_number) if issue_number is not None else None,
+                status=status,
+            )
 
             return _result(
                 "success",

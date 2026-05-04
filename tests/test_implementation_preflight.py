@@ -54,8 +54,12 @@ def _make_db(root: Path) -> sqlite3.Connection:
     return conn
 
 
-def _make_bare_and_clone(tmp_path: Path) -> tuple[Path, Path]:
-    """Create a bare repo + clone, return (bare_path, clone_path)."""
+def _make_bare_and_clone(tmp_path: Path, clone_parent: Path | None = None) -> tuple[Path, Path]:
+    """Create a bare repo + clone, return (bare_path, clone_path).
+
+    If *clone_parent* is given the clone is placed there instead of
+    ``tmp_path / "worktrees"``.
+    """
     seed = tmp_path / "_seed"
     seed.mkdir()
     _git("init", "-b", "main", str(seed), cwd=tmp_path)
@@ -64,7 +68,8 @@ def _make_bare_and_clone(tmp_path: Path) -> tuple[Path, Path]:
     _git("commit", "-m", "initial", cwd=seed)
     bare = tmp_path / "origin.git"
     _git("clone", "--bare", str(seed), str(bare), cwd=tmp_path)
-    clone = tmp_path / "worktrees" / f"{PROJECT_ID}-issue-{ISSUE_NUMBER}"
+    parent = clone_parent or (tmp_path / "worktrees")
+    clone = parent / f"{PROJECT_ID}-issue-{ISSUE_NUMBER}"
     clone.parent.mkdir(parents=True, exist_ok=True)
     _git("clone", str(bare), str(clone), cwd=tmp_path)
     return bare, clone
@@ -86,7 +91,7 @@ def _setup_happy_path(tmp_path: Path) -> tuple[sqlite3.Connection, Path, Path]:
     (root / "artifacts").mkdir()
     (root / "worktrees").mkdir()
 
-    _bare, clone = _make_bare_and_clone(tmp_path)
+    _bare, clone = _make_bare_and_clone(tmp_path, clone_parent=root / "worktrees")
     spec = _write_spec(root)
 
     conn = _make_db(root)
@@ -175,13 +180,14 @@ def test_preflight_blocks_when_worktree_path_missing_on_disk(tmp_path: Path) -> 
     root = tmp_path / "agent-root"
     root.mkdir()
     (root / "artifacts").mkdir()
+    (root / "worktrees").mkdir()
 
     conn = _make_db(root)
     upsert_issue_worktree(
         conn,
         project_id=PROJECT_ID,
         issue_number=ISSUE_NUMBER,
-        path="/nonexistent/path/worktree",
+        path=str(root / "worktrees" / "nonexistent-worktree"),
         state="clean",
         branch_name="main",
     )

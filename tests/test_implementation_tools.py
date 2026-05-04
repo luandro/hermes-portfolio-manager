@@ -184,9 +184,9 @@ class TestSchemas:
         props = PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA["parameters"]["properties"]
         assert "project_ref" in props
         assert "issue_number" in props
+        assert "job_id" in props
         required = PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA["parameters"]["required"]
-        assert "project_ref" in required
-        assert "issue_number" in required
+        assert required == []  # job_id can substitute for project_ref+issue_number
 
     def test_list_schema_accepts_optional_project_issue_status_filters(self) -> None:
         from portfolio_manager.schemas import PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA

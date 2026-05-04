@@ -153,20 +153,20 @@ def run_harness(
             raw_stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
     except Exception as exc:
         duration = time.monotonic() - start
+        message = _redact_output(str(exc))
         return HarnessResult(
             returncode=-1,
             duration_seconds=duration,
             stdout="",
-            stderr=str(exc),
+            stderr=message,
             truncated=False,
             timed_out=False,
             harness_status="failed",
-            harness_message=str(exc),
+            harness_message=message,
         )
 
     duration = time.monotonic() - start
 
-    # Truncate
     if len(raw_stdout) > _MAX_CAPTURE:
         raw_stdout = raw_stdout[:_MAX_CAPTURE]
         truncated = True
@@ -262,15 +262,16 @@ def run_required_check(
             raw_stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
     except Exception as exc:
         duration = time.monotonic() - start
+        message = _redact_output(str(exc))
         return HarnessResult(
             returncode=-1,
             duration_seconds=duration,
             stdout="",
-            stderr=str(exc),
+            stderr=message,
             truncated=False,
             timed_out=False,
             harness_status="failed",
-            harness_message=str(exc),
+            harness_message=message,
         )
 
     duration = time.monotonic() - start

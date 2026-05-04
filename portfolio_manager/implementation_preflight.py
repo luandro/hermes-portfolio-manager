@@ -80,6 +80,14 @@ def preflight_initial_implementation(
 
     wt_path = Path(wt_path_str)
 
+    # 1b. Worktree path must be contained under $ROOT/worktrees
+    worktrees_root = (root / "worktrees").resolve()
+    resolved_wt_path = wt_path.resolve()
+    if not resolved_wt_path.is_relative_to(worktrees_root):
+        reasons.append(f"Worktree path escapes managed root: {resolved_wt_path} (root={worktrees_root})")
+        return PreflightResult(ok=False, reasons=reasons, worktree_path=resolved_wt_path)
+    wt_path = resolved_wt_path
+
     # 2. Worktree path exists on disk
     if not wt_path.is_dir():
         reasons.append(f"Worktree path {wt_path} does not exist on disk")

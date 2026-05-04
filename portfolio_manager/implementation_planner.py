@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import sqlite3
 
-from portfolio_manager.config import load_projects_config
+from portfolio_manager.config import ConfigError, load_projects_config
 from portfolio_manager.harness_config import get_harness
 from portfolio_manager.implementation_paths import (
     resolve_source_artifact,
@@ -55,7 +55,7 @@ def _resolve_project_id(conn: object, root: Path, project_ref: str) -> str | Non
     """
     try:
         config = load_projects_config(root)
-    except Exception:
+    except ConfigError:
         return None
 
     result = resolve_project(config, project_ref=project_ref)

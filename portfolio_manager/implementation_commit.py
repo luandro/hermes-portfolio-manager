@@ -45,6 +45,8 @@ def make_local_commit(
     if state == "clean":
         logger.info("workspace clean, skipping: job=%s issue=%s", job_id, issue_number)
         return None
+    if state not in {"dirty_uncommitted", "dirty_untracked"}:
+        raise GitCommandError(f"cannot create local commit from worktree state: {state}")
 
     # 2. Stage everything
     run_git(["add", "-A"], cwd=workspace, timeout=DEFAULT_TIMEOUTS["add"])

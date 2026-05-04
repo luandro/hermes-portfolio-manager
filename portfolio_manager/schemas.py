@@ -1240,6 +1240,7 @@ PORTFOLIO_IMPLEMENTATION_APPLY_REVIEW_FIXES_SCHEMA = {
                 "description": "File patterns that may be modified",
             },
             "harness_id": {"type": "string"},
+            "expected_branch": {"type": "string"},
             "confirm": {"type": "boolean", "default": False},
             "root": {"type": "string"},
         },
@@ -1263,6 +1264,10 @@ PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
+            "job_id": {
+                "type": "string",
+                "description": "Direct job ID lookup (bypasses project_ref/issue_number).",
+            },
             "project_ref": {
                 "type": "string",
                 "description": "Project reference (id, owner/repo, name, or URL).",
@@ -1276,7 +1281,7 @@ PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA = {
                 "description": "Optional agent system root override.",
             },
         },
-        "required": ["project_ref", "issue_number"],
+        "required": [],
     },
 }
 
@@ -1289,6 +1294,14 @@ PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA = {
             "project_ref": {
                 "type": "string",
                 "description": "Optional project reference to filter.",
+            },
+            "issue_number": {
+                "type": "integer",
+                "description": "Optional issue number to filter.",
+            },
+            "status": {
+                "type": "string",
+                "description": "Optional job status to filter.",
             },
             "root": {
                 "type": "string",

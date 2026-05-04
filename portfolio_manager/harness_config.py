@@ -252,7 +252,10 @@ def load_harness_config(root: Path) -> dict[str, HarnessConfig]:
         return {}
 
     try:
-        raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        text = config_path.read_text(encoding="utf-8")
+        raw = yaml.safe_load(text)
+    except OSError as exc:
+        raise ConfigError(f"Failed to read harnesses.yaml: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ConfigError(f"Failed to parse harnesses.yaml: {exc}") from exc
 
