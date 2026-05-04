@@ -12,15 +12,7 @@ ALLOWED_STATUS = {"planned", "blocked", "running", "failed", "succeeded", "needs
 _TERMINAL_STATUS = {"succeeded", "failed", "needs_user", "blocked"}
 ALLOWED_JOB_TYPES = {"initial_implementation", "review_fix", "qa_fix"}
 
-_ALLOWED_UPDATE_FIELDS = frozenset(
-    {
-        "started_at",
-        "worktree_id",
-        "pr_number",
-        "review_stage_id",
-        "source_artifact_path",
-    }
-)
+_ALLOWED_UPDATE_FIELDS = ("started_at", "worktree_id", "pr_number", "review_stage_id", "source_artifact_path")
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "planned": {"running", "blocked", "failed", "needs_user"},
@@ -88,7 +80,12 @@ def update_job_status(conn: sqlite3.Connection, job_id: str, *, status: str, **f
     if status not in ALLOWED_STATUS:
         raise ValueError(f"Invalid status: {status!r}")
 
-    row = conn.execute("SELECT status FROM implementation_jobs WHERE job_id=?", (job_id,)).fetchone()
+    row = conn.execute(
+        """SELECT status, started_at, worktree_id, pr_number, review_stage_id, source_artifact_path
+           FROM implementation_jobs
+           WHERE job_id=?""",
+        (job_id,),
+    ).fetchone()
     if row is None:
         raise ValueError(f"No job found: {job_id!r}")
 
@@ -97,20 +94,41 @@ def update_job_status(conn: sqlite3.Connection, job_id: str, *, status: str, **f
         raise ValueError(f"Invalid transition: {current!r} -> {status!r}")
 
     now = _utcnow()
-    sets = ["status=?", "updated_at=?"]
-    params: list[Any] = [status, now]
-    if current in {"blocked", "needs_user"} and status == "planned":
-        sets.extend(["finished_at=NULL", "commit_sha=NULL", "artifact_path=NULL", "failure_reason=NULL"])
+    update_values = dict(zip(_ALLOWED_UPDATE_FIELDS, row[1:], strict=True))
     for key, value in fields.items():
-        if key not in _ALLOWED_UPDATE_FIELDS:
+        if key not in update_values:
             raise ValueError(f"Unknown update field: {key!r}")
-        sets.append(f"{key}=?")
-        params.append(value)
-    params.append(job_id)
+        update_values[key] = value
 
+    clear_completion = current in {"blocked", "needs_user"} and status == "planned"
     conn.execute(
-        f"UPDATE implementation_jobs SET {', '.join(sets)} WHERE job_id=?",  # nosec B608 — fields from _ALLOWED_UPDATE_FIELDS allowlist; values parameterized
-        params,
+        """UPDATE implementation_jobs
+           SET status=?,
+               updated_at=?,
+               finished_at=CASE WHEN ? THEN NULL ELSE finished_at END,
+               commit_sha=CASE WHEN ? THEN NULL ELSE commit_sha END,
+               artifact_path=CASE WHEN ? THEN NULL ELSE artifact_path END,
+               failure_reason=CASE WHEN ? THEN NULL ELSE failure_reason END,
+               started_at=?,
+               worktree_id=?,
+               pr_number=?,
+               review_stage_id=?,
+               source_artifact_path=?
+           WHERE job_id=?""",
+        (
+            status,
+            now,
+            clear_completion,
+            clear_completion,
+            clear_completion,
+            clear_completion,
+            update_values["started_at"],
+            update_values["worktree_id"],
+            update_values["pr_number"],
+            update_values["review_stage_id"],
+            update_values["source_artifact_path"],
+            job_id,
+        ),
     )
     conn.commit()
 
@@ -121,14 +139,14 @@ def finish_job(
     *,
     status: str,
     commit_sha: str | None,
-    artifact_path: str,
+    artifact_path: str | None,
     failure_reason: str | None,
 ) -> None:
     """Set status, finished_at, commit_sha, artifact_path, failure_reason.
 
     Validates the transition is allowed before writing. Allowed finish statuses
     are succeeded, failed, needs_user, and blocked; succeeded and failed cannot
-    be overwritten.
+    be overwritten. artifact_path may be None for terminal jobs without artifacts.
     """
     if status not in _TERMINAL_STATUS:
         raise ValueError(f"finish_job requires terminal status, got: {status!r}")
@@ -169,22 +187,13 @@ def list_jobs(
     status: str | None = None,
 ) -> list[dict[str, Any]]:
     """Filter jobs by optional criteria."""
-    conditions: list[str] = []
-    params: list[Any] = []
-    if project_id is not None:
-        conditions.append("project_id=?")
-        params.append(project_id)
-    if issue_number is not None:
-        conditions.append("issue_number=?")
-        params.append(issue_number)
-    if status is not None:
-        conditions.append("status=?")
-        params.append(status)
-
-    where = " AND ".join(conditions) if conditions else "1=1"
     cur = conn.execute(
-        f"SELECT * FROM implementation_jobs WHERE {where} ORDER BY created_at DESC",  # nosec B608 — WHERE clause built from fixed condition strings; values parameterized
-        params,
+        """SELECT * FROM implementation_jobs
+           WHERE (? IS NULL OR project_id=?)
+             AND (? IS NULL OR issue_number=?)
+             AND (? IS NULL OR status=?)
+           ORDER BY created_at DESC""",
+        (project_id, project_id, issue_number, issue_number, status, status),
     )
     rows = cur.fetchall()
     return [_row_to_dict(cur, r) for r in rows]

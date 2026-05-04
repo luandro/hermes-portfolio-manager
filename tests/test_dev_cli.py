@@ -7,6 +7,8 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -634,3 +636,50 @@ def test_cli_implementation_list_returns_empty_array_for_empty_root(tmp_path: Pa
     assert parsed["status"] == "success", parsed
     assert parsed["data"]["jobs"] == []
     assert parsed["data"]["count"] == 0
+
+
+def test_cli_implementation_start_rejects_invalid_instructions_json(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-start",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "test-harness",
+        "--instructions",
+        "{not-json",
+        "--root",
+        str(root),
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "--instructions" in result.stderr
+    assert "valid JSON" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("instructions", ["[]", '"task"', "null"])
+def test_cli_implementation_start_rejects_non_object_instructions_json(tmp_path: Path, instructions: str) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-start",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "test-harness",
+        "--instructions",
+        instructions,
+        "--root",
+        str(root),
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "--instructions" in result.stderr
+    assert "JSON object" in result.stderr
+    assert "Traceback" not in result.stderr

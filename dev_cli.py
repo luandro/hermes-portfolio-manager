@@ -325,6 +325,9 @@ def main(argv: list[str] | None = None) -> None:
         except (_json.JSONDecodeError, ValueError) as exc:
             print(f"Error: --instructions is not valid JSON: {exc}", file=sys.stderr)
             sys.exit(1)
+        if not isinstance(handler_args["instructions"], dict):
+            print("Error: --instructions must be a JSON object", file=sys.stderr)
+            sys.exit(1)
 
     handler = TOOL_HANDLERS[args.tool]
     result = handler(handler_args)

@@ -56,8 +56,8 @@ def _open_db(root: Any) -> Iterator[tuple[Path, sqlite3.Connection]]:
     """Resolve root, open + init state DB, yield (root_path, conn), close on exit."""
     root_path = resolve_root(root if isinstance(root, str) else None)
     conn = open_state(root_path)
-    init_state(conn)
     try:
+        init_state(conn)
         yield root_path, conn
     finally:
         conn.close()

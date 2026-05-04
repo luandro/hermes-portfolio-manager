@@ -67,7 +67,7 @@ def test_runner_uses_argument_array() -> None:
 
 def test_runner_rejects_string_command() -> None:
     with pytest.raises(ValueError, match="must be a list"):
-        _validate_command("echo hello")  # type: ignore[arg-type]
+        _validate_command("echo hello")  # type: ignore[arg-type]  # intentional bad type for validation
 
 
 def test_runner_rejects_command_path_with_shell_metachar() -> None:

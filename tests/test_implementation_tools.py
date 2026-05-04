@@ -210,6 +210,28 @@ class TestSchemas:
 
 
 class TestStatusTool:
+    def test_status_tool_closes_db_when_init_state_fails(self, tmp_root: Path) -> None:
+        from portfolio_manager.implementation_tools import _handle_portfolio_implementation_status
+
+        mock_conn = MagicMock()
+
+        with (
+            patch("portfolio_manager.implementation_tools.open_state", return_value=mock_conn),
+            patch("portfolio_manager.implementation_tools.init_state", side_effect=RuntimeError("init failed")),
+        ):
+            result_str = _handle_portfolio_implementation_status(
+                {
+                    "job_id": "job-known",
+                    "root": str(tmp_root),
+                }
+            )
+
+        result = _parse(result_str)
+        assert result["status"] == "failed"
+        assert result["tool"] == "portfolio_implementation_status"
+        assert result["reason"] == "init failed"
+        mock_conn.close.assert_called_once_with()
+
     def test_status_tool_returns_row_for_known_job(self, tmp_root: Path) -> None:
         from portfolio_manager.implementation_tools import _handle_portfolio_implementation_status
 

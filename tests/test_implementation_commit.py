@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypedDict, Unpack
 from unittest.mock import patch
 
 import pytest
@@ -20,6 +20,22 @@ from portfolio_manager.worktree_git import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+class _RunGitKwargs(TypedDict):
+    cwd: Path
+    capture_output: Literal[True]
+    text: Literal[True]
+    timeout: int
+    env: dict[str, str]
+    shell: Literal[False]
+    check: Literal[False]
+
+
+class _CapturedRun(TypedDict):
+    args: list[str]
+    kwargs: _RunGitKwargs
+
 
 # ---------------------------------------------------------------------------
 # Helpers — bare repo + clone for real-git tests
@@ -65,9 +81,9 @@ class TestWorktreeGitAllowlist:
 
     def test_worktree_git_allows_add_A_for_implementation_commit(self, tmp_path: Path) -> None:
         """git add -A passes the allowlist check."""
-        captured: dict = {}
+        captured: dict[str, list[str]] = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        def fake_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -78,9 +94,9 @@ class TestWorktreeGitAllowlist:
 
     def test_worktree_git_allows_commit_with_per_command_user_config_and_m_message(self, tmp_path: Path) -> None:
         """git -c user.name=X -c user.email=Y commit -m msg passes validation."""
-        captured: dict = {}
+        captured: dict[str, list[str]] = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        def fake_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -94,9 +110,9 @@ class TestWorktreeGitAllowlist:
 
     def test_worktree_git_allows_rev_parse_head(self, tmp_path: Path) -> None:
         """git rev-parse HEAD is allowlisted (pre-existing)."""
-        captured: dict = {}
+        captured: dict[str, list[str]] = {}
 
-        def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        def fake_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
             captured["args"] = args
             return subprocess.CompletedProcess(args, 0, "abc123\n", "")
 
@@ -199,12 +215,12 @@ class TestCommitHelper:
     def test_commit_uses_argument_array_no_shell(self, commit_repo: Path) -> None:
         """All subprocess calls use argument arrays, never shell."""
         (commit_repo / "file.txt").write_text("x", encoding="utf-8")
-        captured_calls: list[dict] = []
+        captured_calls: list[_CapturedRun] = []
         original_run = subprocess.run
 
-        def tracking_run(*args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
-            captured_calls.append({"args": args[0] if args else kwargs.get("args"), "kwargs": kwargs})
-            return original_run(*args, **kwargs)
+        def tracking_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
+            captured_calls.append({"args": args, "kwargs": kwargs})
+            return original_run(args, **kwargs)
 
         with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=tracking_run):
             make_local_commit(
@@ -224,7 +240,7 @@ class TestCommitHelper:
         captured_cmds: list[list[str]] = []
         original_run = subprocess.run
 
-        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        def tracking_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
             captured_cmds.append(list(args))
             return original_run(args, **kwargs)
 
@@ -326,7 +342,7 @@ class TestCommitHelper:
         captured_cmds: list[list[str]] = []
         original_run = subprocess.run
 
-        def tracking_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        def tracking_run(args: list[str], **kwargs: Unpack[_RunGitKwargs]) -> subprocess.CompletedProcess[str]:
             captured_cmds.append(list(args))
             return original_run(args, **kwargs)
 

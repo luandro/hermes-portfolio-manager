@@ -231,6 +231,18 @@ class TestUpdateJobStatus:
         assert row["source_artifact_path"] == "/source/input.md"
         conn.close()
 
+    def test_update_job_status_rejects_unknown_update_field(self, tmp_path: Path):
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+        insert_job(conn, _make_job())
+
+        with pytest.raises(ValueError, match="Unknown update field"):
+            update_job_status(conn, "job-1", status="running", **{"started_at=?, status": "failed"})
+
+        row = get_job(conn, "job-1")
+        assert row["status"] == "planned"
+        conn.close()
+
 
 class TestFinishJob:
     def test_finish_job_sets_finished_at_and_commit_sha(self, tmp_path: Path):
@@ -252,6 +264,30 @@ class TestFinishJob:
         assert row["commit_sha"] == "abc123"
         assert row["artifact_path"] == "/artifacts/job-1.tar.gz"
         assert row["failure_reason"] is None
+        conn.close()
+
+    @pytest.mark.parametrize("status", ["failed", "blocked", "needs_user"])
+    def test_finish_job_allows_null_artifact_path_for_terminal_non_success(self, tmp_path: Path, status: str):
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+        insert_job(conn, _make_job())
+        update_job_status(conn, "job-1", status="running")
+
+        finish_job(
+            conn,
+            "job-1",
+            status=status,
+            commit_sha=None,
+            artifact_path=None,
+            failure_reason="no artifact produced",
+        )
+
+        row = get_job(conn, "job-1")
+        assert row["status"] == status
+        assert row["finished_at"] is not None
+        assert row["commit_sha"] is None
+        assert row["artifact_path"] is None
+        assert row["failure_reason"] == "no artifact produced"
         conn.close()
 
 
@@ -291,6 +327,17 @@ class TestListJobs:
         rows = list_jobs(conn, project_id="p1", issue_number=10)
         assert len(rows) == 2
         assert {r["job_id"] for r in rows} == {"j1", "j3"}
+        conn.close()
+
+    def test_list_jobs_treats_filter_values_as_parameters(self, tmp_path: Path):
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project("p1"))
+        insert_job(conn, _make_job("j1", project_id="p1", status="planned"))
+
+        rows = list_jobs(conn, project_id="p1", status="planned' OR 1=1 --")
+
+        assert rows == []
+        assert get_job(conn, "j1") is not None
         conn.close()
 
 
