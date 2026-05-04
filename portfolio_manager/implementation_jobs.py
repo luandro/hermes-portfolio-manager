@@ -1173,6 +1173,8 @@ def _read_needs_user_from_harness_result(artifact_dir: Path) -> dict[str, Any]:
     if result_path.is_file():
         try:
             data = json.loads(result_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return {}
             needs_user = data.get("needs_user", {})
             if isinstance(needs_user, dict):
                 return dict(needs_user)

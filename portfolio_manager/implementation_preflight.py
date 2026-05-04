@@ -82,7 +82,11 @@ def preflight_initial_implementation(
 
     # 1b. Worktree path must be contained under $ROOT/worktrees
     worktrees_root = (root / "worktrees").resolve()
-    resolved_wt_path = wt_path.resolve()
+    try:
+        resolved_wt_path = wt_path.resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        reasons.append(f"Unable to resolve worktree path {wt_path}: {exc}")
+        return PreflightResult(ok=False, reasons=reasons, worktree_path=wt_path)
     if not resolved_wt_path.is_relative_to(worktrees_root):
         reasons.append(f"Worktree path escapes managed root: {resolved_wt_path} (root={worktrees_root})")
         return PreflightResult(ok=False, reasons=reasons, worktree_path=resolved_wt_path)
