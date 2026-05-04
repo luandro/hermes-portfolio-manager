@@ -219,19 +219,21 @@ def test_artifact_dir_created_with_0o700_permissions(artifact_dir: Path) -> None
 
 def test_secrets_redacted_in_every_artifact(artifact_dir: Path) -> None:
     """Every artifact must redact known secret patterns."""
+    fake_ghp_token = "ghp_" + "abc123secret"
+    fake_sk_token = "sk-" + "testkey123secret"
     secret_payloads = {
-        "write_plan_md": {"steps": ["use token ghp_abc123secret"]},
-        "write_preflight_json": {"ok": True, "token": "ghp_abc123secret"},
-        "write_commands_json": [{"command": ["echo", "ghp_abc123secret"]}],
-        "write_input_request_json": {"env": "Bearer ghp_abc123secret"},
-        "write_test_first_evidence_md": {"note": "sk-testkey123secret"},
-        "write_changed_files_json": [{"path": "ghp_abc123secret.py"}],
-        "write_checks_json": [{"output": "token=ghp_abc123secret"}],
+        "write_plan_md": {"steps": [f"use token {fake_ghp_token}"]},
+        "write_preflight_json": {"ok": True, "token": fake_ghp_token},
+        "write_commands_json": [{"command": ["echo", fake_ghp_token]}],
+        "write_input_request_json": {"env": f"Bearer {fake_ghp_token}"},
+        "write_test_first_evidence_md": {"note": fake_sk_token},
+        "write_changed_files_json": [{"path": f"{fake_ghp_token}.py"}],
+        "write_checks_json": [{"output": f"token={fake_ghp_token}"}],
         "write_scope_check_md": {"detail": "password=supersecret"},
-        "write_test_quality_md": {"log": "Bearer ghp_abc123secret"},
-        "write_commit_json": {"message": "ghp_abc123secret"},
-        "write_result_json": {"output": "ghp_abc123secret"},
-        "write_error_json": {"stderr": "ghp_abc123secret"},
+        "write_test_quality_md": {"log": f"Bearer {fake_ghp_token}"},
+        "write_commit_json": {"message": fake_ghp_token},
+        "write_result_json": {"output": fake_ghp_token},
+        "write_error_json": {"stderr": fake_ghp_token},
     }
 
     for writer_name, data in secret_payloads.items():
@@ -241,14 +243,14 @@ def test_secrets_redacted_in_every_artifact(artifact_dir: Path) -> None:
     # Check all JSON files for unredacted secrets
     for json_file in artifact_dir.glob("*.json"):
         content = json_file.read_text()
-        assert "ghp_abc123secret" not in content, f"Unredacted secret in {json_file.name}"
-        assert "sk-testkey123secret" not in content, f"Unredacted sk- secret in {json_file.name}"
+        assert fake_ghp_token not in content, f"Unredacted secret in {json_file.name}"
+        assert fake_sk_token not in content, f"Unredacted sk- secret in {json_file.name}"
 
     # Check all .md files
     for md_file in artifact_dir.glob("*.md"):
         content = md_file.read_text()
-        assert "ghp_abc123secret" not in content, f"Unredacted secret in {md_file.name}"
-        assert "sk-testkey123secret" not in content, f"Unredacted sk- secret in {md_file.name}"
+        assert fake_ghp_token not in content, f"Unredacted secret in {md_file.name}"
+        assert fake_sk_token not in content, f"Unredacted sk- secret in {md_file.name}"
 
 
 # ---------------------------------------------------------------------------

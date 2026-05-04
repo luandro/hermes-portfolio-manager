@@ -1146,7 +1146,7 @@ class TestMvp6SecretRedaction:
         from portfolio_manager.implementation_artifacts import write_error_json
 
         artifact_dir = tmp_path / "artifacts"
-        token = "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA"  # ggignore
+        token = "ghp_" + ("A" * 28)
         write_error_json(
             artifact_dir,
             {
@@ -1162,7 +1162,7 @@ class TestMvp6SecretRedaction:
         from portfolio_manager.implementation_artifacts import write_error_json
 
         artifact_dir = tmp_path / "artifacts"
-        token = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234"  # ggignore
+        token = "ghp_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "1234"
         write_error_json(
             artifact_dir,
             {"stderr": f"remote: Invalid token {token}"},
@@ -1176,13 +1176,14 @@ class TestMvp6SecretRedaction:
         from portfolio_manager.implementation_artifacts import write_summary_md
 
         artifact_dir = tmp_path / "artifacts"
+        token_value = "abc" + "def" + "1234" + "5678" + "90ab" + "cdef"
         write_summary_md(
             artifact_dir,
-            "Result: token=abcdef1234567890abcdef in output",
+            f"Result: token={token_value} in output",
         )
         content = (artifact_dir / "summary.md").read_text()
         # The redaction helper should redact token=... patterns
-        assert "abcdef1234567890abcdef" not in content
+        assert token_value not in content
 
     def test_no_chain_of_thought_marker_in_implementation_artifacts(self, tmp_path: Path) -> None:
         """Artifact writers strip chain-of-thought markers."""

@@ -98,6 +98,7 @@ def test_evidence_waiver_requires_nonempty_reason_string() -> None:
 
 def test_evidence_writer_redacts_paths_under_user_home() -> None:
     """Secrets in summary text are redacted."""
+    fake_token = "ghp_" + "abc123secret"
     harness_data: dict[str, Any] = {
         "status": "implemented",
         "test_first": [
@@ -105,7 +106,7 @@ def test_evidence_writer_redacts_paths_under_user_home() -> None:
                 "phase": "red",
                 "command": ["pytest"],
                 "exit_code": 1,
-                "summary": "token=ghp_abc123secret failed at /home/user/project",
+                "summary": f"token={fake_token} failed at /home/user/project",
             },
         ],
     }
@@ -113,7 +114,7 @@ def test_evidence_writer_redacts_paths_under_user_home() -> None:
 
     # The summary should have the token value redacted
     phase_summary = evidence.phases[0]["summary"]
-    assert "ghp_abc123secret" not in phase_summary
+    assert fake_token not in phase_summary
     assert "***" in phase_summary
 
 
