@@ -149,8 +149,8 @@ def _check_git_args(args: list[str]) -> None:
                 "--no-gpg-sign",
             }
         )
-        # Reject any dangerous flags anywhere in args (check first for clear errors)
-        for a in args:
+        # Reject any dangerous flags in the remaining args (after -c stripping)
+        for a in remaining:
             if a in _COMMIT_DANGEROUS_FLAGS:
                 raise GitCommandError(f"'commit' flag {a!r} is forbidden")
         commit_remaining = list(remaining[1:])

@@ -36,8 +36,8 @@ def _utcnow() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _row_to_dict(conn: sqlite3.Connection, row: tuple[Any, ...]) -> dict[str, Any]:
-    cols = [c[1] for c in conn.execute("PRAGMA table_info(implementation_jobs)").fetchall()]
+def _row_to_dict(cursor: sqlite3.Cursor, row: tuple[Any, ...]) -> dict[str, Any]:
+    cols = [d[0] for d in cursor.description]
     return dict(zip(cols, row, strict=False))
 
 
@@ -151,10 +151,11 @@ def finish_job(
 
 def get_job(conn: sqlite3.Connection, job_id: str) -> dict[str, Any] | None:
     """Return a job row as dict, or None."""
-    row = conn.execute("SELECT * FROM implementation_jobs WHERE job_id=?", (job_id,)).fetchone()
+    cur = conn.execute("SELECT * FROM implementation_jobs WHERE job_id=?", (job_id,))
+    row = cur.fetchone()
     if row is None:
         return None
-    return _row_to_dict(conn, row)
+    return _row_to_dict(cur, row)
 
 
 def list_jobs(
@@ -178,8 +179,9 @@ def list_jobs(
         params.append(status)
 
     where = " AND ".join(conditions) if conditions else "1=1"
-    rows = conn.execute(
+    cur = conn.execute(
         f"SELECT * FROM implementation_jobs WHERE {where} ORDER BY created_at DESC",  # nosec B608 — WHERE clause built from fixed condition strings; values parameterized
         params,
-    ).fetchall()
-    return [_row_to_dict(conn, r) for r in rows]
+    )
+    rows = cur.fetchall()
+    return [_row_to_dict(cur, r) for r in rows]

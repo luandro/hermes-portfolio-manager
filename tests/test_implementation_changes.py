@@ -79,6 +79,9 @@ def test_collect_changed_files_detects_renames(tmp_path: Path) -> None:
     # Should have an old_path reference
     rename_entries = [s for s in result.statuses if "old_path" in s]
     assert len(rename_entries) > 0
+    # The old file should appear as a deletion entry
+    old_entries = [s for s in result.statuses if s["path"] == "old_name.py"]
+    assert len(old_entries) > 0, "rename should produce a deletion entry for old_name.py"
 
 
 def test_collect_changed_files_normalizes_to_posix_relative_paths(tmp_path: Path) -> None:
