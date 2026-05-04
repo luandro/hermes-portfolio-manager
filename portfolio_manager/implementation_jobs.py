@@ -47,8 +47,23 @@ from portfolio_manager.implementation_state import (
     update_job_status,
 )
 from portfolio_manager.implementation_test_quality import check_test_quality, collect_test_first_evidence
+from portfolio_manager.worktree_git import DEFAULT_TIMEOUTS, run_git
+from portfolio_manager.worktree_paths import assert_under_worktrees_root
 
 logger = logging.getLogger(__name__)
+
+
+def _current_head_sha(workspace: Path) -> str | None:
+    result = run_git(["rev-parse", "HEAD"], cwd=workspace, timeout=DEFAULT_TIMEOUTS["rev-parse"])
+    if result.returncode == 0:
+        return result.stdout.strip() or None
+    return None
+
+
+def _resolve_harness_workspace(workspace: Path, root: Path, workspace_subpath: str | None) -> Path:
+    if not workspace_subpath:
+        return workspace
+    return assert_under_worktrees_root(workspace / workspace_subpath, root)
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +190,7 @@ def run_initial_implementation(
                 artifact_dir=artifact_dir,
                 plan=plan,
                 instructions=instructions,
+                expected_base_sha=base_sha,
             )
     except ImplementationLockBusy as exc:
         return _shared_result(
@@ -212,6 +228,7 @@ def _run_initial_impl_inner(
     artifact_dir: Path,
     plan: Any,
     instructions: dict[str, Any] | None,
+    expected_base_sha: str | None,
 ) -> dict[str, Any]:
     """Inner execution of an initial_implementation job, already holding the lock."""
     import sqlite3
@@ -268,6 +285,14 @@ def _run_initial_impl_inner(
         _finish_blocked_impl(conn, job_id, artifact_dir, "No source artifact resolved")
         return _blocked_impl_result(job_id, "No source artifact resolved")
 
+    if expected_base_sha is not None:
+        current_head = _current_head_sha(workspace)
+        if current_head != expected_base_sha:
+            reason = f"base_sha mismatch: expected {expected_base_sha}, got {current_head or 'unknown'}"
+            _finish_blocked_impl(conn, job_id, artifact_dir, reason)
+            return _blocked_impl_result(job_id, reason)
+
+    harness_workspace = _resolve_harness_workspace(workspace, root, harness.workspace_subpath)
     input_request_path = artifact_dir / "input-request.json"
 
     # --- Run harness ---
@@ -401,7 +426,7 @@ def _run_initial_impl_inner(
             )
         cr = run_required_check(
             check=check_config,
-            workspace=workspace,
+            workspace=harness_workspace,
             root=root,
             artifact_dir=artifact_dir,
         )
@@ -815,6 +840,7 @@ def _run_review_fix_inner(
         _finish_blocked(conn, job_id, artifact_dir, "No source artifact resolved")
         return _blocked_result(job_id, "No source artifact resolved")
 
+    harness_workspace = _resolve_harness_workspace(workspace, root, harness.workspace_subpath)
     input_request_path = artifact_dir / "input-request.json"
 
     # --- Run harness ---
@@ -953,7 +979,7 @@ def _run_review_fix_inner(
             }
         cr = run_required_check(
             check=check_config,
-            workspace=workspace,
+            workspace=harness_workspace,
             root=root,
             artifact_dir=artifact_dir,
         )

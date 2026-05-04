@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from portfolio_manager.harness_config import HarnessCheckConfig, HarnessConfig
 
 from portfolio_manager.errors import redact_secrets
+from portfolio_manager.implementation_artifacts import write_input_request_json
 from portfolio_manager.maintenance_artifacts import redact_secrets as redact_secrets_full
 from portfolio_manager.worktree_git import get_clean_state
 from portfolio_manager.worktree_paths import assert_under_worktrees_root
@@ -104,7 +105,9 @@ def run_harness(
 ) -> HarnessResult:
     """Run a coding harness inside a clean issue worktree."""
     _validate_command(harness.command)
-    assert_under_worktrees_root(workspace, root)
+    if harness.workspace_subpath:
+        workspace = workspace / harness.workspace_subpath
+    workspace = assert_under_worktrees_root(workspace, root)
 
     clean_state = get_clean_state(workspace)
     if clean_state != "clean":
@@ -124,7 +127,7 @@ def run_harness(
 
     # Write input-request.json
     artifact_dir.mkdir(parents=True, exist_ok=True)
-    input_request_path.write_text(json.dumps(instructions, indent=2), encoding="utf-8")
+    write_input_request_json(input_request_path.parent, instructions)
 
     # Run subprocess
     start = time.monotonic()

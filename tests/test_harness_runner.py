@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -293,6 +294,59 @@ def test_runner_passes_portfolio_input_artifact_source_env_vars(tmp_path: Path) 
         input_request_path=input_path,
     )
     assert str(input_path) in result.stdout
+
+
+def test_runner_respects_workspace_subpath_for_process_cwd(tmp_path: Path) -> None:
+    root, workspace = _make_workspace_under_root(tmp_path)
+    package_dir = workspace / "pkg"
+    package_dir.mkdir()
+    _init_git_repo(workspace)
+    script = _write_script(
+        tmp_path,
+        "cwd_check.py",
+        "import pathlib\nprint(pathlib.Path.cwd().name)\n",
+    )
+    harness = _make_harness(
+        command=[sys.executable, script],
+        workspace_subpath="pkg",
+    )
+    artifact_dir = tmp_path / "artifacts"
+
+    result = run_harness(
+        harness=harness,
+        workspace=workspace,
+        root=root,
+        source_artifact_path=tmp_path / "source.md",
+        instructions={},
+        artifact_dir=artifact_dir,
+        input_request_path=artifact_dir / "input-request.json",
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "pkg"
+
+
+def test_runner_writes_redacted_input_request(tmp_path: Path) -> None:
+    root, workspace = _make_workspace_under_root(tmp_path)
+    _init_git_repo(workspace)
+    harness = _make_harness(command=["echo", "ok"])
+    artifact_dir = tmp_path / "artifacts"
+    input_path = artifact_dir / "input-request.json"
+
+    result = run_harness(
+        harness=harness,
+        workspace=workspace,
+        root=root,
+        source_artifact_path=tmp_path / "source.md",
+        instructions={"token": "ghp_AAAA1111BBBB"},
+        artifact_dir=artifact_dir,
+        input_request_path=input_path,
+    )
+
+    written = json.loads(input_path.read_text(encoding="utf-8"))
+    assert result.returncode == 0
+    assert "ghp_AAAA1111BBBB" not in input_path.read_text(encoding="utf-8")
+    assert written["token"] == "ghp_***"
 
 
 def test_runner_reads_harness_result_json_when_present(tmp_path: Path) -> None:

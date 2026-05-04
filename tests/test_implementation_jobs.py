@@ -479,6 +479,76 @@ class TestInitialImplRealRun:
         assert mock_check.call_args.kwargs["check"].id == "lint"
         conn.close()
 
+    def test_initial_impl_runs_required_checks_in_workspace_subpath(self, tmp_path: Path) -> None:
+        """Required checks run from harness.workspace_subpath when configured."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        package_dir = workspace / "pkg"
+        package_dir.mkdir()
+        m = _impl_mocks(workspace, root)
+        harness = _make_impl_harness()
+        harness = HarnessConfig(
+            id=harness.id,
+            command=harness.command,
+            env_passthrough=harness.env_passthrough,
+            timeout_seconds=harness.timeout_seconds,
+            max_files_changed=harness.max_files_changed,
+            required_checks=harness.required_checks,
+            checks=harness.checks,
+            workspace_subpath="pkg",
+        )
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=m["plan"]),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch(
+                "portfolio_manager.implementation_jobs.run_harness", return_value=m["harness_result"]
+            ) as mock_harness,
+            patch("portfolio_manager.implementation_jobs.run_required_check") as mock_check,
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=m["changed_files"]),
+            patch("portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=m["evidence"]),
+            patch("portfolio_manager.implementation_jobs.check_scope", return_value=m["scope"]),
+            patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=m["test_quality"]),
+            patch("portfolio_manager.implementation_jobs.make_local_commit", return_value=m["commit_sha"]),
+        ):
+            mock_check.return_value = FakeHarnessResult(returncode=0, harness_status="implemented")
+            run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert mock_harness.call_args.kwargs["workspace"] == workspace
+        assert mock_check.call_args.kwargs["workspace"] == package_dir
+        conn.close()
+
+    def test_initial_impl_blocks_when_expected_base_sha_mismatches_head(self, tmp_path: Path) -> None:
+        """Caller-provided base_sha must match current worktree HEAD before harness execution."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        m = _impl_mocks(workspace, root)
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=m["plan"]),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=m["harness"]),
+            patch("portfolio_manager.implementation_jobs.run_harness") as mock_harness,
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                base_sha="not-the-current-head",
+                confirm=True,
+            )
+
+        assert result["status"] == "blocked"
+        assert "base_sha mismatch" in result["reason"]
+        mock_harness.assert_not_called()
+        conn.close()
+
     def test_initial_impl_blocks_when_harness_dirties_protected_paths(self, tmp_path: Path) -> None:
         """Scope guard blocks when changed files violate scope constraints."""
         conn, workspace, root = _setup_worktree_env(tmp_path)
