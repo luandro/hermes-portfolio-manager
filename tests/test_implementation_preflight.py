@@ -403,6 +403,30 @@ def test_preflight_for_review_fix_blocks_when_approved_comment_ids_empty(
 
 
 # ---------------------------------------------------------------------------
+# 12b. Review fix — empty fix_scope
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_for_review_fix_blocks_when_fix_scope_empty_with_approved_comments(
+    tmp_path: Path,
+) -> None:
+    conn, root, _clone = _setup_happy_path(tmp_path)
+
+    result = preflight_review_fix(
+        conn,
+        project_id=PROJECT_ID,
+        issue_number=ISSUE_NUMBER,
+        pr_number=7,
+        approved_comment_ids=["comment1"],
+        fix_scope=[],
+        root=root,
+    )
+
+    assert not result.ok
+    assert any("fix_scope" in r for r in result.reasons)
+
+
+# ---------------------------------------------------------------------------
 # 13. Pure read — no artifacts written, no SQLite mutations
 # ---------------------------------------------------------------------------
 

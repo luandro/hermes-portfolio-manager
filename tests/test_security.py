@@ -933,7 +933,7 @@ class TestMvp6SubprocessSafety:
             assert not re.search(r"\bexec\s*\(", content), f"exec() found in {f.name}"
 
     def test_only_harness_runner_invokes_subprocess(self) -> None:
-        """Only harness_runner.py may call subprocess.run/Popen.
+        """Only harness_runner.py may call subprocess.run/Popen/call.
 
         harness_runner.py: runs the coding harness subprocess.
         All other implementation modules must use worktree_git.run_git or avoid subprocess.
@@ -943,9 +943,11 @@ class TestMvp6SubprocessSafety:
             if f.name in allowed:
                 continue
             content = f.read_text()
-            assert "subprocess.run" not in content and "subprocess.Popen" not in content, (
-                f"subprocess call found in {f.name} (only harness_runner.py may invoke subprocess)"
-            )
+            assert (
+                "subprocess.run" not in content
+                and "subprocess.Popen" not in content
+                and "subprocess.call" not in content
+            ), f"subprocess call found in {f.name} (only harness_runner.py may invoke subprocess)"
 
     def test_harness_runner_basename_allowlist_enforced(self) -> None:
         """harness_runner.py must have _validate_command or equivalent allowlist check."""

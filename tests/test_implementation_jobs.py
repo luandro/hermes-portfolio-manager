@@ -1173,6 +1173,24 @@ class TestReviewFixNeedsUser:
         plan = _make_plan()
         harness = _make_harness()
 
+        def _needs_user_harness(**kwargs):
+            artifact_dir = kwargs["artifact_dir"]
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            (artifact_dir / "harness-result.json").write_text(
+                '{"status": "needs_user", "needs_user": {"question": "Which behavior should be used?"}}',
+                encoding="utf-8",
+            )
+            return HarnessResult(
+                returncode=0,
+                duration_seconds=1.0,
+                stdout="",
+                stderr="",
+                truncated=False,
+                timed_out=False,
+                harness_status="needs_user",
+                harness_message="Requires product decision",
+            )
+
         with (
             patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
             patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
@@ -1183,26 +1201,16 @@ class TestReviewFixNeedsUser:
                     __exit__=MagicMock(return_value=False),
                 ),
             ),
-            patch(
-                "portfolio_manager.implementation_jobs.run_harness",
-                return_value=HarnessResult(
-                    returncode=0,
-                    duration_seconds=1.0,
-                    stdout="",
-                    stderr="",
-                    truncated=False,
-                    timed_out=False,
-                    harness_status="needs_user",
-                    harness_message="Requires product decision",
-                ),
-            ),
+            patch("portfolio_manager.implementation_jobs.run_harness", side_effect=_needs_user_harness),
         ):
             kwargs = _default_kwargs()
             kwargs["confirm"] = True
             result = run_review_fix(conn, tmp_path, **kwargs)
 
         assert result["status"] == "needs_user"
-        assert result["data"].get("needs_user") is not None or "needs_user" in str(result)
+        needs_user = result["data"].get("needs_user")
+        assert isinstance(needs_user, dict)
+        assert needs_user["question"] == "Which behavior should be used?"
 
         conn.close()
 
@@ -1318,7 +1326,8 @@ class TestReviewFixNoPush:
         mock_commit.assert_called_once()
         # The result should have a commit_sha (local) but no push info
         assert result["data"]["commit_sha"] is not None
-        assert "pushed" not in str(result).lower() or "no_push" in str(result).lower() or True
+        result_text = str(result).lower()
+        assert "pushed" not in result_text
         # More importantly: verify the function itself doesn't call any push
         # by checking the implementation doesn't import or reference push
         from portfolio_manager import implementation_jobs

@@ -203,6 +203,34 @@ class TestUpdateJobStatus:
             update_job_status(conn, "job-1", status="planned")
         conn.close()
 
+    def test_reopen_blocked_job_to_planned_clears_completion_metadata(self, tmp_path: Path):
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+        insert_job(
+            conn,
+            _make_job(
+                status="blocked",
+                started_at="2025-01-01T00:00:00",
+                finished_at="2025-01-01T01:00:00",
+                commit_sha="abc123",
+                artifact_path="/artifacts/job-1.tar.gz",
+                failure_reason="needs clarification",
+                worktree_id="wt-1",
+                source_artifact_path="/source/input.md",
+            ),
+        )
+        update_job_status(conn, "job-1", status="planned")
+        row = get_job(conn, "job-1")
+        assert row["status"] == "planned"
+        assert row["finished_at"] is None
+        assert row["commit_sha"] is None
+        assert row["artifact_path"] is None
+        assert row["failure_reason"] is None
+        assert row["started_at"] == "2025-01-01T00:00:00"
+        assert row["worktree_id"] == "wt-1"
+        assert row["source_artifact_path"] == "/source/input.md"
+        conn.close()
+
 
 class TestFinishJob:
     def test_finish_job_sets_finished_at_and_commit_sha(self, tmp_path: Path):

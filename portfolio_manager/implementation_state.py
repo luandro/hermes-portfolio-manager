@@ -99,6 +99,8 @@ def update_job_status(conn: sqlite3.Connection, job_id: str, *, status: str, **f
     now = _utcnow()
     sets = ["status=?", "updated_at=?"]
     params: list[Any] = [status, now]
+    if current in {"blocked", "needs_user"} and status == "planned":
+        sets.extend(["finished_at=NULL", "commit_sha=NULL", "artifact_path=NULL", "failure_reason=NULL"])
     for key, value in fields.items():
         if key not in _ALLOWED_UPDATE_FIELDS:
             raise ValueError(f"Unknown update field: {key!r}")
@@ -124,8 +126,9 @@ def finish_job(
 ) -> None:
     """Set status, finished_at, commit_sha, artifact_path, failure_reason.
 
-    Validates the transition is allowed before writing. Terminal states
-    (succeeded, failed) cannot be overwritten.
+    Validates the transition is allowed before writing. Allowed finish statuses
+    are succeeded, failed, needs_user, and blocked; succeeded and failed cannot
+    be overwritten.
     """
     if status not in _TERMINAL_STATUS:
         raise ValueError(f"finish_job requires terminal status, got: {status!r}")

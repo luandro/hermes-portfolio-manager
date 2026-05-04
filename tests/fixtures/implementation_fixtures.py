@@ -18,6 +18,7 @@ from portfolio_manager.state import init_state, open_state, upsert_issue, upsert
 from portfolio_manager.worktree_state import upsert_issue_worktree
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from pathlib import Path
 
 _GIT_ENV = {
@@ -28,10 +29,18 @@ _GIT_ENV = {
     "GIT_COMMITTER_NAME": "Test",
     "GIT_COMMITTER_EMAIL": "test@example.com",
 }
+_GIT_TIMEOUT_SECONDS = 30
 
 
 def _git(*args: str, cwd: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, env=_GIT_ENV, check=True, capture_output=True)
+    subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        env=_GIT_ENV,
+        check=True,
+        capture_output=True,
+        timeout=_GIT_TIMEOUT_SECONDS,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +224,7 @@ def prepared_issue_worktree(
     projects_yaml_pointing_to_bare_remote: Path,
     harnesses_yaml_with_fake: Path,
     tmp_path: Path,
-) -> dict:
+) -> Generator[dict, None, None]:
     """Create a fully prepared agent root with issue worktree for testproj/42.
 
     Returns dict with: root, project_id, issue_number, worktree_path, conn,
@@ -280,12 +289,15 @@ def prepared_issue_worktree(
         remote_url=bare_remote.as_uri(),
     )
 
-    return {
-        "root": root,
-        "project_id": project_id,
-        "issue_number": issue_number,
-        "worktree_path": wt_path,
-        "conn": conn,
-        "spec_path": spec_path,
-        "bare_remote": bare_remote,
-    }
+    try:
+        yield {
+            "root": root,
+            "project_id": project_id,
+            "issue_number": issue_number,
+            "worktree_path": wt_path,
+            "conn": conn,
+            "spec_path": spec_path,
+            "bare_remote": bare_remote,
+        }
+    finally:
+        conn.close()

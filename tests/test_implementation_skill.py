@@ -76,5 +76,5 @@ def test_skill_states_operator_exports_provider_env_vars() -> None:
     assert "FORGE_SESSION__MODEL_ID" in text
     assert "OPENAI_API_KEY" in text
     assert "ANTHROPIC_API_KEY" in text
-    # Must mention that MVP 6 does not pick provider/model
-    assert "does not pick a provider" in text.lower() or "does not" in text.lower()
+    # Must mention the exact provider/model boundary
+    assert "mvp 6 does **not** pick a provider or model" in text.lower()

@@ -380,9 +380,7 @@ class TestStartHandler:
             }
         )
         result = _parse(result_str)
-        # The planner will block on unknown harness (no harnesses.yaml loaded in
-        # the test's root context), or the confirm gate will block.
-        assert result["status"] in ("blocked", "failed")
+        assert result["status"] == "blocked"
         assert result["tool"] == "portfolio_implementation_start"
 
     @patch("portfolio_manager.implementation_tools.run_initial_implementation")
@@ -457,7 +455,7 @@ class TestApplyReviewFixesHandler:
             }
         )
         result = _parse(result_str)
-        assert result["status"] in ("blocked", "failed")
+        assert result["status"] == "blocked"
         assert result["tool"] == "portfolio_implementation_apply_review_fixes"
 
     @patch("portfolio_manager.implementation_tools.run_review_fix")

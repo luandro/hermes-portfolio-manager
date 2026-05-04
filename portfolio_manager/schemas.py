@@ -1274,6 +1274,7 @@ PORTFOLIO_IMPLEMENTATION_STATUS_SCHEMA = {
             },
             "issue_number": {
                 "type": "integer",
+                "minimum": 1,
                 "description": "GitHub issue number.",
             },
             "root": {
@@ -1324,6 +1325,7 @@ PORTFOLIO_IMPLEMENTATION_EXPLAIN_SCHEMA = {
             },
             "issue_number": {
                 "type": "integer",
+                "minimum": 1,
                 "description": "GitHub issue number.",
             },
             "root": {
