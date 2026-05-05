@@ -240,6 +240,7 @@ def test_runner_captures_stdout_stderr_truncated_to_64KB_each(tmp_path: Path) ->
     )
     assert result.truncated is True
     assert len(result.stdout) <= 64 * 1024
+    assert len(result.stderr) <= 64 * 1024
 
 
 def test_runner_redacts_token_patterns_in_captured_output(tmp_path: Path) -> None:

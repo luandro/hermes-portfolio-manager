@@ -197,7 +197,7 @@ def run_initial_implementation(
             "blocked",
             tool,
             f"Lock contention: {exc}",
-            data={"job_id": job_id, "lock_error": str(exc)},
+            data={"lock_error": str(exc)},
             summary="Initial-implementation blocked: lock busy.",
             reason=str(exc),
         )
@@ -750,7 +750,7 @@ def run_review_fix(
             "status": "blocked",
             "tool": "portfolio_implementation_apply_review_fixes",
             "message": f"Lock contention: {exc}",
-            "data": {"job_id": job_id, "lock_error": str(exc)},
+            "data": {"lock_error": str(exc)},
             "summary": "Review-fix blocked: lock busy.",
             "reason": str(exc),
         }
@@ -1218,9 +1218,11 @@ def _read_needs_user_from_harness_result(artifact_dir: Path) -> dict[str, Any]:
             data = json.loads(result_path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 return {}
-            needs_user = data.get("needs_user", {})
-            if isinstance(needs_user, dict):
-                return dict(needs_user)
+            raw_needs_user = data.get("needs_user", {})
+            if not isinstance(raw_needs_user, dict):
+                logger.warning("harness-result.json needs_user is not a dict: %r", raw_needs_user)
+                return {}
+            return dict(raw_needs_user)
         except (json.JSONDecodeError, OSError):
             pass
     return {}

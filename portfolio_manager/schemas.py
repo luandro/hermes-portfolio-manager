@@ -1299,6 +1299,7 @@ PORTFOLIO_IMPLEMENTATION_LIST_SCHEMA = {
             },
             "issue_number": {
                 "type": "integer",
+                "minimum": 1,
                 "description": "Optional issue number to filter.",
             },
             "status": {

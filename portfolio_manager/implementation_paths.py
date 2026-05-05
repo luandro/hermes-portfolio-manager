@@ -13,7 +13,7 @@ from uuid import uuid4
 JOB_ID_RE = re.compile(r"^impl_[0-9a-f-]{8,}$")
 HARNESS_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
-_PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_PROJECT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 def generate_job_id() -> str:

@@ -111,7 +111,9 @@ def _check_git_args(args: list[str]) -> None:
         if not branch_args or branch_args[0] not in {"--list", "-a", "-r", "--all", "--remotes"}:
             raise GitCommandError("git branch only allows read-only show/list forms")
         for a in branch_args:
-            if a.startswith("-") and a not in _BRANCH_ALLOWED_FLAGS:
+            if not a.startswith("-"):
+                raise GitCommandError(f"positional args not allowed for git branch: {a}")
+            if a not in _BRANCH_ALLOWED_FLAGS:
                 raise GitCommandError(f"git branch flag {a!r} not allowed")
     # remote: only get-url allowed
     if leader == "remote" and (len(remaining) < 2 or remaining[1] != "get-url"):

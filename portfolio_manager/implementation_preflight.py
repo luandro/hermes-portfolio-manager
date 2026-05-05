@@ -84,7 +84,7 @@ def preflight_initial_implementation(
     worktrees_root = (root / "worktrees").resolve()
     try:
         resolved_wt_path = wt_path.resolve(strict=False)
-    except (OSError, RuntimeError) as exc:
+    except (OSError, ValueError) as exc:
         reasons.append(f"Unable to resolve worktree path {wt_path}: {exc}")
         return PreflightResult(ok=False, reasons=reasons, worktree_path=wt_path)
     if not resolved_wt_path.is_relative_to(worktrees_root):

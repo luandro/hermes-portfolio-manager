@@ -6,6 +6,7 @@ Consumes harness output and check results to verify the test-first workflow
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -292,7 +293,8 @@ def check_test_quality(
     if job_type == "review_fix" and fix_scope is not None:
         stripped = [f.strip() for f in fix_scope if f.strip()]
         doc_only = bool(stripped) and all(
-            f.endswith((".md", ".txt", ".rst")) or f.startswith("docs/") for f in stripped
+            f.endswith((".md", ".txt", ".rst")) or os.path.normpath(f).split(os.sep)[0] in ("doc", "docs")
+            for f in stripped
         )
         if doc_only:
             return QualityCheckResult(
