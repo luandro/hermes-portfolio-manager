@@ -32,7 +32,7 @@ from portfolio_manager.worktree_git import (
 def test_run_git_uses_argument_array(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["args"] = args
         captured["shell"] = kwargs.get("shell", False)
         return subprocess.CompletedProcess(args, 0, "git version 2.0\n", "")
@@ -46,7 +46,7 @@ def test_run_git_uses_argument_array(tmp_path: Path) -> None:
 def test_run_git_sets_GIT_TERMINAL_PROMPT_zero(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["env"] = kwargs.get("env")
         return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -58,7 +58,7 @@ def test_run_git_sets_GIT_TERMINAL_PROMPT_zero(tmp_path: Path) -> None:
 def test_run_git_applies_timeout_per_command(tmp_path: Path) -> None:
     captured: dict = {}
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         captured["timeout"] = kwargs["timeout"]
         return subprocess.CompletedProcess(args, 0, "", "")
 
@@ -70,8 +70,6 @@ def test_run_git_applies_timeout_per_command(tmp_path: Path) -> None:
 def test_run_git_rejects_non_allowlisted_subcommand(tmp_path: Path) -> None:
     with pytest.raises(GitCommandError):
         run_git(["push", "origin", "main"], cwd=tmp_path, timeout=5)
-    with pytest.raises(GitCommandError):
-        run_git(["commit", "-m", "x"], cwd=tmp_path, timeout=5)
     with pytest.raises(GitCommandError):
         run_git(["reset", "--hard"], cwd=tmp_path, timeout=5)
     with pytest.raises(GitCommandError):
@@ -85,7 +83,7 @@ def test_run_git_rejects_non_allowlisted_subcommand(tmp_path: Path) -> None:
 def test_run_git_redacts_credentials_in_stderr_capture(tmp_path: Path) -> None:
     leaked = "fatal: cannot access https://user:ghp_AAAA1111@github.com/o/r.git\n"
 
-    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         return subprocess.CompletedProcess(args, 128, "", leaked)
 
     with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):
@@ -180,3 +178,78 @@ def test_rebase_conflict_state_detected(cloned_repo: Path) -> None:
     rb = cloned_repo / ".git" / "rebase-apply"
     rb.mkdir()
     assert get_clean_state(cloned_repo) == "rebase_conflict"
+
+
+# ---------------------------------------------------------------------------
+# Commit validation tests
+# ---------------------------------------------------------------------------
+
+
+def test_commit_rejects_dangerous_amend_flag(tmp_path: Path) -> None:
+    with pytest.raises(GitCommandError, match="amend"):
+        run_git(["commit", "--amend", "-m", "msg"], cwd=tmp_path, timeout=5)
+
+
+def test_commit_rejects_no_verify_flag(tmp_path: Path) -> None:
+    with pytest.raises(GitCommandError, match="no-verify"):
+        run_git(["commit", "--no-verify", "-m", "msg"], cwd=tmp_path, timeout=5)
+
+
+def test_commit_rejects_missing_m_flag(tmp_path: Path) -> None:
+    with pytest.raises(GitCommandError, match="-m"):
+        run_git(["commit"], cwd=tmp_path, timeout=5)
+
+
+def test_commit_rejects_extra_args_beyond_m_message(tmp_path: Path) -> None:
+    with pytest.raises(GitCommandError):
+        run_git(["commit", "-m", "msg", "extra"], cwd=tmp_path, timeout=5)
+
+
+def test_commit_accepts_valid_m_message(tmp_path: Path) -> None:
+    """Valid commit -m <msg> passes arg validation (will fail at subprocess level since no repo)."""
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        captured["args"] = args
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):
+        result = run_git(["commit", "-m", "valid message"], cwd=tmp_path, timeout=5)
+    assert result.returncode == 0
+    assert captured["args"] == ["git", "commit", "-m", "valid message"]
+
+
+def test_commit_with_c_user_overrides_passes_validation(tmp_path: Path) -> None:
+    """git -c user.name=X -c user.email=Y commit -m msg should pass validation."""
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        captured["args"] = args
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):
+        result = run_git(
+            ["-c", "user.name=Bot", "-c", "user.email=bot@e.com", "commit", "-m", "msg"],
+            cwd=tmp_path,
+            timeout=5,
+        )
+    assert result.returncode == 0
+
+
+def test_commit_rejects_dangerous_flag_in_c_value(tmp_path: Path) -> None:
+    """A -c value that looks like a dangerous flag (e.g. --amend) should not be caught
+    as a dangerous commit flag since -c values are stripped before flag checking."""
+    captured: dict = {}
+
+    def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
+        captured["args"] = args
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    # user.name=--amend is a valid -c value, should NOT be rejected as dangerous commit flag
+    with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):
+        result = run_git(
+            ["-c", "user.name=--amend", "commit", "-m", "msg"],
+            cwd=tmp_path,
+            timeout=5,
+        )
+    assert result.returncode == 0

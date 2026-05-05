@@ -7,6 +7,8 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -532,3 +534,152 @@ def test_cli_worktree_inspect_blocks_path_outside_root(tmp_path: Path) -> None:
     parsed = _parse_json(result)
     assert parsed["status"] == "blocked", parsed
     assert "outside" in parsed.get("message", "").lower() or "escape" in parsed.get("message", "").lower()
+
+
+# ---------------------------------------------------------------------------
+# MVP 6 — implementation runner CLI tests
+# ---------------------------------------------------------------------------
+
+
+def _write_impl_config(root: Path) -> Path:
+    """Write config with one project + harnesses.yaml."""
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "projects.yaml").write_text(
+        "version: 1\n"
+        "projects:\n"
+        "  - id: impl-proj\n"
+        "    name: Impl Project\n"
+        "    repo: https://github.com/example/impl\n"
+        "    priority: high\n"
+        "    status: active\n"
+        "    github:\n"
+        "      owner: example\n"
+        "      repo: impl\n",
+        encoding="utf-8",
+    )
+    (config_dir / "harnesses.yaml").write_text(
+        "harnesses:\n"
+        "  - id: test-harness\n"
+        "    command: [echo, hello]\n"
+        "    env_passthrough: []\n"
+        "    timeout_seconds: 60\n"
+        "    max_files_changed: 20\n"
+        "    required_checks: []\n"
+        "    checks: {}\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_cli_implementation_plan_returns_blocked_for_unknown_project(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-plan",
+        "--project-ref",
+        "does-not-exist",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "test-harness",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "blocked", parsed
+    assert parsed["tool"] == "portfolio_implementation_plan"
+
+
+def test_cli_implementation_plan_returns_blocked_for_unknown_harness_id(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-plan",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "no-such-harness",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "blocked", parsed
+    assert parsed["tool"] == "portfolio_implementation_plan"
+    assert "harness" in parsed.get("reason", "").lower()
+
+
+def test_cli_implementation_status_returns_blocked_for_unknown_job_id(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-status",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "blocked", parsed
+    assert parsed["tool"] == "portfolio_implementation_status"
+
+
+def test_cli_implementation_list_returns_empty_array_for_empty_root(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-list",
+        "--root",
+        str(root),
+    )
+    parsed = _parse_json(result)
+    assert parsed["status"] == "success", parsed
+    assert parsed["data"]["jobs"] == []
+    assert parsed["data"]["count"] == 0
+
+
+def test_cli_implementation_start_rejects_invalid_instructions_json(tmp_path: Path) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-start",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "test-harness",
+        "--instructions",
+        "{not-json",
+        "--root",
+        str(root),
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "--instructions" in result.stderr
+    assert "valid JSON" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("instructions", ["[]", '"task"', "null"])
+def test_cli_implementation_start_rejects_non_object_instructions_json(tmp_path: Path, instructions: str) -> None:
+    root = _write_impl_config(tmp_path / "agent-system")
+    result = _run_cli(
+        "implementation-start",
+        "--project-ref",
+        "impl-proj",
+        "--issue-number",
+        "42",
+        "--harness-id",
+        "test-harness",
+        "--instructions",
+        instructions,
+        "--root",
+        str(root),
+    )
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "--instructions" in result.stderr
+    assert "JSON object" in result.stderr
+    assert "Traceback" not in result.stderr

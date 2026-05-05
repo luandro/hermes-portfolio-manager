@@ -180,3 +180,105 @@ def test_existing_portfolio_worktree_inspect_still_callable() -> None:
     from portfolio_manager.tools import _handle_portfolio_worktree_inspect
 
     assert callable(_handle_portfolio_worktree_inspect)
+
+
+# ---------------------------------------------------------------------------
+# MVP 6 — Implementation Runner
+# ---------------------------------------------------------------------------
+
+MVP6_MODULES = [
+    "portfolio_manager.implementation_paths",
+    "portfolio_manager.implementation_state",
+    "portfolio_manager.harness_config",
+    "portfolio_manager.implementation_locks",
+    "portfolio_manager.implementation_artifacts",
+    "portfolio_manager.implementation_preflight",
+    "portfolio_manager.implementation_planner",
+    "portfolio_manager.harness_runner",
+    "portfolio_manager.implementation_changes",
+    "portfolio_manager.implementation_scope_guard",
+    "portfolio_manager.implementation_test_quality",
+    "portfolio_manager.implementation_commit",
+    "portfolio_manager.implementation_jobs",
+    "portfolio_manager.implementation_tools",
+]
+
+MVP6_TOOLS = [
+    "portfolio_implementation_plan",
+    "portfolio_implementation_start",
+    "portfolio_implementation_apply_review_fixes",
+    "portfolio_implementation_status",
+    "portfolio_implementation_list",
+    "portfolio_implementation_explain",
+]
+
+MVP6_CLI_COMMANDS = [
+    "implementation-plan",
+    "implementation-start",
+    "implementation-apply-review-fixes",
+    "implementation-status",
+    "implementation-list",
+    "implementation-explain",
+]
+
+
+def test_implementation_modules_exist() -> None:
+    """All fourteen MVP 6 implementation_* modules must be importable."""
+    import importlib
+
+    missing: list[str] = []
+    for mod in MVP6_MODULES:
+        try:
+            importlib.import_module(mod)
+        except ImportError:
+            missing.append(mod)
+    assert not missing, f"Missing MVP 6 modules: {missing}"
+
+
+def test_implementation_run_skill_folder_exists() -> None:
+    skill_md = ROOT / "skills" / "implementation-run" / "SKILL.md"
+    assert skill_md.is_file(), f"Missing skill: {skill_md}"
+
+
+def test_implementation_tools_registered() -> None:
+    """All MVP 6 implementation tools must appear in the __init__ tool registry."""
+    from portfolio_manager import _TOOL_REGISTRY
+
+    registered = {name for name, _, _ in _TOOL_REGISTRY}
+    missing = [t for t in MVP6_TOOLS if t not in registered]
+    assert not missing, f"Missing tool registrations: {missing}"
+
+
+def test_dev_cli_implementation_commands_registered() -> None:
+    """All MVP 6 CLI subcommands must be registered in dev_cli."""
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("dev_cli", ROOT / "dev_cli.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["dev_cli"] = module
+    spec.loader.exec_module(module)
+    missing = [c for c in MVP6_CLI_COMMANDS if c not in module.TOOL_HANDLERS]
+    assert not missing, f"Missing CLI commands: {missing}"
+
+
+def test_existing_worktree_tools_still_callable() -> None:
+    """MVP 5 worktree tool handlers must remain importable and callable (back-compat)."""
+    from portfolio_manager.worktree_tools import (
+        _handle_portfolio_worktree_create_issue,
+        _handle_portfolio_worktree_explain,
+        _handle_portfolio_worktree_list,
+        _handle_portfolio_worktree_plan,
+        _handle_portfolio_worktree_prepare_base,
+    )
+
+    handlers = [
+        _handle_portfolio_worktree_create_issue,
+        _handle_portfolio_worktree_explain,
+        _handle_portfolio_worktree_list,
+        _handle_portfolio_worktree_plan,
+        _handle_portfolio_worktree_prepare_base,
+    ]
+    for h in handlers:
+        assert callable(h), f"{h.__name__} is not callable"

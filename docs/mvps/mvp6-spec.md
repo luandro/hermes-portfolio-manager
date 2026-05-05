@@ -104,7 +104,7 @@ job_type
 project_id
 issue_number
 worktree_id
-pr_id
+pr_number
 review_stage_id
 source_artifact_path
 status
@@ -163,12 +163,14 @@ confirm
 Additional inputs for `review_fix`:
 
 ```txt
-pr_id
+pr_number
 review_stage_id
 review_iteration
 approved_comment_ids
 fix_scope
 ```
+
+Naming note: `pr_number` is the GitHub PR number (e.g. 130). MVP 6 does not use a separate GitHub node-id; if a future MVP needs one it may add `pr_id` alongside, but MVP 6 schemas, SQLite columns, lock names, CLI args, and helper signatures use `pr_number` only.
 
 Rules:
 
