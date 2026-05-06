@@ -24,11 +24,39 @@ import pytest
 
 SRC_DIR = Path(__file__).parent.parent / "portfolio_manager"
 SOURCE_FILES = sorted(SRC_DIR.rglob("*.py"))
+REPO_ROOT = Path(__file__).parent.parent
+TEXT_FILE_SUFFIXES = {".md", ".py", ".toml", ".txt", ".yaml", ".yml"}
+RISKY_FAKE_SECRET_RE = re.compile(
+    r"gh[opusr]_[A-Za-z0-9]{8,}"
+    r"|github_pat_[A-Za-z0-9_]{12,}"
+    r"|(?<![A-Za-z0-9])sk-[A-Za-z0-9]{8,}"
+    r"|token=[A-Za-z0-9]{12,}"
+    r"|Bearer [A-Za-z0-9_-]{12,}"
+    r"|password=[A-Za-z0-9]{8,}"
+)
+SCAN_EXCLUDED_DIRS = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"}
 
 
 # ---------------------------------------------------------------------------
 # 8.1 No shell strings — all subprocess calls use argument arrays
 # ---------------------------------------------------------------------------
+
+
+def test_no_contiguous_fake_secret_literals_in_repo() -> None:
+    """Redaction tests must build fake credentials at runtime to avoid GitGuardian incidents."""
+    findings: list[str] = []
+    for path in sorted(REPO_ROOT.rglob("*")):
+        rel_path = path.relative_to(REPO_ROOT)
+        if any(part in SCAN_EXCLUDED_DIRS or part.startswith(".") for part in rel_path.parts[:-1]):
+            continue
+        if not path.is_file() or path.suffix not in TEXT_FILE_SUFFIXES:
+            continue
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if RISKY_FAKE_SECRET_RE.search(line):
+                findings.append(f"{rel_path}:{line_number}")
+
+    assert not findings, "Split fake secret literals at runtime: " + ", ".join(findings)
 
 
 class TestSubprocessUsesArgumentArrays:
