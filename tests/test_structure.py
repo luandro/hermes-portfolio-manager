@@ -240,6 +240,12 @@ def test_implementation_run_skill_folder_exists() -> None:
     assert skill_md.is_file(), f"Missing skill: {skill_md}"
 
 
+def test_implementation_run_skill_registered() -> None:
+    from portfolio_manager import _SKILL_DESCRIPTIONS
+
+    assert "implementation-run" in _SKILL_DESCRIPTIONS
+
+
 def test_implementation_tools_registered() -> None:
     """All MVP 6 implementation tools must appear in the __init__ tool registry."""
     from portfolio_manager import _TOOL_REGISTRY

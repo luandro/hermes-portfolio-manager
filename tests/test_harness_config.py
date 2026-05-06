@@ -10,6 +10,7 @@ import yaml
 
 from portfolio_manager.config import ConfigError
 from portfolio_manager.harness_config import (
+    IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET,
     MAX_TIMEOUT,
     HarnessCheckConfig,
     HarnessConfig,
@@ -161,10 +162,25 @@ class TestHarnessTimeoutSeconds:
         with pytest.raises(ConfigError, match=f"must be <= {MAX_TIMEOUT}"):
             load_harness_config(root)
 
-    def test_harness_timeout_accepts_max(self, tmp_path: Path) -> None:
-        root = _write_harnesses_yaml(tmp_path, _valid_config(timeout_seconds=MAX_TIMEOUT))
+    def test_harness_timeout_accepts_lock_budget_without_required_checks(self, tmp_path: Path) -> None:
+        root = _write_harnesses_yaml(
+            tmp_path,
+            _valid_config(timeout_seconds=IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET, required_checks=[], checks={}),
+        )
         result = load_harness_config(root)
-        assert result["forge"].timeout_seconds == MAX_TIMEOUT
+        assert result["forge"].timeout_seconds == IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET
+
+    def test_harness_timeout_plus_required_checks_must_fit_lock_budget(self, tmp_path: Path) -> None:
+        root = _write_harnesses_yaml(
+            tmp_path,
+            _valid_config(
+                timeout_seconds=IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET,
+                required_checks=["lint"],
+                checks={"lint": {"command": ["ruff", "check"], "timeout_seconds": 1}},
+            ),
+        )
+        with pytest.raises(ConfigError, match="implementation lock TTL"):
+            load_harness_config(root)
 
 
 class TestHarnessMaxFilesChanged:

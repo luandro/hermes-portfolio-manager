@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_CAPTURE = 64 * 1024  # 64KB per stream
 _SHELL_META_RE = re.compile(r"[;&|$<>\`\\*?\[\]{}()!#\n\r]")
+VALID_HARNESS_STATUSES = {"implemented", "needs_user", "failed"}
 
 
 def _redact_output(text: str) -> str:
@@ -90,6 +91,18 @@ def _validate_command(command: list[str]) -> None:
                 raise ValueError(f"command[0] must be a basename or absolute path, got {elem!r}")
             if ".." in elem:
                 raise ValueError(f"command[0] must not contain '..': {elem!r}")
+
+
+def _invalid_harness_result(message: str) -> tuple[str, str]:
+    redacted = _redact_output(message)
+    logger.warning("%s", redacted)
+    return "failed", redacted
+
+
+def _format_invalid_harness_result(message: str, raw_message: object) -> str:
+    if isinstance(raw_message, str) and raw_message:
+        return f"{message}: {_redact_output(raw_message)}"
+    return message
 
 
 def run_harness(
@@ -195,10 +208,32 @@ def run_harness(
     if result_path.is_file():
         try:
             data = json.loads(result_path.read_text(encoding="utf-8"))
-            harness_status = data.get("status")
-            harness_message = data.get("message")
-        except (json.JSONDecodeError, OSError):
-            logger.warning("Failed to parse %s", result_path)
+            if not isinstance(data, dict):
+                harness_status, harness_message = _invalid_harness_result(
+                    f"Invalid harness-result.json: root must be an object, got {type(data).__name__}"
+                )
+            else:
+                raw_status = data.get("status")
+                if raw_status not in VALID_HARNESS_STATUSES:
+                    harness_status, harness_message = _invalid_harness_result(
+                        _format_invalid_harness_result(
+                            f"Invalid harness-result.json: status must be one of "
+                            f"{sorted(VALID_HARNESS_STATUSES)}, got {raw_status!r}",
+                            data.get("message"),
+                        )
+                    )
+                else:
+                    harness_status = raw_status
+                    raw_message = data.get("message")
+                    harness_message = _redact_output(raw_message) if isinstance(raw_message, str) else None
+        except json.JSONDecodeError as exc:
+            harness_status, harness_message = _invalid_harness_result(
+                f"Invalid harness-result.json: malformed JSON ({exc.msg})"
+            )
+        except OSError as exc:
+            harness_status, harness_message = _invalid_harness_result(
+                f"Invalid harness-result.json: failed to read file ({exc})"
+            )
 
     # Fallback: infer status from returncode if no harness-result.json
     if harness_status is None:

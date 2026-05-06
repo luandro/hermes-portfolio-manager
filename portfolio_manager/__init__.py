@@ -230,6 +230,7 @@ _SKILL_DESCRIPTIONS: dict[str, str] = {
     "issue-brainstorm": "Brainstorm and refine an issue draft from a rough description.",
     "issue-create": "Create a GitHub issue from a refined draft (with confirmation).",
     "portfolio-maintenance": "Run safe maintenance checks and generate reports.",
+    "implementation-run": "Plan, start, monitor, and explain implementation runs.",
 }
 
 

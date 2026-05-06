@@ -16,6 +16,7 @@ from typing import Any
 import yaml
 
 from portfolio_manager.config import ConfigError
+from portfolio_manager.implementation_locks import IMPLEMENTATION_LOCK_TTL
 from portfolio_manager.implementation_paths import validate_harness_id
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,8 @@ class HarnessConfig:
 
 ALLOWED_CHECK_IDS = {"lint", "typecheck", "unit_tests", "format_check"}
 MAX_TIMEOUT = 7200  # 2 hours max
+IMPLEMENTATION_LOCK_SAFETY_MARGIN = 60
+IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET = IMPLEMENTATION_LOCK_TTL - IMPLEMENTATION_LOCK_SAFETY_MARGIN
 
 _SHELL_METACHAR_RE = re.compile(r"[;|&$`<>]")
 
@@ -200,6 +203,26 @@ def _validate_harness_entry(raw: dict[str, Any], idx: int) -> HarnessConfig:
         for check_id in raw_required:
             if isinstance(check_id, str) and check_id not in raw_checks:
                 errors.append(f"{prefix}: required_checks references '{check_id}' which is not defined in checks")
+
+    if (
+        isinstance(raw_timeout, int)
+        and not isinstance(raw_timeout, bool)
+        and raw_timeout > 0
+        and isinstance(raw_required, list)
+    ):
+        required_check_timeout_total = sum(
+            checks[check_id].timeout_seconds
+            for check_id in raw_required
+            if isinstance(check_id, str) and check_id in checks
+        )
+        total_timeout = raw_timeout + required_check_timeout_total
+        if total_timeout > IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET:
+            errors.append(
+                f"{prefix}: timeout_seconds plus required check timeouts must be <= "
+                f"{IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET} seconds "
+                f"(implementation lock TTL {IMPLEMENTATION_LOCK_TTL}s minus "
+                f"{IMPLEMENTATION_LOCK_SAFETY_MARGIN}s safety margin), got {total_timeout}"
+            )
 
     # --- workspace_subpath ---
     raw_subpath = raw.get("workspace_subpath")

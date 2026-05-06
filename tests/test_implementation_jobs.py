@@ -738,6 +738,40 @@ class TestInitialImplRealRun:
         assert row[0] == "needs_user"
         conn.close()
 
+    def test_initial_impl_fails_with_harness_message_when_harness_status_failed(self, tmp_path: Path) -> None:
+        """A protocol-level harness failure with rc=0 must preserve the validation message."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        m = _impl_mocks(
+            workspace,
+            root,
+            harness_result=FakeHarnessResult(
+                returncode=0,
+                harness_status="failed",
+                harness_message="Invalid harness-result.json: status must be one of ['failed', 'implemented', 'needs_user']",
+            ),
+        )
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=m["plan"]),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=m["harness"]),
+            patch("portfolio_manager.implementation_jobs.run_harness", return_value=m["harness_result"]),
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert result["status"] == "failed"
+        assert "Invalid harness-result.json" in result["reason"]
+        row = conn.execute("SELECT status, failure_reason FROM implementation_jobs").fetchone()
+        assert row[0] == "failed"
+        assert "Invalid harness-result.json" in row[1]
+        conn.close()
+
     def test_initial_impl_releases_lock_on_exception(self, tmp_path: Path) -> None:
         """Lock is released even when an uncaught exception occurs inside the lock."""
         conn, workspace, root = _setup_worktree_env(tmp_path)

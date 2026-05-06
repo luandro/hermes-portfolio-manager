@@ -410,6 +410,104 @@ def test_runner_maps_harness_result_status_needs_user(tmp_path: Path) -> None:
     assert result.harness_status == "needs_user"
 
 
+def test_runner_maps_harness_result_status_failed(tmp_path: Path) -> None:
+    root, workspace = _make_workspace_under_root(tmp_path)
+    _init_git_repo(workspace)
+    artifact_dir = tmp_path / "artifacts"
+
+    script = _write_script(
+        tmp_path,
+        "failed_result.py",
+        textwrap.dedent("""\
+        import json, os
+        result = {"status": "failed", "message": "could not apply"}
+        artifact_dir = os.environ["PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR"]
+        with open(os.path.join(artifact_dir, "harness-result.json"), "w") as f:
+            json.dump(result, f)
+    """),
+    )
+    harness = _make_harness(command=[sys.executable, script], timeout_seconds=5)
+
+    result = run_harness(
+        harness=harness,
+        workspace=workspace,
+        root=root,
+        source_artifact_path=tmp_path / "source.md",
+        instructions={},
+        artifact_dir=artifact_dir,
+        input_request_path=artifact_dir / "input-request.json",
+    )
+
+    assert result.harness_status == "failed"
+    assert result.harness_message == "could not apply"
+
+
+def test_runner_treats_non_dict_harness_result_json_as_failed(tmp_path: Path) -> None:
+    root, workspace = _make_workspace_under_root(tmp_path)
+    _init_git_repo(workspace)
+    artifact_dir = tmp_path / "artifacts"
+
+    script = _write_script(
+        tmp_path,
+        "list_result.py",
+        textwrap.dedent("""\
+        import json, os
+        artifact_dir = os.environ["PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR"]
+        with open(os.path.join(artifact_dir, "harness-result.json"), "w") as f:
+            json.dump(["implemented"], f)
+    """),
+    )
+    harness = _make_harness(command=[sys.executable, script], timeout_seconds=5)
+
+    result = run_harness(
+        harness=harness,
+        workspace=workspace,
+        root=root,
+        source_artifact_path=tmp_path / "source.md",
+        instructions={},
+        artifact_dir=artifact_dir,
+        input_request_path=artifact_dir / "input-request.json",
+    )
+
+    assert result.returncode == 0
+    assert result.harness_status == "failed"
+    assert "root must be an object" in (result.harness_message or "")
+
+
+def test_runner_treats_unknown_harness_result_status_as_failed(tmp_path: Path) -> None:
+    root, workspace = _make_workspace_under_root(tmp_path)
+    _init_git_repo(workspace)
+    artifact_dir = tmp_path / "artifacts"
+
+    script = _write_script(
+        tmp_path,
+        "unknown_status.py",
+        textwrap.dedent("""\
+        import json, os
+        result = {"status": "done", "message": "not a valid status"}
+        artifact_dir = os.environ["PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR"]
+        with open(os.path.join(artifact_dir, "harness-result.json"), "w") as f:
+            json.dump(result, f)
+    """),
+    )
+    harness = _make_harness(command=[sys.executable, script], timeout_seconds=5)
+
+    result = run_harness(
+        harness=harness,
+        workspace=workspace,
+        root=root,
+        source_artifact_path=tmp_path / "source.md",
+        instructions={},
+        artifact_dir=artifact_dir,
+        input_request_path=artifact_dir / "input-request.json",
+    )
+
+    assert result.returncode == 0
+    assert result.harness_status == "failed"
+    assert "status must be one of" in (result.harness_message or "")
+    assert "not a valid status" in (result.harness_message or "")
+
+
 def test_runner_returns_typed_result_with_returncode_duration_truncated_flag(tmp_path: Path) -> None:
     root, workspace = _make_workspace_under_root(tmp_path)
     _init_git_repo(workspace)

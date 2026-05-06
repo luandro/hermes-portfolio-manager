@@ -370,12 +370,14 @@ def _run_initial_impl_inner(
         )
 
     if harness_result.harness_status == "failed":
+        reason = harness_result.harness_message or f"harness exit code {harness_result.returncode}"
         write_error_json(
             artifact_dir,
             {
                 "error": "harness failed",
                 "returncode": harness_result.returncode,
                 "stderr": harness_result.stderr[:2000],
+                "message": reason,
                 "job_id": job_id,
             },
         )
@@ -385,7 +387,7 @@ def _run_initial_impl_inner(
             status="failed",
             commit_sha=None,
             artifact_path=str(artifact_dir),
-            failure_reason=f"harness exit code {harness_result.returncode}",
+            failure_reason=reason,
         )
         return _shared_result(
             "failed",
@@ -393,7 +395,35 @@ def _run_initial_impl_inner(
             f"Harness failed with exit code {harness_result.returncode}",
             data={"job_id": job_id, "returncode": harness_result.returncode},
             summary=f"Initial-implementation harness failed (exit {harness_result.returncode}).",
-            reason=f"harness exit code {harness_result.returncode}",
+            reason=reason,
+        )
+
+    if harness_result.harness_status != "implemented":
+        reason = harness_result.harness_message or f"invalid harness status: {harness_result.harness_status!r}"
+        write_error_json(
+            artifact_dir,
+            {
+                "error": "invalid harness status",
+                "harness_status": harness_result.harness_status,
+                "message": reason,
+                "job_id": job_id,
+            },
+        )
+        finish_job(
+            conn,
+            job_id,
+            status="failed",
+            commit_sha=None,
+            artifact_path=str(artifact_dir),
+            failure_reason=reason,
+        )
+        return _shared_result(
+            "failed",
+            tool,
+            "Harness returned an invalid status.",
+            data={"job_id": job_id, "harness_status": harness_result.harness_status},
+            summary=f"Initial-implementation harness returned invalid status: {harness_result.harness_status!r}.",
+            reason=reason,
         )
 
     # --- Collect changed files ---
@@ -932,12 +962,14 @@ def _run_review_fix_inner(
         }
 
     if harness_result.harness_status == "failed":
+        reason = harness_result.harness_message or f"harness exit code {harness_result.returncode}"
         write_error_json(
             artifact_dir,
             {
                 "error": "harness failed",
                 "returncode": harness_result.returncode,
                 "stderr": harness_result.stderr[:2000],
+                "message": reason,
                 "job_id": job_id,
             },
         )
@@ -947,7 +979,7 @@ def _run_review_fix_inner(
             status="failed",
             commit_sha=None,
             artifact_path=str(artifact_dir),
-            failure_reason=f"harness exit code {harness_result.returncode}",
+            failure_reason=reason,
         )
         return {
             "status": "failed",
@@ -955,7 +987,35 @@ def _run_review_fix_inner(
             "message": f"Harness failed with exit code {harness_result.returncode}",
             "data": {"job_id": job_id, "returncode": harness_result.returncode},
             "summary": f"Review-fix harness failed (exit {harness_result.returncode}).",
-            "reason": f"harness exit code {harness_result.returncode}",
+            "reason": reason,
+        }
+
+    if harness_result.harness_status != "implemented":
+        reason = harness_result.harness_message or f"invalid harness status: {harness_result.harness_status!r}"
+        write_error_json(
+            artifact_dir,
+            {
+                "error": "invalid harness status",
+                "harness_status": harness_result.harness_status,
+                "message": reason,
+                "job_id": job_id,
+            },
+        )
+        finish_job(
+            conn,
+            job_id,
+            status="failed",
+            commit_sha=None,
+            artifact_path=str(artifact_dir),
+            failure_reason=reason,
+        )
+        return {
+            "status": "failed",
+            "tool": "portfolio_implementation_apply_review_fixes",
+            "message": "Harness returned an invalid status.",
+            "data": {"job_id": job_id, "harness_status": harness_result.harness_status},
+            "summary": f"Review-fix harness returned invalid status: {harness_result.harness_status!r}.",
+            "reason": reason,
         }
 
     # --- Collect changed files ---
