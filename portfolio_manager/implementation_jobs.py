@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from portfolio_manager.config import ConfigError, load_projects_config
 from portfolio_manager.harness_config import get_harness
 from portfolio_manager.harness_runner import run_harness, run_required_check
 from portfolio_manager.implementation_artifacts import (
@@ -49,6 +50,7 @@ from portfolio_manager.implementation_state import (
 from portfolio_manager.implementation_test_quality import check_test_quality, collect_test_first_evidence
 from portfolio_manager.worktree_git import DEFAULT_TIMEOUTS, run_git
 from portfolio_manager.worktree_paths import assert_under_worktrees_root
+from portfolio_manager.worktree_state import init_worktree_schema, issue_worktree_id
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,45 @@ def _resolve_harness_workspace(workspace: Path, root: Path, workspace_subpath: s
     if not workspace_subpath:
         return workspace
     return assert_under_worktrees_root(workspace / workspace_subpath, root)
+
+
+def _protected_paths_for_project(root: Path, project_id: str) -> list[str]:
+    try:
+        config = load_projects_config(root)
+    except ConfigError:
+        return []
+    for project in config.projects:
+        if project.id == project_id:
+            return list(project.protected_paths)
+    return []
+
+
+def _read_harness_result_data(artifact_dir: Path) -> dict[str, Any] | None:
+    import json as _json
+
+    result_path = artifact_dir / "harness-result.json"
+    if result_path.is_file():
+        with contextlib.suppress(_json.JSONDecodeError, OSError):
+            data = _json.loads(result_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    return None
+
+
+def _record_issue_worktree_head(conn: object, plan: Any, commit_sha: str) -> None:
+    """Update the MVP 5 issue worktree row after MVP 6 creates a local commit."""
+    import sqlite3
+
+    if not isinstance(conn, sqlite3.Connection):
+        return
+    if plan.workspace_path is None:
+        return
+    init_worktree_schema(conn)
+    conn.execute(
+        "UPDATE worktrees SET state=?, head_sha=?, updated_at=? WHERE id=?",
+        ("clean", commit_sha, _utcnow(), issue_worktree_id(plan.project_id, plan.issue_number)),
+    )
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -426,10 +467,6 @@ def _run_initial_impl_inner(
             reason=reason,
         )
 
-    # --- Collect changed files ---
-    changed = collect_changed_files(workspace, root=root)
-    write_changed_files_json(artifact_dir, changed.statuses)
-
     # --- Run required checks ---
     check_results: list[dict[str, Any]] = []
     for check_id in plan.required_checks:
@@ -472,6 +509,10 @@ def _run_initial_impl_inner(
         )
     write_checks_json(artifact_dir, check_results)
 
+    # --- Collect final changed files after required checks ---
+    changed = collect_changed_files(workspace, root=root)
+    write_changed_files_json(artifact_dir, changed.statuses)
+
     # Check if any required check failed
     failed_checks = [c for c in check_results if c["exit_code"] != 0]
     if failed_checks:
@@ -480,14 +521,7 @@ def _run_initial_impl_inner(
         return _blocked_impl_result(job_id, "; ".join(reasons))
 
     # --- Collect test-first evidence ---
-    import json as _json
-
-    harness_result_data: dict[str, Any] | None = None
-    result_path = artifact_dir / "harness-result.json"
-    if result_path.is_file():
-        with contextlib.suppress(_json.JSONDecodeError, OSError):
-            harness_result_data = _json.loads(result_path.read_text(encoding="utf-8"))
-
+    harness_result_data = _read_harness_result_data(artifact_dir)
     evidence = collect_test_first_evidence(harness_result_data, check_results)
     write_test_first_evidence_md(
         artifact_dir,
@@ -499,17 +533,17 @@ def _run_initial_impl_inner(
             "blocked_reason": evidence.blocked_reason,
         },
     )
-    # NOTE(MVP): evidence.blocked_reason is recorded in artifacts but not yet
-    # used to block the job. Test-first blocking will be enforced in a later MVP.
+
+    if evidence.blocked_reason:
+        _finish_blocked_impl(conn, job_id, artifact_dir, evidence.blocked_reason)
+        return _blocked_impl_result(job_id, evidence.blocked_reason)
 
     # --- Scope guard ---
-    # NOTE(MVP): spec_scope and protected_paths are empty — scope enforcement
-    # (spec-scoped changes + protected-path blocking) is deferred to a later MVP.
-    # Only max_files_changed is enforced here.
+    protected_paths = _protected_paths_for_project(root, plan.project_id)
     scope_check = check_scope(
         changed_files=changed.files,
         spec_scope=[],
-        protected_paths=[],
+        protected_paths=protected_paths,
         max_files_changed=harness.max_files_changed,
     )
     write_scope_check_md(
@@ -520,6 +554,7 @@ def _run_initial_impl_inner(
             "changed_files": scope_check.changed_files,
             "protected_violations": scope_check.protected_violations,
             "out_of_scope_files": scope_check.out_of_scope_files,
+            "protected_paths": protected_paths,
         },
     )
 
@@ -600,6 +635,7 @@ def _run_initial_impl_inner(
     )
 
     # --- Finish succeeded ---
+    _record_issue_worktree_head(conn, plan, commit_sha)
     finish_job(
         conn, job_id, status="succeeded", commit_sha=commit_sha, artifact_path=str(artifact_dir), failure_reason=None
     )
@@ -1018,10 +1054,6 @@ def _run_review_fix_inner(
             "reason": reason,
         }
 
-    # --- Collect changed files ---
-    changed = collect_changed_files(workspace, root=root)
-    write_changed_files_json(artifact_dir, changed.statuses)
-
     # --- Run required checks ---
     check_results: list[dict[str, Any]] = []
     for check_id in plan.required_checks:
@@ -1065,6 +1097,10 @@ def _run_review_fix_inner(
         )
     write_checks_json(artifact_dir, check_results)
 
+    # --- Collect final changed files after required checks ---
+    changed = collect_changed_files(workspace, root=root)
+    write_changed_files_json(artifact_dir, changed.statuses)
+
     # Check if any required check failed
     failed_checks = [c for c in check_results if c["exit_code"] != 0]
     if failed_checks:
@@ -1072,13 +1108,30 @@ def _run_review_fix_inner(
         _finish_blocked(conn, job_id, artifact_dir, "; ".join(reasons))
         return _blocked_result(job_id, "; ".join(reasons))
 
+    # --- Collect test-first evidence ---
+    harness_result_data = _read_harness_result_data(artifact_dir)
+    evidence = collect_test_first_evidence(harness_result_data, check_results)
+    write_test_first_evidence_md(
+        artifact_dir,
+        {
+            "job_type": "review_fix",
+            "has_failing_phase": evidence.has_failing_phase,
+            "has_passing_phase": evidence.has_passing_phase,
+            "waiver": evidence.waiver,
+            "blocked_reason": evidence.blocked_reason,
+        },
+    )
+
+    if evidence.blocked_reason:
+        _finish_blocked(conn, job_id, artifact_dir, evidence.blocked_reason)
+        return _blocked_result(job_id, evidence.blocked_reason)
+
     # --- Scope guard: use fix_scope instead of full spec scope ---
-    # NOTE(MVP): protected_paths is empty — protected-path blocking is deferred
-    # to a later MVP. Only max_files_changed and fix_scope are enforced here.
+    protected_paths = _protected_paths_for_project(root, plan.project_id)
     scope_check = check_scope(
         changed_files=changed.files,
         spec_scope=[],  # review_fix uses fix_scope, not spec scope
-        protected_paths=[],
+        protected_paths=protected_paths,
         max_files_changed=harness.max_files_changed,
         fix_scope=fix_scope,
     )
@@ -1089,6 +1142,8 @@ def _run_review_fix_inner(
             "reasons": scope_check.reasons,
             "changed_files": scope_check.changed_files,
             "out_of_scope_files": scope_check.out_of_scope_files,
+            "protected_violations": scope_check.protected_violations,
+            "protected_paths": protected_paths,
             "fix_scope": fix_scope,
         },
     )
@@ -1134,16 +1189,6 @@ def _run_review_fix_inner(
         _finish_blocked(conn, job_id, artifact_dir, "; ".join(test_quality.reasons))
         return _blocked_result(job_id, "; ".join(test_quality.reasons))
 
-    # --- Write test-first evidence ---
-    write_test_first_evidence_md(
-        artifact_dir,
-        {
-            "job_type": "review_fix",
-            "mode": test_quality.mode,
-            "test_quality_ok": test_quality.ok,
-        },
-    )
-
     # --- Make local commit ---
     comment_ids_str = ",".join(approved_comment_ids)
     commit_message = (
@@ -1187,6 +1232,7 @@ def _run_review_fix_inner(
     )
 
     # --- Finish succeeded ---
+    _record_issue_worktree_head(conn, plan, commit_sha)
     finish_job(
         conn, job_id, status="succeeded", commit_sha=commit_sha, artifact_path=str(artifact_dir), failure_reason=None
     )

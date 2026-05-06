@@ -6,7 +6,9 @@ Phase 11.2 tests (initial_implementation) and Phase 12.2 tests (review_fix).
 from __future__ import annotations
 
 import contextlib
+import json
 import subprocess
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -45,6 +47,28 @@ def _make_project(project_id: str = "test-proj") -> ProjectConfig:
             issue_worktree_pattern="/tmp/test-issue-{issue_number}",
         ),
     )
+
+
+def _write_projects_yaml(root: Path, *, protected_paths: list[str]) -> None:
+    config_dir = root / "config"
+    config_dir.mkdir(exist_ok=True)
+    protected_yaml = "\n".join(f"      - {path}" for path in protected_paths)
+    cfg = textwrap.dedent("""\
+        version: 1
+        projects:
+          - id: test-proj
+            name: Test Project
+            repo: git@github.com:test/test.git
+            github:
+              owner: test
+              repo: test
+            priority: high
+            status: active
+            default_branch: main
+    """)
+    if protected_paths:
+        cfg += "    protected_paths:\n" + protected_yaml + "\n"
+    (config_dir / "projects.yaml").write_text(cfg, encoding="utf-8")
 
 
 def _open_and_init(tmp: str) -> sqlite3.Connection:
@@ -100,6 +124,14 @@ def _default_kwargs() -> dict[str, Any]:
     )
 
 
+def _passing_evidence() -> FirstEvidenceResult:
+    return FirstEvidenceResult(has_failing_phase=True, has_passing_phase=True)
+
+
+def _blocked_evidence(reason: str = "no_failing_test_phase_found") -> FirstEvidenceResult:
+    return FirstEvidenceResult(has_failing_phase=False, has_passing_phase=True, blocked_reason=reason)
+
+
 # ---------------------------------------------------------------------------
 # Initial-implementation helpers
 # ---------------------------------------------------------------------------
@@ -138,7 +170,7 @@ def _setup_worktree_env(tmp_path: Path, issue_number: int = 42) -> tuple[sqlite3
             created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, 'clean', NULL, ?, ?)""",
         (
-            f"test-proj-issue-{issue_number}",
+            f"issue:test-proj:{issue_number}",
             "test-proj",
             issue_number,
             str(worktrees_root),
@@ -264,7 +296,7 @@ def _impl_mocks(
         else ["zero_new_tests_for_initial_implementation"],
         mode="acceptance_criteria_ids" if test_quality_ok else "",
     )
-    evidence = FirstEvidenceResult(has_failing_phase=True, has_passing_phase=True)
+    evidence = _passing_evidence()
     return dict(
         plan=plan,
         harness=harness,
@@ -414,10 +446,10 @@ class TestInitialImplRealRun:
 
         # Verify order of first four artifacts
         assert call_order[:4] == ["plan", "preflight", "commands", "input-request"]
-        # Then harness runs, then changed-files and checks
+        # Then harness runs, checks complete, and final changed-files are written
         assert "changed-files" in call_order
         assert "checks" in call_order
-        assert call_order.index("changed-files") < call_order.index("checks")
+        assert call_order.index("checks") < call_order.index("changed-files")
         conn.close()
 
     def test_initial_impl_real_run_calls_harness_runner_once(self, tmp_path: Path) -> None:
@@ -549,6 +581,35 @@ class TestInitialImplRealRun:
         mock_harness.assert_not_called()
         conn.close()
 
+    def test_initial_impl_confirmed_run_blocks_on_preflight_prepared_head_mismatch(self, tmp_path: Path) -> None:
+        """Confirmed runs must honor stale prepared-worktree blocks from preflight."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        plan = _make_impl_plan(
+            workspace_path=workspace,
+            source_artifact_path=root / "artifacts" / "issues" / "test-proj" / "42" / "spec.md",
+            blocked_reasons=["Prepared HEAD mismatch: expected 'old', got 'new'"],
+        )
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.run_harness") as mock_harness,
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert result["status"] == "blocked"
+        assert "Prepared HEAD mismatch" in result["reason"]
+        mock_harness.assert_not_called()
+        rows = conn.execute("SELECT * FROM implementation_jobs").fetchall()
+        assert rows == []
+        conn.close()
+
     def test_initial_impl_blocks_when_harness_dirties_protected_paths(self, tmp_path: Path) -> None:
         """Scope guard blocks when changed files violate scope constraints."""
         conn, workspace, root = _setup_worktree_env(tmp_path)
@@ -604,6 +665,149 @@ class TestInitialImplRealRun:
         assert result["status"] == "blocked"
         row = conn.execute("SELECT status FROM implementation_jobs").fetchone()
         assert row[0] == "blocked"
+        conn.close()
+
+    def test_initial_impl_blocks_when_test_first_evidence_is_missing(self, tmp_path: Path) -> None:
+        """Test-first evidence failure blocks before commit."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        m = _impl_mocks(workspace, root)
+        evidence = _blocked_evidence()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=m["plan"]),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=m["harness"]),
+            patch("portfolio_manager.implementation_jobs.run_harness", return_value=m["harness_result"]),
+            patch("portfolio_manager.implementation_jobs.run_required_check", return_value=FakeHarnessResult()),
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=m["changed_files"]),
+            patch("portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=evidence),
+            patch("portfolio_manager.implementation_jobs.check_scope") as mock_scope,
+            patch("portfolio_manager.implementation_jobs.make_local_commit") as mock_commit,
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "no_failing_test_phase_found"
+        mock_scope.assert_not_called()
+        mock_commit.assert_not_called()
+        row = conn.execute("SELECT status, failure_reason FROM implementation_jobs").fetchone()
+        assert row[0] == "blocked"
+        assert row[1] == "no_failing_test_phase_found"
+        conn.close()
+
+    def test_initial_impl_final_scope_includes_files_created_by_required_checks(self, tmp_path: Path) -> None:
+        """Final scope/test gates use changed files collected after required checks."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        m = _impl_mocks(workspace, root)
+        check_has_run = False
+
+        def collect_after_check(workspace_arg: Path, *, root: Path) -> ChangedFiles:
+            if check_has_run:
+                return ChangedFiles(
+                    files=["src/foo.py", "tests/test_foo.py", "tests/generated_by_check.py"],
+                    statuses=[
+                        {"path": "src/foo.py", "status": "M"},
+                        {"path": "tests/test_foo.py", "status": "A"},
+                        {"path": "tests/generated_by_check.py", "status": "A"},
+                    ],
+                )
+            return m["changed_files"]
+
+        def run_check(**kwargs: Any) -> FakeHarnessResult:
+            nonlocal check_has_run
+            check_has_run = True
+            return FakeHarnessResult()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=m["plan"]),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=m["harness"]),
+            patch("portfolio_manager.implementation_jobs.run_harness", return_value=m["harness_result"]),
+            patch("portfolio_manager.implementation_jobs.run_required_check", side_effect=run_check),
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", side_effect=collect_after_check),
+            patch("portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=m["evidence"]),
+            patch("portfolio_manager.implementation_jobs.check_scope", return_value=m["scope"]) as mock_scope,
+            patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=m["test_quality"]),
+            patch("portfolio_manager.implementation_jobs.make_local_commit", return_value=m["commit_sha"]),
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert result["status"] == "success"
+        assert mock_scope.call_args.kwargs["changed_files"] == [
+            "src/foo.py",
+            "tests/test_foo.py",
+            "tests/generated_by_check.py",
+        ]
+        conn.close()
+
+    def test_initial_impl_blocks_protected_path_created_by_required_check_real_scope(self, tmp_path: Path) -> None:
+        """A required check-created protected file is blocked by the real scope gate."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        _write_projects_yaml(root, protected_paths=[".env", ".github/workflows/**"])
+        spec_path = root / "artifacts" / "issues" / "test-proj" / "42" / "spec.md"
+        plan = _make_impl_plan(workspace_path=workspace, source_artifact_path=spec_path)
+        harness = _make_impl_harness()
+
+        def run_harness_ok(**kwargs: Any) -> FakeHarnessResult:
+            (workspace / "src").mkdir()
+            (workspace / "src" / "foo.py").write_text("def foo():\n    return True\n", encoding="utf-8")
+            (workspace / "tests").mkdir()
+            (workspace / "tests" / "test_foo.py").write_text(
+                "# AC-1: coverage for foo\nfrom src.foo import foo\n\ndef test_foo():\n    assert foo() == True\n",
+                encoding="utf-8",
+            )
+            (kwargs["artifact_dir"] / "harness-result.json").write_text(
+                json.dumps(
+                    {
+                        "status": "implemented",
+                        "test_first": [
+                            {"phase": "red", "command": ["pytest"], "exit_code": 1, "summary": "failed"},
+                            {"phase": "green", "command": ["pytest"], "exit_code": 0, "summary": "passed"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return FakeHarnessResult()
+
+        def run_check_writes_protected(**kwargs: Any) -> FakeHarnessResult:
+            (workspace / ".env").write_text("SECRET=leaked\n", encoding="utf-8")
+            return FakeHarnessResult()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_initial_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch("portfolio_manager.implementation_jobs.run_harness", side_effect=run_harness_ok),
+            patch("portfolio_manager.implementation_jobs.run_required_check", side_effect=run_check_writes_protected),
+            patch("portfolio_manager.implementation_jobs.make_local_commit") as mock_commit,
+        ):
+            result = run_initial_implementation(
+                conn,
+                root,
+                project_ref="test-proj",
+                issue_number=42,
+                harness_id="test-harness",
+                confirm=True,
+            )
+
+        assert result["status"] == "blocked"
+        assert "protected_path_violations" in result["reason"]
+        mock_commit.assert_not_called()
+        row = conn.execute("SELECT status, failure_reason FROM implementation_jobs").fetchone()
+        assert row[0] == "blocked"
+        assert "protected_path_violations" in row[1]
         conn.close()
 
     def test_initial_impl_creates_local_commit_when_all_gates_pass(self, tmp_path: Path) -> None:
@@ -673,6 +877,8 @@ class TestInitialImplRealRun:
         row = conn.execute("SELECT status, commit_sha FROM implementation_jobs").fetchone()
         assert row[0] == "succeeded"
         assert row[1] == m["commit_sha"]
+        wt_row = conn.execute("SELECT head_sha FROM worktrees WHERE id=?", ("issue:test-proj:42",)).fetchone()
+        assert wt_row[0] == m["commit_sha"]
         conn.close()
 
     def test_initial_impl_writes_error_artifact_and_fails_gracefully_on_lock_exception(self, tmp_path: Path) -> None:
@@ -945,6 +1151,9 @@ class TestReviewFixRealRun:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
             patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
             patch(
@@ -1007,52 +1216,72 @@ class TestReviewFixArtifacts:
             nonlocal written_input_request
             written_input_request = request
 
-        with (
-            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
-            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
-            patch(
-                "portfolio_manager.implementation_jobs.with_implementation_review_lock",
-                return_value=MagicMock(
-                    __enter__=MagicMock(return_value=None),
-                    __exit__=MagicMock(return_value=False),
-                ),
-            ),
-            patch(
-                "portfolio_manager.implementation_jobs.run_harness",
-                return_value=HarnessResult(
-                    returncode=0,
-                    duration_seconds=1.0,
-                    stdout="",
-                    stderr="",
-                    truncated=False,
-                    timed_out=False,
-                    harness_status="implemented",
-                    harness_message=None,
-                ),
-            ),
-            patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
-            patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
-            patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
-            patch(
-                "portfolio_manager.implementation_jobs.make_local_commit",
-                return_value="deadbeef" * 5,
-            ),
-            patch(
-                "portfolio_manager.implementation_jobs.write_input_request_json",
-                side_effect=capture_input_request,
-            ),
-            patch("portfolio_manager.implementation_jobs.write_plan_md"),
-            patch("portfolio_manager.implementation_jobs.write_preflight_json"),
-            patch("portfolio_manager.implementation_jobs.write_commands_json"),
-            patch("portfolio_manager.implementation_jobs.write_changed_files_json"),
-            patch("portfolio_manager.implementation_jobs.write_checks_json"),
-            patch("portfolio_manager.implementation_jobs.write_scope_check_md"),
-            patch("portfolio_manager.implementation_jobs.write_test_quality_md"),
-            patch("portfolio_manager.implementation_jobs.write_test_first_evidence_md"),
-            patch("portfolio_manager.implementation_jobs.write_commit_json"),
-            patch("portfolio_manager.implementation_jobs.write_result_json"),
-            patch("portfolio_manager.implementation_jobs.write_summary_md"),
-        ):
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan))
+            stack.enter_context(patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness))
+            stack.enter_context(
+                patch(
+                    "portfolio_manager.implementation_jobs.with_implementation_review_lock",
+                    return_value=MagicMock(
+                        __enter__=MagicMock(return_value=None),
+                        __exit__=MagicMock(return_value=False),
+                    ),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "portfolio_manager.implementation_jobs.run_harness",
+                    return_value=HarnessResult(
+                        returncode=0,
+                        duration_seconds=1.0,
+                        stdout="",
+                        stderr="",
+                        truncated=False,
+                        timed_out=False,
+                        harness_status="implemented",
+                        harness_message=None,
+                    ),
+                )
+            )
+            stack.enter_context(
+                patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed)
+            )
+            stack.enter_context(
+                patch(
+                    "portfolio_manager.implementation_jobs.collect_test_first_evidence",
+                    return_value=_passing_evidence(),
+                )
+            )
+            stack.enter_context(patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check))
+            stack.enter_context(
+                patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality)
+            )
+            stack.enter_context(
+                patch(
+                    "portfolio_manager.implementation_jobs.make_local_commit",
+                    return_value="deadbeef" * 5,
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "portfolio_manager.implementation_jobs.write_input_request_json",
+                    side_effect=capture_input_request,
+                )
+            )
+            for name in (
+                "write_plan_md",
+                "write_preflight_json",
+                "write_commands_json",
+                "write_changed_files_json",
+                "write_checks_json",
+                "write_scope_check_md",
+                "write_test_quality_md",
+                "write_test_first_evidence_md",
+                "write_commit_json",
+                "write_result_json",
+                "write_summary_md",
+            ):
+                stack.enter_context(patch(f"portfolio_manager.implementation_jobs.{name}"))
             kwargs = _default_kwargs()
             kwargs["confirm"] = True
             result = run_review_fix(conn, tmp_path, **kwargs)
@@ -1087,6 +1316,28 @@ class TestReviewFixBranchMismatch:
         assert result["status"] == "blocked"
         assert "Branch mismatch" in result["reason"]
 
+        conn.close()
+
+    def test_review_fix_confirmed_run_blocks_on_preflight_prepared_head_mismatch(self, tmp_path: Path):
+        """Confirmed review-fix runs must honor stale prepared-worktree blocks from preflight."""
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+
+        plan = _make_plan(blocked_reasons=["Prepared HEAD mismatch: expected 'old', got 'new'"])
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.run_harness") as mock_harness,
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            result = run_review_fix(conn, tmp_path, **kwargs)
+
+        assert result["status"] == "blocked"
+        assert "Prepared HEAD mismatch" in result["reason"]
+        mock_harness.assert_not_called()
+        rows = conn.execute("SELECT * FROM implementation_jobs").fetchall()
+        assert rows == []
         conn.close()
 
 
@@ -1159,6 +1410,9 @@ class TestReviewFixScopeViolation:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
         ):
             kwargs = _default_kwargs()
@@ -1172,6 +1426,259 @@ class TestReviewFixScopeViolation:
 
 
 class TestReviewFixTestQuality:
+    def test_review_fix_blocks_when_test_first_evidence_is_missing(self, tmp_path: Path):
+        """Review-fix test-first evidence failure blocks before commit."""
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+
+        plan = _make_plan()
+        harness = _make_harness()
+        changed = ChangedFiles(files=["src/foo.py"], statuses=[{"path": "src/foo.py", "status": "M"}])
+        evidence = _blocked_evidence()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch(
+                "portfolio_manager.implementation_jobs.with_implementation_review_lock",
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=None),
+                    __exit__=MagicMock(return_value=False),
+                ),
+            ),
+            patch(
+                "portfolio_manager.implementation_jobs.run_harness",
+                return_value=HarnessResult(
+                    returncode=0,
+                    duration_seconds=1.0,
+                    stdout="",
+                    stderr="",
+                    truncated=False,
+                    timed_out=False,
+                    harness_status="implemented",
+                    harness_message=None,
+                ),
+            ),
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch("portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=evidence),
+            patch("portfolio_manager.implementation_jobs.check_scope") as mock_scope,
+            patch("portfolio_manager.implementation_jobs.make_local_commit") as mock_commit,
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            result = run_review_fix(conn, tmp_path, **kwargs)
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "no_failing_test_phase_found"
+        mock_scope.assert_not_called()
+        mock_commit.assert_not_called()
+        row = conn.execute("SELECT status, failure_reason FROM implementation_jobs").fetchone()
+        assert row[0] == "blocked"
+        assert row[1] == "no_failing_test_phase_found"
+        conn.close()
+
+    def test_review_fix_writes_real_test_first_evidence_from_harness_result(self, tmp_path: Path):
+        """Review-fix evidence is collected from harness-result.json, not a placeholder."""
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+
+        plan = _make_plan()
+        harness = _make_harness()
+        changed = ChangedFiles(files=["src/foo.py"], statuses=[{"path": "src/foo.py", "status": "M"}])
+        scope_check = ScopeCheck(ok=True, changed_files=["src/foo.py"])
+        test_quality = QualityCheckResult(ok=True, mode="keyword_overlap")
+        written_evidence: dict[str, Any] | None = None
+
+        def run_harness_with_evidence(**kwargs: Any) -> HarnessResult:
+            (kwargs["artifact_dir"] / "harness-result.json").write_text(
+                json.dumps(
+                    {
+                        "status": "implemented",
+                        "test_first": [
+                            {"phase": "red", "command": ["pytest"], "exit_code": 1, "summary": "failed"},
+                            {"phase": "green", "command": ["pytest"], "exit_code": 0, "summary": "passed"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return HarnessResult(
+                returncode=0,
+                duration_seconds=1.0,
+                stdout="",
+                stderr="",
+                truncated=False,
+                timed_out=False,
+                harness_status="implemented",
+                harness_message=None,
+            )
+
+        def capture_evidence(artifact_dir: Path, data: dict[str, Any]) -> None:
+            nonlocal written_evidence
+            written_evidence = data
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch(
+                "portfolio_manager.implementation_jobs.with_implementation_review_lock",
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=None),
+                    __exit__=MagicMock(return_value=False),
+                ),
+            ),
+            patch("portfolio_manager.implementation_jobs.run_harness", side_effect=run_harness_with_evidence),
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
+            patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
+            patch("portfolio_manager.implementation_jobs.write_test_first_evidence_md", side_effect=capture_evidence),
+            patch("portfolio_manager.implementation_jobs.make_local_commit", return_value="deadbeef" * 5),
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            result = run_review_fix(conn, tmp_path, **kwargs)
+
+        assert result["status"] == "success"
+        assert written_evidence is not None
+        assert written_evidence["job_type"] == "review_fix"
+        assert written_evidence["has_failing_phase"] is True
+        assert written_evidence["has_passing_phase"] is True
+        assert written_evidence["blocked_reason"] is None
+        conn.close()
+
+    def test_review_fix_final_scope_includes_files_created_by_required_checks(self, tmp_path: Path) -> None:
+        """Review-fix final scope gates use changed files collected after required checks."""
+        conn = _open_and_init(str(tmp_path))
+        upsert_project(conn, _make_project())
+
+        plan = _make_plan(required_checks=["lint"])
+        harness = _make_impl_harness()
+        before_check = ChangedFiles(files=["src/foo.py"], statuses=[{"path": "src/foo.py", "status": "M"}])
+        check_has_run = False
+        scope_check = ScopeCheck(ok=True, changed_files=["src/foo.py", "tests/generated_by_check.py"])
+        test_quality = QualityCheckResult(ok=True, mode="keyword_overlap")
+
+        def collect_after_check(workspace_arg: Path, *, root: Path) -> ChangedFiles:
+            if check_has_run:
+                return ChangedFiles(
+                    files=["src/foo.py", "tests/generated_by_check.py"],
+                    statuses=[
+                        {"path": "src/foo.py", "status": "M"},
+                        {"path": "tests/generated_by_check.py", "status": "A"},
+                    ],
+                )
+            return before_check
+
+        def run_check(**kwargs: Any) -> FakeHarnessResult:
+            nonlocal check_has_run
+            check_has_run = True
+            return FakeHarnessResult()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch(
+                "portfolio_manager.implementation_jobs.with_implementation_review_lock",
+                return_value=MagicMock(
+                    __enter__=MagicMock(return_value=None),
+                    __exit__=MagicMock(return_value=False),
+                ),
+            ),
+            patch(
+                "portfolio_manager.implementation_jobs.run_harness",
+                return_value=HarnessResult(
+                    returncode=0,
+                    duration_seconds=1.0,
+                    stdout="",
+                    stderr="",
+                    truncated=False,
+                    timed_out=False,
+                    harness_status="implemented",
+                    harness_message=None,
+                ),
+            ),
+            patch("portfolio_manager.implementation_jobs.run_required_check", side_effect=run_check),
+            patch("portfolio_manager.implementation_jobs.collect_changed_files", side_effect=collect_after_check),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
+            patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check) as mock_scope,
+            patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
+            patch("portfolio_manager.implementation_jobs.make_local_commit", return_value="deadbeef" * 5),
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            result = run_review_fix(conn, tmp_path, **kwargs)
+
+        assert result["status"] == "success"
+        assert mock_scope.call_args.kwargs["changed_files"] == ["src/foo.py", "tests/generated_by_check.py"]
+        conn.close()
+
+    def test_review_fix_blocks_protected_path_created_by_required_check_real_scope(self, tmp_path: Path) -> None:
+        """Review-fix enforces protected paths in addition to fix_scope."""
+        conn, workspace, root = _setup_worktree_env(tmp_path)
+        _write_projects_yaml(root, protected_paths=[".github/workflows/**"])
+        spec_path = root / "artifacts" / "issues" / "test-proj" / "42" / "spec.md"
+        plan = _make_plan(workspace_path=workspace, source_artifact_path=spec_path, required_checks=["lint"])
+        harness = _make_impl_harness()
+
+        def run_harness_ok(**kwargs: Any) -> HarnessResult:
+            (workspace / "src").mkdir()
+            (workspace / "src" / "foo.py").write_text("def foo():\n    return True\n", encoding="utf-8")
+            (workspace / "tests").mkdir()
+            (workspace / "tests" / "test_foo.py").write_text(
+                "# AC-1: review fix coverage\nfrom src.foo import foo\n\ndef test_foo():\n    assert foo() == True\n",
+                encoding="utf-8",
+            )
+            (kwargs["artifact_dir"] / "harness-result.json").write_text(
+                json.dumps(
+                    {
+                        "status": "implemented",
+                        "test_first": [
+                            {"phase": "red", "command": ["pytest"], "exit_code": 1, "summary": "failed"},
+                            {"phase": "green", "command": ["pytest"], "exit_code": 0, "summary": "passed"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return HarnessResult(
+                returncode=0,
+                duration_seconds=1.0,
+                stdout="",
+                stderr="",
+                truncated=False,
+                timed_out=False,
+                harness_status="implemented",
+                harness_message=None,
+            )
+
+        def run_check_writes_protected(**kwargs: Any) -> FakeHarnessResult:
+            workflow_dir = workspace / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / "ci.yml").write_text("name: leaked\n", encoding="utf-8")
+            return FakeHarnessResult()
+
+        with (
+            patch("portfolio_manager.implementation_jobs.build_review_fix_plan", return_value=plan),
+            patch("portfolio_manager.implementation_jobs.get_harness", return_value=harness),
+            patch("portfolio_manager.implementation_jobs.run_harness", side_effect=run_harness_ok),
+            patch("portfolio_manager.implementation_jobs.run_required_check", side_effect=run_check_writes_protected),
+            patch("portfolio_manager.implementation_jobs.make_local_commit") as mock_commit,
+        ):
+            kwargs = _default_kwargs()
+            kwargs["confirm"] = True
+            kwargs["fix_scope"] = ["src/*", "tests/*", ".github/workflows/*"]
+            result = run_review_fix(conn, root, **kwargs)
+
+        assert result["status"] == "blocked"
+        assert "protected_path_violations" in result["reason"]
+        mock_commit.assert_not_called()
+        row = conn.execute("SELECT status, failure_reason FROM implementation_jobs").fetchone()
+        assert row[0] == "blocked"
+        assert "protected_path_violations" in row[1]
+        conn.close()
+
     def test_review_fix_blocks_when_no_failing_test_added_for_regression_fix(self, tmp_path: Path):
         """Test quality failure should block the review fix."""
         conn = _open_and_init(str(tmp_path))
@@ -1211,6 +1718,9 @@ class TestReviewFixTestQuality:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
             patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
         ):
@@ -1267,6 +1777,9 @@ class TestReviewFixCommit:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
             patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
             patch(
@@ -1377,6 +1890,9 @@ class TestReviewFixNoPassFailDecision:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
             patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
             patch(
@@ -1435,6 +1951,9 @@ class TestReviewFixNoPush:
                 ),
             ),
             patch("portfolio_manager.implementation_jobs.collect_changed_files", return_value=changed),
+            patch(
+                "portfolio_manager.implementation_jobs.collect_test_first_evidence", return_value=_passing_evidence()
+            ),
             patch("portfolio_manager.implementation_jobs.check_scope", return_value=scope_check),
             patch("portfolio_manager.implementation_jobs.check_test_quality", return_value=test_quality),
             patch(

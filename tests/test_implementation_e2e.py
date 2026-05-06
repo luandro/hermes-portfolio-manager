@@ -37,12 +37,49 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def _write_harnesses_yaml(root: Path, script_path: Path, mode: str = "ok") -> Path:
     """Rewrite harnesses.yaml with the desired fake harness mode."""
+    runner = root / "config" / f"fake_harness_runner_{mode}.py"
+    runner.write_text(
+        textwrap.dedent("""\
+            from __future__ import annotations
+
+            import json
+            import os
+            import subprocess
+            import sys
+            from pathlib import Path
+
+            script = sys.argv[1]
+            mode = sys.argv[2]
+            result = subprocess.run(["python3", script, mode], check=False)
+            evidence_modes = {"ok", "protected_path", "out_of_scope", "no_tests", "empty_tests", "review_fix_in", "review_fix_out"}
+            if result.returncode == 0 and mode in evidence_modes:
+                artifact_dir = os.environ.get("PORTFOLIO_IMPLEMENTATION_ARTIFACT_DIR", "")
+                if artifact_dir:
+                    path = Path(artifact_dir) / "harness-result.json"
+                    data = {"status": "implemented"}
+                    if path.is_file():
+                        try:
+                            loaded = json.loads(path.read_text(encoding="utf-8"))
+                            if isinstance(loaded, dict):
+                                data.update(loaded)
+                        except json.JSONDecodeError:
+                            pass
+                    data["test_first"] = [
+                        {"phase": "red", "command": ["pytest"], "exit_code": 1, "summary": "expected failure before fix"},
+                        {"phase": "green", "command": ["pytest"], "exit_code": 0, "summary": "passing after fix"},
+                    ]
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            sys.exit(result.returncode)
+            """),
+        encoding="utf-8",
+    )
     cfg = root / "config" / "harnesses.yaml"
     cfg.write_text(
         textwrap.dedent(f"""\
             harnesses:
               - id: fake
-                command: ["python3", "{script_path}", "{mode}"]
+                command: ["python3", "{runner}", "{script_path}", "{mode}"]
                 env_passthrough: []
                 timeout_seconds: 30
                 max_files_changed: 20
