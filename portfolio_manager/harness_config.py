@@ -55,7 +55,7 @@ MAX_TIMEOUT = 7200  # 2 hours max
 IMPLEMENTATION_LOCK_SAFETY_MARGIN = 60
 IMPLEMENTATION_HARNESS_TIMEOUT_BUDGET = IMPLEMENTATION_LOCK_TTL - IMPLEMENTATION_LOCK_SAFETY_MARGIN
 
-_SHELL_METACHAR_RE = re.compile(r"[;|&$`<>]")
+SHELL_METACHAR_RE = re.compile(r"[;&|$<>\`\\*?\[\]{}()!#\n\r]")
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ def _validate_command(cmd: Any, context: str) -> list[str]:
         if not elem:
             raise ConfigError(f"{context}: command[{i}] must not be empty")
 
-        if _SHELL_METACHAR_RE.search(elem):
+        if SHELL_METACHAR_RE.search(elem):
             raise ConfigError(f"{context}: command[{i}] contains shell metacharacters: {elem!r}")
 
         if i == 0:

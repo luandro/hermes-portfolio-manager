@@ -127,6 +127,28 @@ class TestHarnessCommandValidation:
         with pytest.raises(ConfigError, match="shell metacharacters"):
             load_harness_config(root)
 
+    @pytest.mark.parametrize(
+        "unsafe_arg",
+        [
+            "run(task)",
+            "run\nnext",
+            "run\rnext",
+            "*.py",
+            "file?.py",
+            "pkg[0]",
+            "pkg{src}",
+            r"path\to\file",
+            "force!",
+            "value#comment",
+        ],
+    )
+    def test_harness_command_rejects_runner_shell_metacharacters_at_config_load(
+        self, tmp_path: Path, unsafe_arg: str
+    ) -> None:
+        root = _write_harnesses_yaml(tmp_path, _valid_config(command=["forge", unsafe_arg]))
+        with pytest.raises(ConfigError, match="shell metacharacters"):
+            load_harness_config(root)
+
     def test_harness_command_rejects_empty_element(self, tmp_path: Path) -> None:
         root = _write_harnesses_yaml(tmp_path, _valid_config(command=["forge", ""]))
         with pytest.raises(ConfigError, match="must not be empty"):
@@ -246,6 +268,22 @@ class TestHarnessChecksMapping:
             _valid_config(checks={"unit_tests": "not a mapping"}),
         )
         with pytest.raises(ConfigError, match="must be a mapping"):
+            load_harness_config(root)
+
+    def test_harness_check_command_rejects_runner_shell_metacharacters_at_config_load(self, tmp_path: Path) -> None:
+        root = _write_harnesses_yaml(
+            tmp_path,
+            _valid_config(
+                checks={
+                    "unit_tests": {
+                        "command": ["pytest", "tests/(bad).py"],
+                        "timeout_seconds": 600,
+                    },
+                },
+                required_checks=["unit_tests"],
+            ),
+        )
+        with pytest.raises(ConfigError, match="shell metacharacters"):
             load_harness_config(root)
 
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import signal
 import subprocess
 import time
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
     from portfolio_manager.harness_config import HarnessCheckConfig, HarnessConfig
 
 from portfolio_manager.errors import redact_secrets
+from portfolio_manager.harness_config import SHELL_METACHAR_RE
 from portfolio_manager.implementation_artifacts import write_input_request_json
 from portfolio_manager.maintenance_artifacts import redact_secrets as redact_secrets_full
 from portfolio_manager.worktree_git import get_clean_state
@@ -30,7 +30,6 @@ from portfolio_manager.worktree_paths import assert_under_worktrees_root
 logger = logging.getLogger(__name__)
 
 _MAX_CAPTURE = 64 * 1024  # 64KB per stream
-_SHELL_META_RE = re.compile(r"[;&|$<>\`\\*?\[\]{}()!#\n\r]")
 VALID_HARNESS_STATUSES = {"implemented", "needs_user", "failed"}
 
 
@@ -84,7 +83,7 @@ def _validate_command(command: list[str]) -> None:
     for i, elem in enumerate(command):
         if not isinstance(elem, str) or not elem:
             raise ValueError(f"command[{i}] must be a non-empty string")
-        if _SHELL_META_RE.search(elem):
+        if SHELL_METACHAR_RE.search(elem):
             raise ValueError(f"command[{i}] contains shell metacharacters: {elem!r}")
         if i == 0:
             if "/" in elem and not elem.startswith("/"):
