@@ -104,19 +104,21 @@ def test_inspection_json_shape(tmp_path: Path) -> None:
 def test_error_json_shape_redacts_token_in_stderr(tmp_path: Path) -> None:
     d = base_artifact_dir(tmp_path, "p")
     d.mkdir(parents=True)
-    out = write_error(d, {"stderr": "fatal: ghp_AAAA1111BBBB2222 not authorized"})
+    fake_token = "ghp_" + "AAAA1111BBBB2222"
+    out = write_error(d, {"stderr": f"fatal: {fake_token} not authorized"})
     text = out.read_text()
-    assert "ghp_AAAA1111BBBB2222" not in text
+    assert fake_token not in text
     assert "ghp_***" in text
 
 
 def test_summary_md_is_public_safe_no_token_no_local_path_secrets(tmp_path: Path) -> None:
     d = base_artifact_dir(tmp_path, "p")
     d.mkdir(parents=True)
-    md = "# Result\n\nUsing token ghp_SECRET12345 and url https://user:pwd@github.com/o/r.git"
+    fake_token = "ghp_" + "SECRET12345"
+    md = f"# Result\n\nUsing token {fake_token} and url https://user:pwd@github.com/o/r.git"
     out = write_summary_md(d, md)
     text = out.read_text()
-    assert "ghp_SECRET12345" not in text
+    assert fake_token not in text
     assert "user:pwd" not in text
 
 

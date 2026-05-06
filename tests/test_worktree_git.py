@@ -81,14 +81,15 @@ def test_run_git_rejects_non_allowlisted_subcommand(tmp_path: Path) -> None:
 
 
 def test_run_git_redacts_credentials_in_stderr_capture(tmp_path: Path) -> None:
-    leaked = "fatal: cannot access https://user:ghp_AAAA1111@github.com/o/r.git\n"
+    fake_token = "ghp_" + "AAAA1111"
+    leaked = f"fatal: cannot access https://user:{fake_token}@github.com/o/r.git\n"
 
     def fake_run(args, **kwargs):  # type: ignore[no-untyped-def]  # mock matches subprocess.run
         return subprocess.CompletedProcess(args, 128, "", leaked)
 
     with patch("portfolio_manager.worktree_git.subprocess.run", side_effect=fake_run):
         result = run_git(["--version"], cwd=tmp_path, timeout=5)
-    assert "ghp_AAAA1111" not in result.stderr
+    assert fake_token not in result.stderr
     assert "ghp_***" in result.stderr or "***" in result.stderr
 
 

@@ -221,6 +221,7 @@ def test_secrets_redacted_in_every_artifact(artifact_dir: Path) -> None:
     """Every artifact must redact known secret patterns."""
     fake_ghp_token = "ghp_" + "abc123secret"
     fake_sk_token = "sk-" + "testkey123secret"
+    fake_password = "super" + "secret"
     secret_payloads = {
         "write_plan_md": {"steps": [f"use token {fake_ghp_token}"]},
         "write_preflight_json": {"ok": True, "token": fake_ghp_token},
@@ -229,7 +230,7 @@ def test_secrets_redacted_in_every_artifact(artifact_dir: Path) -> None:
         "write_test_first_evidence_md": {"note": fake_sk_token},
         "write_changed_files_json": [{"path": f"{fake_ghp_token}.py"}],
         "write_checks_json": [{"output": f"token={fake_ghp_token}"}],
-        "write_scope_check_md": {"detail": "password=supersecret"},
+        "write_scope_check_md": {"detail": f"password={fake_password}"},
         "write_test_quality_md": {"log": f"Bearer {fake_ghp_token}"},
         "write_commit_json": {"message": fake_ghp_token},
         "write_result_json": {"output": fake_ghp_token},

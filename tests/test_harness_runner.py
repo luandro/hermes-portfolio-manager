@@ -246,7 +246,8 @@ def test_runner_captures_stdout_stderr_truncated_to_64KB_each(tmp_path: Path) ->
 def test_runner_redacts_token_patterns_in_captured_output(tmp_path: Path) -> None:
     root, workspace = _make_workspace_under_root(tmp_path)
     _init_git_repo(workspace)
-    script = _write_script(tmp_path, "token.py", "print('token ghp_AAAA1111BBBB')\n")
+    fake_token = "ghp_" + "AAAA1111BBBB"
+    script = _write_script(tmp_path, "token.py", f"print('token {fake_token}')\n")
     harness = _make_harness(
         command=[sys.executable, script],
         timeout_seconds=5,
@@ -263,7 +264,7 @@ def test_runner_redacts_token_patterns_in_captured_output(tmp_path: Path) -> Non
         artifact_dir=artifact_dir,
         input_request_path=input_path,
     )
-    assert "ghp_AAAA1111BBBB" not in result.stdout
+    assert fake_token not in result.stdout
     assert "ghp_***" in result.stdout
 
 
@@ -330,20 +331,21 @@ def test_runner_writes_redacted_input_request(tmp_path: Path) -> None:
     harness = _make_harness(command=["echo", "ok"])
     artifact_dir = tmp_path / "artifacts"
     input_path = artifact_dir / "input-request.json"
+    fake_token = "ghp_" + "AAAA1111BBBB"
 
     result = run_harness(
         harness=harness,
         workspace=workspace,
         root=root,
         source_artifact_path=tmp_path / "source.md",
-        instructions={"token": "ghp_AAAA1111BBBB"},
+        instructions={"token": fake_token},
         artifact_dir=artifact_dir,
         input_request_path=input_path,
     )
 
     written = json.loads(input_path.read_text(encoding="utf-8"))
     assert result.returncode == 0
-    assert "ghp_AAAA1111BBBB" not in input_path.read_text(encoding="utf-8")
+    assert fake_token not in input_path.read_text(encoding="utf-8")
     assert written["token"] == "ghp_***"
 
 

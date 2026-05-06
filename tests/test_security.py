@@ -170,19 +170,19 @@ class TestRedactSecrets:
         ("input_text", "expected"),
         [
             # GitHub tokens
-            ("ghp_abc123def456", "ghp_***"),  # ggignore
-            ("gho_xyz789token", "gho_***"),  # ggignore
-            ("github_pat_11abc22def33", "github_pat_***"),  # ggignore
+            ("ghp_" + "abc123def456", "ghp_***"),
+            ("gho_" + "xyz789token", "gho_***"),
+            ("github_pat_" + "11abc22def33", "github_pat_***"),
             # GitHub OAuth access tokens
-            ("ghu_xxxxxtoken", "ghu_***"),  # ggignore
-            ("ghs_xxxxxtoken", "ghs_***"),  # ggignore
+            ("ghu_" + "xxxxxtoken", "ghu_***"),
+            ("ghs_" + "xxxxxtoken", "ghs_***"),
             # Bearer tokens in HTTP
-            ("Authorization: Bearer sk-abc123def456", "Authorization: Bearer ***"),  # ggignore
+            ("Authorization: Bearer " + "sk-" + "abc123def456", "Authorization: Bearer ***"),
             # Note: after the first pass, only the secret marker remains
             # Generic token patterns
-            ("token=abcdef1234567890abcdef", "token=***"),  # ggignore
+            ("token=" + "abcdef1234567890abcdef", "token=***"),
             # Multiple tokens in one string
-            ("ghp_abc and github_pat_def", "ghp_*** and github_pat_***"),  # ggignore
+            ("ghp_" + "abc and " + "github_pat_" + "def", "ghp_*** and github_pat_***"),
             # No tokens should pass through unchanged
             ("hello world no tokens here", "hello world no tokens here"),
             # Empty string
@@ -316,12 +316,13 @@ class TestMvp2RedactSecretsInToolOutput:
         """Tokens in _result() message are redacted."""
         from portfolio_manager.tools import _result
 
+        fake_token = "ghp_" + "abc123def456ghi789"
         output = _result(
             status="success",
             tool="test_tool",
-            message="Token is ghp_abc123def456ghi789 in output",
+            message=f"Token is {fake_token} in output",
         )
-        assert "ghp_abc123def456ghi789" not in output, "GitHub token leaked in tool output"
+        assert fake_token not in output, "GitHub token leaked in tool output"
         assert "ghp_***" in output, "Token not properly redacted"
 
 
@@ -632,9 +633,10 @@ class TestMaintenancePrivacyRedaction:
         """Error artifacts have tokens redacted."""
         from portfolio_manager.maintenance_artifacts import redact_secrets
 
-        text_with_token = "Error: ghp_ABC123DEF456 failed for repo"  # ggignore
+        fake_token = "ghp_" + "ABC123DEF456"
+        text_with_token = f"Error: {fake_token} failed for repo"
         redacted = redact_secrets(text_with_token)
-        assert "ghp_ABC123DEF456" not in redacted  # ggignore
+        assert fake_token not in redacted
         assert "ghp_***" in redacted
 
     def test_report_does_not_include_environment_variables(self, tmp_path: Path) -> None:
@@ -846,7 +848,8 @@ class TestMvp5SecretRedaction:
     def test_https_token_in_remote_url_redacted(self) -> None:
         from portfolio_manager.worktree_paths import redact_remote_url
 
-        url = "https://x-access-token:ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA@github.com/owner/repo.git"  # ggignore
+        token = "ghp_" + ("A" * 28)
+        url = f"https://x-access-token:{token}@github.com/owner/repo.git"
         redacted = redact_remote_url(url)
         assert "ghp_" not in redacted
         assert "x-access-token" not in redacted
@@ -859,7 +862,7 @@ class TestMvp5SecretRedaction:
         )
 
         artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
-        token = "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA"  # ggignore
+        token = "ghp_" + ("A" * 28)
         path = write_error(
             artifact_dir,
             {
@@ -868,7 +871,7 @@ class TestMvp5SecretRedaction:
             },
         )
         content = path.read_text(encoding="utf-8")
-        assert token not in content  # ggignore
+        assert token not in content
 
     def test_summary_md_does_not_leak_token(self, tmp_path: Path) -> None:
         from portfolio_manager.worktree_artifacts import (
@@ -878,12 +881,12 @@ class TestMvp5SecretRedaction:
         )
 
         artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
-        token = "github_pat_AAAAAAAAAAAAAAAAAAAA_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"  # ggignore
+        token = "github_pat_" + ("A" * 20) + "_" + ("B" * 58)
         path = write_summary_md(
             artifact_dir,
             f"# Result\n\nClone URL contained {token} (should be redacted).",
         )
-        assert token not in path.read_text(encoding="utf-8")  # ggignore
+        assert token not in path.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -1157,7 +1160,7 @@ class TestMvp6SecretRedaction:
             },
         )
         content = (artifact_dir / "error.json").read_text()
-        assert token not in content  # ggignore
+        assert token not in content
 
     def test_ghp_token_in_harness_stderr_redacted_in_error_json(self, tmp_path: Path) -> None:
         """write_error_json redacts ghp_ tokens from harness stderr."""
@@ -1170,7 +1173,7 @@ class TestMvp6SecretRedaction:
             {"stderr": f"remote: Invalid token {token}"},
         )
         content = (artifact_dir / "error.json").read_text()
-        assert token not in content  # ggignore
+        assert token not in content
         assert "ghp_***" in content
 
     def test_env_variable_value_not_in_passthrough_never_written_to_artifacts(self, tmp_path: Path) -> None:

@@ -371,7 +371,8 @@ class TestExplainTool:
         from portfolio_manager.implementation_tools import _handle_portfolio_implementation_explain
 
         conn = _open_conn(tmp_root)
-        _insert_job(conn, job_id="job-secret", status="blocked", failure_reason="token=abc123secret")
+        fake_token = "abc" + "123secret"
+        _insert_job(conn, job_id="job-secret", status="blocked", failure_reason=f"token={fake_token}")
         conn.close()
 
         result_str = _handle_portfolio_implementation_explain(
@@ -382,7 +383,7 @@ class TestExplainTool:
             }
         )
         result = _parse(result_str)
-        assert "abc123secret" not in result_str
+        assert fake_token not in result_str
         assert result["message"] == "Job job-secret is in state 'blocked'. Reason: token=***"
 
     def test_explain_tool_returns_blocked_for_unknown_project(self, tmp_root: Path) -> None:
@@ -474,12 +475,13 @@ class TestStartHandler:
     def test_start_handler_redacts_result_json(self, mock_run: MagicMock, tmp_root: Path) -> None:
         from portfolio_manager.implementation_tools import _handle_portfolio_implementation_start
 
+        fake_token = "ghp_" + "AAAA1111BBBB"
         mock_run.return_value = {
             "status": "needs_user",
             "tool": "portfolio_implementation_start",
-            "message": "Need token ghp_AAAA1111BBBB",
-            "data": {"needs_user": {"question": "Use ghp_AAAA1111BBBB?"}},
-            "summary": "Need token ghp_AAAA1111BBBB",
+            "message": f"Need token {fake_token}",
+            "data": {"needs_user": {"question": f"Use {fake_token}?"}},
+            "summary": f"Need token {fake_token}",
             "reason": None,
         }
 
@@ -493,7 +495,7 @@ class TestStartHandler:
             }
         )
         result = _parse(result_str)
-        assert "ghp_AAAA1111BBBB" not in result_str
+        assert fake_token not in result_str
         assert result["data"]["needs_user"]["question"] == "Use ghp_***?"
 
 
@@ -563,13 +565,14 @@ class TestApplyReviewFixesHandler:
     ) -> None:
         from portfolio_manager.implementation_tools import _handle_portfolio_implementation_apply_review_fixes
 
+        fake_token = "ghp_" + "AAAA1111BBBB"
         mock_run.return_value = {
             "status": "failed",
             "tool": "portfolio_implementation_apply_review_fixes",
-            "message": "failed with ghp_AAAA1111BBBB",
+            "message": f"failed with {fake_token}",
             "data": {},
-            "summary": "failed with ghp_AAAA1111BBBB",
-            "reason": "ghp_AAAA1111BBBB",
+            "summary": f"failed with {fake_token}",
+            "reason": fake_token,
         }
 
         result_str = _handle_portfolio_implementation_apply_review_fixes(
@@ -588,7 +591,7 @@ class TestApplyReviewFixesHandler:
             }
         )
         result = _parse(result_str)
-        assert "ghp_AAAA1111BBBB" not in result_str
+        assert fake_token not in result_str
         assert result["reason"] == "ghp_***"
         assert mock_run.call_args.kwargs["base_sha"] == "abc123"
 
