@@ -29,6 +29,7 @@ from portfolio_manager.worktree_artifacts import (
     write_result,
 )
 from portfolio_manager.worktree_create import create_issue_worktree
+from portfolio_manager.worktree_git import DEFAULT_TIMEOUTS, run_git
 from portfolio_manager.worktree_locks import (
     WorktreeLockBusy,
     with_project_and_issue_locks,
@@ -50,6 +51,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _current_head_sha(path: Path) -> str | None:
+    result = run_git(["rev-parse", "HEAD"], cwd=path, timeout=DEFAULT_TIMEOUTS["rev-parse"])
+    if result.returncode == 0:
+        return result.stdout.strip() or None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +469,7 @@ def _execute_create_issue(
                     reason="failed" if create_outcome.is_failed else "blocked",
                     data={"outcome": payload},
                 )
+            issue_head_sha = _current_head_sha(plan.issue_worktree_path)
             upsert_issue_worktree(
                 conn,
                 project_id=plan.project_id,
@@ -470,6 +479,8 @@ def _execute_create_issue(
                 branch_name=plan.branch_name,
                 base_branch=plan.base_branch,
                 remote_url=plan.remote_url,
+                head_sha=issue_head_sha,
+                base_sha=issue_head_sha,
             )
             result_payload = {
                 "status": "success",

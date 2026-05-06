@@ -24,11 +24,39 @@ import pytest
 
 SRC_DIR = Path(__file__).parent.parent / "portfolio_manager"
 SOURCE_FILES = sorted(SRC_DIR.rglob("*.py"))
+REPO_ROOT = Path(__file__).parent.parent
+TEXT_FILE_SUFFIXES = {".md", ".py", ".toml", ".txt", ".yaml", ".yml"}
+RISKY_FAKE_SECRET_RE = re.compile(
+    r"gh[opusr]_[A-Za-z0-9]{8,}"
+    r"|github_pat_[A-Za-z0-9_]{12,}"
+    r"|(?<![A-Za-z0-9])sk-[A-Za-z0-9]{8,}"
+    r"|token=[A-Za-z0-9]{12,}"
+    r"|Bearer [A-Za-z0-9_-]{12,}"
+    r"|password=[A-Za-z0-9]{8,}"
+)
+SCAN_EXCLUDED_DIRS = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__"}
 
 
 # ---------------------------------------------------------------------------
 # 8.1 No shell strings — all subprocess calls use argument arrays
 # ---------------------------------------------------------------------------
+
+
+def test_no_contiguous_fake_secret_literals_in_repo() -> None:
+    """Redaction tests must build fake credentials at runtime to avoid GitGuardian incidents."""
+    findings: list[str] = []
+    for path in sorted(REPO_ROOT.rglob("*")):
+        rel_path = path.relative_to(REPO_ROOT)
+        if any(part in SCAN_EXCLUDED_DIRS or part.startswith(".") for part in rel_path.parts[:-1]):
+            continue
+        if not path.is_file() or path.suffix not in TEXT_FILE_SUFFIXES:
+            continue
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if RISKY_FAKE_SECRET_RE.search(line):
+                findings.append(f"{rel_path}:{line_number}")
+
+    assert not findings, "Split fake secret literals at runtime: " + ", ".join(findings)
 
 
 class TestSubprocessUsesArgumentArrays:
@@ -170,19 +198,19 @@ class TestRedactSecrets:
         ("input_text", "expected"),
         [
             # GitHub tokens
-            ("ghp_abc123def456", "ghp_***"),  # ggignore
-            ("gho_xyz789token", "gho_***"),  # ggignore
-            ("github_pat_11abc22def33", "github_pat_***"),  # ggignore
+            ("ghp_" + "abc123def456", "ghp_***"),
+            ("gho_" + "xyz789token", "gho_***"),
+            ("github_pat_" + "11abc22def33", "github_pat_***"),
             # GitHub OAuth access tokens
-            ("ghu_xxxxxtoken", "ghu_***"),  # ggignore
-            ("ghs_xxxxxtoken", "ghs_***"),  # ggignore
+            ("ghu_" + "xxxxxtoken", "ghu_***"),
+            ("ghs_" + "xxxxxtoken", "ghs_***"),
             # Bearer tokens in HTTP
-            ("Authorization: Bearer sk-abc123def456", "Authorization: Bearer ***"),  # ggignore
+            ("Authorization: Bearer " + "sk-" + "abc123def456", "Authorization: Bearer ***"),
             # Note: after the first pass, only the secret marker remains
             # Generic token patterns
-            ("token=abcdef1234567890abcdef", "token=***"),  # ggignore
+            ("token=" + "abcdef1234567890abcdef", "token=***"),
             # Multiple tokens in one string
-            ("ghp_abc and github_pat_def", "ghp_*** and github_pat_***"),  # ggignore
+            ("ghp_" + "abc and " + "github_pat_" + "def", "ghp_*** and github_pat_***"),
             # No tokens should pass through unchanged
             ("hello world no tokens here", "hello world no tokens here"),
             # Empty string
@@ -316,12 +344,13 @@ class TestMvp2RedactSecretsInToolOutput:
         """Tokens in _result() message are redacted."""
         from portfolio_manager.tools import _result
 
+        fake_token = "ghp_" + "abc123def456ghi789"
         output = _result(
             status="success",
             tool="test_tool",
-            message="Token is ghp_abc123def456ghi789 in output",
+            message=f"Token is {fake_token} in output",
         )
-        assert "ghp_abc123def456ghi789" not in output, "GitHub token leaked in tool output"
+        assert fake_token not in output, "GitHub token leaked in tool output"
         assert "ghp_***" in output, "Token not properly redacted"
 
 
@@ -632,9 +661,10 @@ class TestMaintenancePrivacyRedaction:
         """Error artifacts have tokens redacted."""
         from portfolio_manager.maintenance_artifacts import redact_secrets
 
-        text_with_token = "Error: ghp_ABC123DEF456 failed for repo"  # ggignore
+        fake_token = "ghp_" + "ABC123DEF456"
+        text_with_token = f"Error: {fake_token} failed for repo"
         redacted = redact_secrets(text_with_token)
-        assert "ghp_ABC123DEF456" not in redacted  # ggignore
+        assert fake_token not in redacted
         assert "ghp_***" in redacted
 
     def test_report_does_not_include_environment_variables(self, tmp_path: Path) -> None:
@@ -846,7 +876,8 @@ class TestMvp5SecretRedaction:
     def test_https_token_in_remote_url_redacted(self) -> None:
         from portfolio_manager.worktree_paths import redact_remote_url
 
-        url = "https://x-access-token:ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA@github.com/owner/repo.git"  # ggignore
+        token = "ghp_" + ("A" * 28)
+        url = f"https://x-access-token:{token}@github.com/owner/repo.git"
         redacted = redact_remote_url(url)
         assert "ghp_" not in redacted
         assert "x-access-token" not in redacted
@@ -859,7 +890,7 @@ class TestMvp5SecretRedaction:
         )
 
         artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
-        token = "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAA"  # ggignore
+        token = "ghp_" + ("A" * 28)
         path = write_error(
             artifact_dir,
             {
@@ -868,7 +899,7 @@ class TestMvp5SecretRedaction:
             },
         )
         content = path.read_text(encoding="utf-8")
-        assert token not in content  # ggignore
+        assert token not in content
 
     def test_summary_md_does_not_leak_token(self, tmp_path: Path) -> None:
         from portfolio_manager.worktree_artifacts import (
@@ -878,9 +909,340 @@ class TestMvp5SecretRedaction:
         )
 
         artifact_dir = ensure_artifact_dir(base_artifact_dir(tmp_path, "proj"))
-        token = "github_pat_AAAAAAAAAAAAAAAAAAAA_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"  # ggignore
+        token = "github_pat_" + ("A" * 20) + "_" + ("B" * 58)
         path = write_summary_md(
             artifact_dir,
             f"# Result\n\nClone URL contained {token} (should be redacted).",
         )
-        assert token not in path.read_text(encoding="utf-8")  # ggignore
+        assert token not in path.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Phase 16 — MVP 6 implementation harness security hardening
+# ---------------------------------------------------------------------------
+
+# MVP 6 implementation + harness modules to scan
+IMPL_FILES = sorted(
+    p for p in SRC_DIR.rglob("*.py") if p.name.startswith("implementation_") or p.name.startswith("harness_")
+)
+
+
+# ---------------------------------------------------------------------------
+# 16.1 Harness command allowlist + shell=True grep
+# ---------------------------------------------------------------------------
+
+
+class TestMvp6SubprocessSafety:
+    """MVP 6 implementation modules must use safe subprocess patterns."""
+
+    def test_no_shell_true_in_implementation_modules(self) -> None:
+        """No implementation or harness module uses shell=True."""
+        for f in IMPL_FILES:
+            content = f.read_text()
+            assert "shell=True" not in content, f"shell=True found in {f.name}"
+
+    def test_no_subprocess_string_command_in_implementation_modules(self) -> None:
+        """No subprocess.run/Popen/call with a bare string argument."""
+        for f in IMPL_FILES:
+            content = f.read_text()
+            assert not re.search(r"subprocess\.(run|Popen|call)\([\s\n]*['\"]", content), (
+                f"String-arg subprocess call found in {f.name}"
+            )
+
+    def test_no_os_system_or_popen_in_implementation_modules(self) -> None:
+        """No os.system() or os.popen() calls."""
+        for f in IMPL_FILES:
+            content = f.read_text()
+            assert "os.system(" not in content, f"os.system() found in {f.name}"
+            assert "os.popen(" not in content, f"os.popen() found in {f.name}"
+
+    def test_no_eval_or_exec_in_implementation_modules(self) -> None:
+        """No eval() or exec() calls (only check actual calls, not string literals)."""
+        for f in IMPL_FILES:
+            content = f.read_text()
+            assert not re.search(r"\beval\s*\(", content), f"eval() found in {f.name}"
+            assert not re.search(r"\bexec\s*\(", content), f"exec() found in {f.name}"
+
+    def test_only_harness_runner_invokes_subprocess(self) -> None:
+        """Only harness_runner.py may call subprocess.run/Popen/call.
+
+        harness_runner.py: runs the coding harness subprocess.
+        All other implementation modules must use worktree_git.run_git or avoid subprocess.
+        """
+        allowed = {"harness_runner.py"}
+        for f in IMPL_FILES:
+            if f.name in allowed:
+                continue
+            content = f.read_text()
+            assert (
+                "subprocess.run" not in content
+                and "subprocess.Popen" not in content
+                and "subprocess.call" not in content
+            ), f"subprocess call found in {f.name} (only harness_runner.py may invoke subprocess)"
+
+    def test_harness_runner_basename_allowlist_enforced(self) -> None:
+        """harness_runner.py must have _validate_command or equivalent allowlist check."""
+        harness_runner = SRC_DIR / "harness_runner.py"
+        content = harness_runner.read_text()
+        assert "_validate_command" in content or "validate_command" in content, (
+            "harness_runner.py must define a command validation function"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 16.2 Forbidden git/gh subcommands grep
+# ---------------------------------------------------------------------------
+
+
+class TestMvp6ForbiddenCommands:
+    """MVP 6 implementation modules must not contain destructive commands."""
+
+    BANNED_GIT_IMPL: ClassVar[list[str]] = [
+        "git push",
+        "git rebase",
+        "git reset",
+        "git clean",
+        "git stash",
+    ]
+    BANNED_GH_IMPL: ClassVar[list[str]] = [
+        "gh pr create",
+        "gh pr merge",
+        "gh issue create",
+    ]
+    # Build/test tool names that must not appear as bare commands in orchestrator modules
+    BANNED_BUILD_TOOLS: ClassVar[list[str]] = [
+        "npm ",
+        "pnpm ",
+        "yarn ",
+        "pip install",
+        "cargo ",
+        "make ",
+    ]
+
+    def test_no_git_push_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "git push" not in f.read_text(), f"'git push' found in {f.name}"
+
+    def test_no_git_amend_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "--amend" not in f.read_text(), f"'--amend' found in {f.name}"
+
+    def test_no_git_rebase_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "git rebase" not in f.read_text(), f"'git rebase' found in {f.name}"
+
+    def test_no_git_reset_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "git reset" not in f.read_text(), f"'git reset' found in {f.name}"
+
+    def test_no_git_clean_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "git clean" not in f.read_text(), f"'git clean' found in {f.name}"
+
+    def test_no_git_stash_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "git stash" not in f.read_text(), f"'git stash' found in {f.name}"
+
+    def test_no_gh_pr_create_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "gh pr create" not in f.read_text(), f"'gh pr create' found in {f.name}"
+
+    def test_no_gh_pr_merge_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "gh pr merge" not in f.read_text(), f"'gh pr merge' found in {f.name}"
+
+    def test_no_gh_issue_create_in_implementation_modules(self) -> None:
+        for f in IMPL_FILES:
+            assert "gh issue create" not in f.read_text(), f"'gh issue create' found in {f.name}"
+
+    def test_no_npm_pnpm_yarn_pip_cargo_make_in_orchestrator(self) -> None:
+        """Build/test tool commands must not appear in orchestrator modules.
+
+        These tools run only inside the harness sandbox (configured in
+        harnesses.yaml checks), never invoked directly by MVP 6 code.
+        """
+        for f in IMPL_FILES:
+            content = f.read_text()
+            for banned in self.BANNED_BUILD_TOOLS:
+                assert banned not in content, f"Build tool command '{banned.strip()}' found in {f.name}"
+
+
+# ---------------------------------------------------------------------------
+# 16.3 Path containment
+# ---------------------------------------------------------------------------
+
+
+class TestMvp6PathContainment:
+    """MVP 6 paths must stay under $ROOT and reject traversal attempts."""
+
+    def test_harness_workspace_outside_root_blocked_at_handler_layer(self, tmp_path: Path) -> None:
+        """run_harness rejects a workspace path that escapes $ROOT/worktrees."""
+        from portfolio_manager.harness_config import HarnessConfig
+        from portfolio_manager.harness_runner import run_harness
+
+        harness = HarnessConfig(
+            id="test",
+            command=["true"],
+            env_passthrough=[],
+            timeout_seconds=10,
+            max_files_changed=10,
+            required_checks=[],
+            checks={},
+            workspace_subpath=None,
+        )
+        outside_workspace = tmp_path / "outside" / "worktrees" / "escape"
+        outside_workspace.mkdir(parents=True)
+        with pytest.raises(ValueError, match="escapes worktrees root"):
+            run_harness(
+                harness=harness,
+                workspace=outside_workspace,
+                root=tmp_path,
+                source_artifact_path=tmp_path / "source.md",
+                instructions={},
+                artifact_dir=tmp_path / "artifacts",
+                input_request_path=tmp_path / "input-request.json",
+            )
+
+    def test_artifact_dir_path_traversal_in_job_id_blocked(self, tmp_path: Path) -> None:
+        """implementation_artifact_dir rejects path traversal in job_id."""
+        from portfolio_manager.implementation_paths import implementation_artifact_dir
+
+        with pytest.raises(ValueError):
+            implementation_artifact_dir(tmp_path, "proj", 1, "../escape")
+
+    def test_artifact_dir_path_traversal_in_project_id_blocked(self, tmp_path: Path) -> None:
+        """implementation_artifact_dir rejects path traversal in project_id."""
+        from portfolio_manager.implementation_paths import implementation_artifact_dir
+
+        with pytest.raises(ValueError):
+            implementation_artifact_dir(tmp_path, "../escape", 1, "impl_abc12345")
+
+    def test_source_artifact_path_outside_root_blocked(self, tmp_path: Path) -> None:
+        """resolve_source_artifact raises when a candidate path escapes root."""
+        import sqlite3
+
+        from portfolio_manager.implementation_paths import resolve_source_artifact
+
+        root = tmp_path / "root"
+        root.mkdir()
+        (root / "artifacts" / "issues").mkdir(parents=True)
+
+        conn = sqlite3.connect(":memory:")
+        # Create the tables needed for the query
+        conn.execute("CREATE TABLE issues (project_id TEXT, issue_number INTEGER, spec_artifact_path TEXT)")
+        conn.execute("CREATE TABLE issue_drafts (github_issue_number INTEGER, project_id TEXT, artifact_path TEXT)")
+
+        # Insert a spec_artifact_path that points outside root
+        conn.execute(
+            "INSERT INTO issues VALUES (?, ?, ?)",
+            ("proj", 1, str(tmp_path / "outside" / "escape.md")),
+        )
+        conn.commit()
+
+        with pytest.raises(ValueError, match="escapes"):
+            resolve_source_artifact(root, conn, "proj", 1)
+
+    def test_symlink_under_worktrees_to_outside_blocked_for_harness_workspace(self, tmp_path: Path) -> None:
+        """assert_under_worktrees_root blocks a symlink pointing outside $ROOT/worktrees."""
+        import os
+
+        from portfolio_manager.worktree_paths import assert_under_worktrees_root
+
+        worktrees_root = tmp_path / "worktrees"
+        worktrees_root.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        link = worktrees_root / "evil-link"
+        os.symlink(outside, link)
+
+        with pytest.raises(ValueError, match="escapes"):
+            assert_under_worktrees_root(link, tmp_path)
+
+    def test_workspace_subpath_with_dotdot_blocked(self, tmp_path: Path) -> None:
+        """implementation_artifact_dir rejects job_id containing '..'."""
+        from portfolio_manager.implementation_paths import implementation_artifact_dir
+
+        with pytest.raises(ValueError):
+            implementation_artifact_dir(tmp_path, "proj", 1, "impl_abc/../escape")
+
+
+# ---------------------------------------------------------------------------
+# 16.4 Secret + env redaction
+# ---------------------------------------------------------------------------
+
+
+class TestMvp6SecretRedaction:
+    """MVP 6 artifacts must never contain secrets, env values, or CoT markers."""
+
+    def test_https_token_in_remote_url_redacted_in_implementation_artifacts(self, tmp_path: Path) -> None:
+        """write_error_json redacts tokens from HTTPS remote URLs."""
+        from portfolio_manager.implementation_artifacts import write_error_json
+
+        artifact_dir = tmp_path / "artifacts"
+        token = "ghp_" + ("A" * 28)
+        write_error_json(
+            artifact_dir,
+            {
+                "step": "fetch",
+                "stderr": f"fatal: could not read Username for 'https://x-access-token:{token}@github.com/'",
+            },
+        )
+        content = (artifact_dir / "error.json").read_text()
+        assert token not in content
+
+    def test_ghp_token_in_harness_stderr_redacted_in_error_json(self, tmp_path: Path) -> None:
+        """write_error_json redacts ghp_ tokens from harness stderr."""
+        from portfolio_manager.implementation_artifacts import write_error_json
+
+        artifact_dir = tmp_path / "artifacts"
+        token = "ghp_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "1234"
+        write_error_json(
+            artifact_dir,
+            {"stderr": f"remote: Invalid token {token}"},
+        )
+        content = (artifact_dir / "error.json").read_text()
+        assert token not in content
+        assert "ghp_***" in content
+
+    def test_env_variable_value_not_in_passthrough_never_written_to_artifacts(self, tmp_path: Path) -> None:
+        """Artifact writers sanitize env-like variable values from output."""
+        from portfolio_manager.implementation_artifacts import write_summary_md
+
+        artifact_dir = tmp_path / "artifacts"
+        token_value = "abc" + "def" + "1234" + "5678" + "90ab" + "cdef"
+        write_summary_md(
+            artifact_dir,
+            f"Result: token={token_value} in output",
+        )
+        content = (artifact_dir / "summary.md").read_text()
+        # The redaction helper should redact token=... patterns
+        assert token_value not in content
+
+    def test_no_chain_of_thought_marker_in_implementation_artifacts(self, tmp_path: Path) -> None:
+        """Artifact writers strip chain-of-thought markers."""
+        from portfolio_manager.implementation_artifacts import write_summary_md
+
+        artifact_dir = tmp_path / "artifacts"
+        write_summary_md(
+            artifact_dir,
+            "Result: internal: secret thinking: process <|cot|> hidden <thought>deep</thought>",
+        )
+        content = (artifact_dir / "summary.md").read_text()
+        assert "internal:" not in content
+        assert "<|cot|>" not in content
+        assert "<thought>" not in content
+        assert "</thought>" not in content
+
+    def test_no_user_home_path_in_summary_md(self, tmp_path: Path) -> None:
+        """summary.md does not contain absolute user-home paths."""
+        from portfolio_manager.implementation_artifacts import write_summary_md
+
+        artifact_dir = tmp_path / "artifacts"
+        home = str(Path.home())
+        write_summary_md(
+            artifact_dir,
+            f"Workspace at {home}/projects/my-repo is ready.",
+        )
+        content = (artifact_dir / "summary.md").read_text()
+        assert home not in content
+        assert "$HOME" in content

@@ -42,9 +42,7 @@ The system must grow in safe stages. Each MVP has strict boundaries.
 
 # Current Roadmap Position
 
-MVP 4 is the current merge boundary. Treat MVPs 1-4 as the baseline only after the branch is merged or the implementation is otherwise confirmed with tests and smoke checks.
-
-Do not assume implementation status from this document alone.
+MVP 6 is the current implementation boundary. Treat MVPs 1-5 as the baseline and MVP 6 as implemented (automated tests green; manual smoke deferred). The handoff table reflects actual status.
 
 ## Status Table
 
@@ -55,11 +53,12 @@ Do not assume implementation status from this document alone.
 | MVP 3 - Issue creation and brainstorming | Baseline | Run full tests; verify draft, dry-run, duplicate detection, and create-from-draft using test repo or mocks |
 | MVP 4 - Maintenance skills | Merge boundary | Run full tests; verify maintenance tools and local draft behavior |
 | MVP 5 - Worktree preparation | Implemented (automated tests green; manual smoke deferred) | Run full tests; verify plan / prepare-base / create-issue tools dry-run + confirm flow against `/tmp/agent-system-test` with the local bare-repo fixture |
-| MVP 6-10 - Implementation, review, QA, operations, constrained autonomy | Roadmap specs only | Must not implement before previous MVPs are green |
+| MVP 6 - Implementation harness orchestration | Implemented (automated tests green; manual smoke deferred) | Run full tests; verify plan/start/status/list/explain tools and E2E fake-harness flow against `/tmp/agent-system-test` |
+| MVP 7-10 - Review, QA, operations, constrained autonomy | Roadmap specs only | Must not implement before previous MVPs are green |
 
 ## Verification Gate Before New Work
 
-Before starting MVP 5 or changing architecture, run:
+Before starting MVP 7 or changing architecture, run:
 
 ```bash
 pytest
@@ -72,9 +71,11 @@ MVP 1: portfolio status and heartbeat work.
 MVP 2: project admin works with $HOME/.agent-system or test root.
 MVP 3: issue draft and dry-run issue creation work without unsafe side effects.
 MVP 4: maintenance checks, reports, and optional local draft creation work.
+MVP 5: worktree plan / prepare-base / create-issue tools work with test root.
+MVP 6: implementation plan/start/status/list/explain tools work; E2E fake-harness flow passes.
 ```
 
-If any MVP 1-4 tests fail, fix them before starting MVP 5 design or implementation.
+If any MVP 1-6 tests fail, fix them before starting MVP 7 design or implementation.
 
 ---
 
@@ -775,6 +776,10 @@ docs/mvps/mvp3-progress.md
 docs/mvps/mvp4-spec.md
 docs/mvps/mvp4-progress.md
 docs/mvps/mvp5-spec.md
+docs/mvps/mvp5-progress.md
+docs/mvps/mvp6-spec.md
+docs/mvps/mvp6-progress.md
+docs/mvps/mvp7-spec.md
 ```
 
 If names differ, locate equivalent files.
@@ -787,23 +792,23 @@ Run:
 pytest
 ```
 
-Then inspect whether MVPs 1-4 are implemented or only specified.
+Then inspect whether MVPs 1-6 are implemented or only specified.
 
 Update the status table in this handoff if needed.
 
-## Step 3: Do Not Start MVP 5 Until MVPs 1-4 Are Green
+## Step 3: Do Not Start MVP 7 Until MVPs 1-6 Are Green
 
 If tests fail, fix regressions first.
 
-## Step 4: Continue with MVP 5
+## Step 4: Continue with MVP 7
 
 Create:
 
 ```txt
-docs/mvps/mvp5-progress.md
+docs/mvps/mvp7-progress.md
 ```
 
-Do not implement MVP 5 before writing and reviewing the progress plan.
+Do not implement MVP 7 before writing and reviewing the progress plan.
 
 ## Step 5: Preserve Safety Boundaries
 
@@ -824,7 +829,7 @@ until the roadmap reaches those MVPs.
 
 # Next Roadmap
 
-MVP 4 is already specified and is the current merge boundary. The remaining roadmap source files are:
+MVP 6 is implemented. The remaining roadmap source files are:
 
 ```txt
 docs/mvps/mvp5-spec.md  - Worktree preparation
@@ -877,10 +882,7 @@ Do not:
 create one Hermes agent per repo
 move project policy into repo-local YAML
 return to /srv/agent-system as default root
-start MVP 5 before MVPs 1-4 are verified green
-add worktree creation before MVP 5
-run coding harnesses before MVP 6
-create PRs before implementation orchestration exists
+start MVP 7 before MVPs 1-6 are verified green
 add review ladders before MVP 7
 add auto-merge before review ladder and QA readiness exist
 silently create duplicate GitHub issues
@@ -897,7 +899,7 @@ bypass tests
 Use this exact instruction when handing off:
 
 ```txt
-Read docs/product/project-handoff.md first. Verify MVP 1-4 implementation status by running tests and inspecting the repo. Do not start MVP 5 until MVPs 1-4 are confirmed passing. If they are passing, create docs/mvps/mvp5-progress.md from docs/mvps/mvp5-spec.md using the same test-first, safety-gated style as previous MVPs.
+Read docs/product/project-handoff.md first. Verify MVP 1-6 implementation status by running tests and inspecting the repo. Do not start MVP 7 until MVPs 1-6 are confirmed passing. If they are passing, create docs/mvps/mvp7-progress.md from docs/mvps/mvp7-spec.md using the same test-first, safety-gated style as previous MVPs.
 ```
 
 ---

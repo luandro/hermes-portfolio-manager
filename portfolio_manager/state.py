@@ -243,6 +243,29 @@ ON maintenance_findings(project_id, skill_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_maintenance_findings_severity
 ON maintenance_findings(severity, status);
+
+CREATE TABLE IF NOT EXISTS implementation_jobs (
+  job_id TEXT PRIMARY KEY,
+  job_type TEXT NOT NULL CHECK(job_type IN ('initial_implementation','review_fix','qa_fix')),
+  project_id TEXT NOT NULL,
+  issue_number INTEGER,
+  worktree_id TEXT,
+  pr_number INTEGER,
+  review_stage_id TEXT,
+  source_artifact_path TEXT,
+  status TEXT NOT NULL CHECK(status IN ('planned','blocked','running','failed','succeeded','needs_user')),
+  harness_id TEXT,
+  started_at TEXT,
+  finished_at TEXT,
+  commit_sha TEXT,
+  artifact_path TEXT,
+  failure_reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_impl_jobs_proj_issue ON implementation_jobs(project_id, issue_number);
+CREATE INDEX IF NOT EXISTS idx_impl_jobs_status ON implementation_jobs(status);
 """
 
 # ---------------------------------------------------------------------------
