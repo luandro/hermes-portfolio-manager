@@ -28,6 +28,15 @@ class PreflightResult:
     source_artifact_path: Path | None = None
 
 
+def _persisted_prepared_sha(row: dict[str, object]) -> tuple[str | None, str | None]:
+    """Return the persisted prepared SHA and source column, if the row has one."""
+    for column in ("head_sha", "base_sha"):
+        value = row.get(column)
+        if isinstance(value, str) and value.strip():
+            return value.strip(), column
+    return None, None
+
+
 def _get_head_sha(path: Path) -> str | None:
     """Return the current HEAD commit SHA, or None on failure."""
     r = run_git(["rev-parse", "HEAD"], cwd=path, timeout=DEFAULT_TIMEOUTS["rev-parse"])
@@ -116,6 +125,16 @@ def preflight_initial_implementation(
         reasons.append("Source artifact (spec) not found")
 
     head_sha = _get_head_sha(wt_path)
+    persisted_sha, persisted_column = _persisted_prepared_sha(row)
+    if persisted_sha is not None:
+        if head_sha is None:
+            reasons.append(
+                f"Prepared HEAD mismatch: expected {persisted_sha!r} from worktree {persisted_column}, got 'unknown'"
+            )
+        elif head_sha != persisted_sha:
+            reasons.append(
+                f"Prepared HEAD mismatch: expected {persisted_sha!r} from worktree {persisted_column}, got {head_sha!r}"
+            )
 
     ok = len(reasons) == 0
     return PreflightResult(

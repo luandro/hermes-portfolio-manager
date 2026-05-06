@@ -106,7 +106,8 @@ def _setup_worktree(
     project_id: str = "my-project",
     issue_number: int = 42,
     branch_name: str = "agent/my-project/issue-42",
-    head_sha: str = "abc123",
+    head_sha: str | None = None,
+    base_sha: str | None = None,
     state: str = "clean",
 ) -> Path:
     """Insert a worktree row and create the directory on disk."""
@@ -123,6 +124,7 @@ def _setup_worktree(
         state=state,
         branch_name=branch_name,
         head_sha=head_sha,
+        base_sha=base_sha,
     )
     return wt_path
 
@@ -253,6 +255,59 @@ class TestPlanBlocksWhenPreflightFails:
 
         assert len(plan.blocked_reasons) > 0
         assert any("not found in SQLite" in r for r in plan.blocked_reasons)
+
+
+class TestPlanValidatesPersistedPreparedSha:
+    def test_plan_blocks_when_persisted_prepared_head_mismatches_current_head(
+        self, conn: sqlite3.Connection, tmp_root: Path
+    ) -> None:
+        _setup_worktree(conn, tmp_root, head_sha="prepared-sha")
+        _setup_source_artifact(tmp_root, conn)
+
+        with (
+            patch("portfolio_manager.implementation_planner.get_harness", return_value=_HARNESS),
+            patch("portfolio_manager.implementation_preflight.get_clean_state", return_value="clean"),
+            patch(
+                "portfolio_manager.implementation_preflight._get_branch_name",
+                return_value="agent/my-project/issue-42",
+            ),
+            patch("portfolio_manager.implementation_preflight._get_head_sha", return_value="current-sha"),
+        ):
+            plan = build_initial_plan(
+                conn,
+                tmp_root,
+                project_ref="my-project",
+                issue_number=42,
+                harness_id="forge",
+            )
+
+        assert len(plan.blocked_reasons) > 0
+        assert any("Prepared HEAD mismatch" in r for r in plan.blocked_reasons)
+
+    def test_plan_passes_when_persisted_prepared_head_matches_current_head(
+        self, conn: sqlite3.Connection, tmp_root: Path
+    ) -> None:
+        _setup_worktree(conn, tmp_root, head_sha="prepared-sha")
+        _setup_source_artifact(tmp_root, conn)
+
+        with (
+            patch("portfolio_manager.implementation_planner.get_harness", return_value=_HARNESS),
+            patch("portfolio_manager.implementation_preflight.get_clean_state", return_value="clean"),
+            patch(
+                "portfolio_manager.implementation_preflight._get_branch_name",
+                return_value="agent/my-project/issue-42",
+            ),
+            patch("portfolio_manager.implementation_preflight._get_head_sha", return_value="prepared-sha"),
+        ):
+            plan = build_initial_plan(
+                conn,
+                tmp_root,
+                project_ref="my-project",
+                issue_number=42,
+                harness_id="forge",
+            )
+
+        assert plan.blocked_reasons == []
 
 
 class TestPlanReturnsRequiredChecksFromHarnessConfig:

@@ -38,6 +38,18 @@ def _git(*args: str, cwd: Path) -> None:
     subprocess.run(["git", *args], cwd=cwd, env=_GIT_ENV, check=True, capture_output=True)
 
 
+def _git_stdout(*args: str, cwd: Path) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        env=_GIT_ENV,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
 def _make_db(root: Path) -> sqlite3.Connection:
     """Create an in-memory SQLite with full schema + worktree extensions."""
     conn = sqlite3.connect(":memory:")
@@ -108,6 +120,7 @@ def _setup_happy_path(tmp_path: Path) -> tuple[sqlite3.Connection, Path, Path]:
     conn.commit()
 
     # Insert worktree row
+    prepared_sha = _git_stdout("rev-parse", "HEAD", cwd=clone)
     upsert_issue_worktree(
         conn,
         project_id=PROJECT_ID,
@@ -115,6 +128,8 @@ def _setup_happy_path(tmp_path: Path) -> tuple[sqlite3.Connection, Path, Path]:
         path=str(clone),
         state="clean",
         branch_name="main",
+        head_sha=prepared_sha,
+        base_sha=prepared_sha,
     )
 
     return conn, root, clone
@@ -145,6 +160,48 @@ def test_preflight_passes_for_clean_worktree_matching_branch_and_existing_source
     assert result.head_sha is not None and len(result.head_sha) == 40
     assert result.source_artifact_path is not None
     assert result.source_artifact_path.is_file()
+
+
+def test_preflight_blocks_when_prepared_head_metadata_is_stale(tmp_path: Path) -> None:
+    conn, root, clone = _setup_happy_path(tmp_path)
+    (clone / "README.md").write_text("changed after prepare\n", encoding="utf-8")
+    _git("add", "README.md", cwd=clone)
+    _git("commit", "-m", "advance prepared worktree", cwd=clone)
+
+    result = preflight_initial_implementation(
+        conn,
+        project_id=PROJECT_ID,
+        issue_number=ISSUE_NUMBER,
+        expected_branch="main",
+        root=root,
+    )
+
+    assert not result.ok
+    assert any("Prepared HEAD mismatch" in r for r in result.reasons)
+
+
+def test_preflight_uses_persisted_base_sha_when_head_sha_missing(tmp_path: Path) -> None:
+    conn, root, clone = _setup_happy_path(tmp_path)
+    prepared_sha = _git_stdout("rev-parse", "HEAD", cwd=clone)
+    conn.execute(
+        "UPDATE worktrees SET head_sha=NULL, base_sha=? WHERE project_id=? AND issue_number=?",
+        (prepared_sha, PROJECT_ID, ISSUE_NUMBER),
+    )
+    conn.commit()
+    (clone / "README.md").write_text("changed after prepare\n", encoding="utf-8")
+    _git("add", "README.md", cwd=clone)
+    _git("commit", "-m", "advance prepared worktree", cwd=clone)
+
+    result = preflight_initial_implementation(
+        conn,
+        project_id=PROJECT_ID,
+        issue_number=ISSUE_NUMBER,
+        expected_branch="main",
+        root=root,
+    )
+
+    assert not result.ok
+    assert any("Prepared HEAD mismatch" in r and "base_sha" in r for r in result.reasons)
 
 
 # ---------------------------------------------------------------------------

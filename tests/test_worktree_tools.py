@@ -236,6 +236,17 @@ def test_create_issue_executes_and_records_state(agent_root: Path, projects_yaml
     issue_path = agent_root / "worktrees" / "testproj-issue-11"
     assert issue_path.is_dir() and (issue_path / ".git").exists()
     assert (agent_root / "artifacts" / "worktrees" / "testproj" / "issue-11" / "result.json").exists()
+    from portfolio_manager.state import open_state
+    from portfolio_manager.worktree_state import get_worktree
+
+    conn = open_state(agent_root)
+    try:
+        row = get_worktree(conn, "issue:testproj:11")
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["head_sha"]
+    assert row["base_sha"] == row["head_sha"]
 
 
 def test_create_issue_idempotent_second_call_skipped(
